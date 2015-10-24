@@ -1,0 +1,188 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+PROCESSOR=1
+NMOTIFS=50
+LENGTH="8,10,12" ## recommended 7,8,9,10,11,12,13,14 (Andersson et al. 2014)
+REDUCE_THRESHOLD="0.6" ## argument in compareMotifs.pl (-reduceThreshold)  ## recommended 0.75 (Andersson et al. 2014)#INFO="1.5" ## argument in compareMotifs.pl (-info)
+#MIN_T=50 ## argument in compareMotifs.pl (-minT)
+PVALUE="0.01" ## recommended 1e-15 (Andersson et al. 2014)
+MIN_P_T=0 ## recommended 3 (Andersson et al. 2014)
+B=100 ## recommended 30 (Andersson et al. 2014)
+S=25 ## recommended 100 (Andersson et al. 2014)
+
+#### usage ####
+usage() {
+	echo Program: "motifDynAna (compute dynamics in the enrichment of motifs across multiple samples)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: motifDynAna -i <dir> -o <file> [OPTIONS]"
+	echo "Options:"
+    echo " -i <dir>    [directory containing result from prior run of motifAna script]"
+    echo "             [if multiple, seperate them by a comma]"
+    echo " -o <dir>    [output directory]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome for which to perform the analysis (default: mm9)]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
+    echo " -c <int>    [number of top motifs to analyze from each sample (default: 50)]"
+    echo " -t <string> [motif length (default=8,10,12)]"
+    echo " -u <float>  [similarity threshold used to remove similar motifs (default: 0.6)]"
+    echo " -v <float>  [remove motifs with information content less than # (default: not used)]"
+    echo " -w <int>    [remove motifs with less than # number of target instances (default: not used)]"
+    echo " -x <float>  [p-value cutoff (default: 0.01)]"
+    echo " -y <float>  [remove motifs with target percentage less than # (default: 0)]"
+    echo " -z <float>  [remove motifs with background percentage greater than # (default: 100)]"
+    echo " -n <int>    [number of motifs to optimize for each motif length (default: 25)]"
+    echo " -h          [help]"
+    echo
+    exit 0
+}
+
+#### parse options ####
+while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:h ARG; do
+	case "$ARG" in
+		i) INDIR=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+        c) NMOTIFS=$OPTARG;;
+        t) LENGTH=$OPTARG;;
+        u) REDUCE_THRESHOLD=$OPTARG;;
+        v) INFO=$OPTARG;;
+        w) MIN_T=$OPTARG;;
+        x) PVALUE=$OPTARG;;
+        y) MIN_P_T=$OPTARG;;
+        z) B=$OPTARG;;
+        n) S=$OPTARG;;
+        h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INDIR" -o -z "$OUTDIR" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+<<"COMMENT1"
+COMMENT1
+
+echo -n "Create directory structure... "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+if [ ! -d "$OUTDIR/motifs_logo" ]; then
+    mkdir -p $OUTDIR/motifs_logo
+fi
+echo "done"
+
+echo -n "Populating files based on input genome, $GENOME (`date`).. "
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.simpleRepeat.gz"
+    GENOME_MOTIF="mm9r"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg19.simpleRepeat.gz"
+    GENOME_MOTIF="hg19r"
+elif [ "$GENOME" == "danRer7" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.simpleRepeat.gz"
+    GENOME_MOTIF="danRer7r"
+else
+    echo "Presently the program only support analysis for mm9, hg19 or danRer7"
+    echo
+    usage
+fi
+echo done
+
+## parse input directories
+oIFS=$IFS
+IFS=","
+INDIRS=($INDIR)
+IFS=$oIFS
+
+<<"COMMENT"
+COMMENT
+echo -n "Parse through each input directory to create a list of all motifs found at any motifAna run (`date`).. "
+for (( i=0; i<${#INDIRS[@]}; i++)); do
+    ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
+    head -n $NMOTIFS ${INDIRS[$i]}/DENOVO_MOTIFS.TXT | perl -ane 'print "'$ID'\t$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n";'
+done > $OUTDIR/DENOVO_MOTIFS.TXT
+#done | perl -ane '$id=$F[1]; $id=~s/^.*BestGuess\://g; $id=~s/\s+.*//g; $score=$id; $score=~s/^.*\(//g; $score=~s/\)//g; $id=~s/\(.*//g; if(defined($seen{$id}) && $score > $seen{$id}{'score'}) { $seen{$id}{'score'}=$score; $seen{$id}{'entry'}=$_; } elsif(!defined($seen{$id})) { $seen{$id}{'score'}=$score; $seen{$id}{'entry'}=$_; } END { foreach(keys(%seen)) { print "$seen{$_}{'entry'}"; } }' > $OUTDIR/DENOVO_MOTIFS.TXT
+
+for MOTIF_FILE in $(cut -f 6 $OUTDIR/DENOVO_MOTIFS.TXT); do
+    cat $MOTIF_FILE
+done > $OUTDIR/DENOVO_MOTIFS.MOTIFS
+echo "done"
+
+echo -n "Parse through each input directory to compute enrichment of motifs (`date`).. "
+ADDITIONAL_ARGUMENT=""
+echo -n "Determine all TFBS motifs enriched in the input regions... "
+if [ ! -z "$INFO" ]; then
+    ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -info $INFO"
+fi
+if [ ! -z "$MIN_T" ]; then
+    ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -minT $MIN_T"
+fi
+
+for (( i=0; i<${#INDIRS[@]}; i++)); do
+    ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
+    findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]} -mcheck $OUTDIR/DENOVO_MOTIFS.MOTIFS -mknown $OUTDIR/DENOVO_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT
+
+    TARGET_TOTAL=$(grep "^>" ${INDIRS[$i]}/target.fa | wc -l)
+    BKG_TOTAL=$(grep "^>" ${INDIRS[$i]}/background.fa | wc -l)
+    if [ -f "${INDIRS[$i]}/knownResults.html" ]; then
+        grep -v Name ${INDIRS[$i]}/knownResults.txt | perl -ane '$pval=sprintf("%0.20f", $F[2]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[6]=~s/\%//g; $F[8]=~s/\%//g; if($pval < $my_pval && $F[6]>='$MIN_P_T' && $F[8]<='$B') { chomp($_); $_=~s/\%//g; print "'$ID'\t$_\t'$TARGET_TOTAL'\t'$BKG_TOTAL'\n"; }'
+    fi
+done | sort -k 1,1 -k 2,2 > $OUTDIR/MOTIF_ENRICHMENT_DYNAMICS.TXT
+echo "done"
+
+<<"COMMENT"
+echo -n "Parse through each input directory to compute enrichment of motifs (`date`).. "
+for (( i=0; i<${#INDIRS[@]}; i++)); do
+    ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
+
+    if [ -f "${INDIRS[$i]}/target.fa" -a -f "${INDIRS[$i]}/background.fa" ]; then
+        homer2 find -i ${INDIRS[$i]}/target.fa -m $OUTDIR/DENOVO_MOTIFS.MOTIFS 2> /dev/null | perl -ane '$id="$F[0]_$F[3]"; print "$id\n";' | sort | uniq > $OUTDIR/$ID.target.fa.homer
+        homer2 find -i ${INDIRS[$i]}/background.fa -m $OUTDIR/DENOVO_MOTIFS.MOTIFS 2> /dev/null | perl -ane '$id="$F[0]_$F[3]"; print "$id\n";' | sort | uniq > $OUTDIR/$ID.background.fa.homer
+
+        TARGET_TOTAL=$(grep "^>" ${INDIRS[$i]}/target.fa | wc -l)
+        BKG_TOTAL=$(grep "^>" ${INDIRS[$i]}/background.fa | wc -l)
+        for MOTIF in $(grep "^>" $OUTDIR/DENOVO_MOTIFS.MOTIFS | cut -f 2); do
+            TARGET_COUNT=$(grep $MOTIF $OUTDIR/$ID.target.fa.homer | wc -l)
+            BKG_COUNT=$(grep $MOTIF $OUTDIR/$ID.background.fa.homer | wc -l)
+            echo "$MOTIF $TARGET_COUNT $TARGET_TOTAL $BKG_COUNT $BKG_TOTAL"
+        done | perl -ane 'if($F[1]==0) { $F[1]=1; } if($F[3]==0) { $F[3]=1; } $obs=$F[1]/$F[2]; $exp=$F[3]/$F[4]; $log_odd_score=sprintf("%0.2f", log($obs/$exp)/log(2)); $obs=sprintf("%0.2f", $obs); $exp=sprintf("%0.2f", $exp); print "$F[0]\t$obs\t$exp\t$log_odd_score\t'$ID'\t$F[1]\t$F[2]\t$F[3]\t$F[4]\n";' 
+
+        rm $OUTDIR/$ID.target.fa.homer
+        rm $OUTDIR/$ID.background.fa.homer
+    fi
+done > $OUTDIR/MOTIF_ENRICHMENT_DYNAMICS.TXT
+echo "done"
+COMMENT
+
+echo -n "Plot motif dynamics (`date`).. "
+motifDynAna.R -i $OUTDIR/MOTIF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/motif_dynamics.pdf
+echo "done"
+
+echo -n "Plot logo for significant motifs (`date`).. "
+for motifInfo in $(cut -f 1,2,6 $OUTDIR/DENOVO_MOTIFS.TXT | perl -ane '$F[0]=~s/[^a-zA-Z0-9]+/_/g; $F[1]=~s/\(.*//g; $F[1]=~s/[^a-zA-Z0-9]+/_/g; $key="$F[0]_$F[1]"; if(!$seen{$key}) { print "$key#$F[2]\n"; $seen{$key}=1; }'); do
+    logoFile=$(echo $motifInfo | sed -E 's/\#.*//g');
+    motifFile=$(echo $motifInfo | sed -E 's/^.*\#//g');
+    motif2Logo.pl $motifFile -pdf -o $OUTDIR/motifs_logo/$logoFile;
+done
+echo "done"

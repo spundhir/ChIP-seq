@@ -1,0 +1,134 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9";
+GENE_ID_TYPE="SYMBOL"
+ANNOTATION="GOTERM_BP_ALL"
+PVALUE="0.05"
+MAXCLASS=20
+MINGENE=10
+
+#### usage ####
+usage() {
+echo Program: "goAna (perform gene ontology analysis on input gene list)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: goAna -i <file or stdin> -o <dir> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file containing gene list(s)]"
+    echo "             [single gene list format (default)]"
+    echo "             => column 1: <gene>; column 2: <fold change> (optional)"
+    echo "             [multiple gene list format (required with -c parameter)]"
+    echo "             => column 1: <gene>; column 2: <gene> ... column N: <gene>"
+    echo "             [multiple gene list format (required with -f parameter)]"
+    echo "             => column 1: <gene>; column 2: <class>"
+    echo " -o <dir>    [output directory]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome for which to perform the analysis (default: mm9)]"
+    echo " -d <string> [input gene id type (default: SYMBOL)]"
+    echo "             [options: ENTREZID, PFAM, IPI, PROSITE, ACCNUM, ALIAS, ENZYME,]"
+    echo "             [         MAP, PATH, PMID, REFSEQ, SYMBOL, UNIGENE, ENSEMBL,  ]"
+    echo "             [         ENSEMBLPROT, ENSEMBLTRANS, GENENAME, UNIPROT, GO,   ]"
+    echo "             [         EVIDENCE, ONTOLOGY, GOALL, EVIDENCEALL, ONTOLOGYALL,]"
+    echo "             [         OMIM, UCSCKG                                        ]"
+    echo " -a <string> [annotation type (default: GOTERM_BP_ALL)]"
+    echo "             [if multiple separate then by a comma]"
+    echo "             [options: DAVID, GOTERM_BP_ALL, GOTERM_MF_ALL, GOTERM_CC_ALL,]"
+    echo "                       KEGG_PATHWAY, DISEASE_ONTOLOGY, REACTOME_PATHWAY]"
+    echo "             [run goAna.R -l for complete list of annotations available]"
+    echo " -p <float>  [p-value (default: 0.05)]"
+    echo " -m <int>    [maximum number of go classes to plot (default: 20)]"
+    echo " -n <int>    [minimum genes in a go class (default: 10)]"
+    echo " -c          [compare gene lists]"
+    echo " -f          [compare gene lists using formula (gene~class)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:o:g:d:a:p:m:n:cfh ARG; do
+	case "$ARG" in
+		i) GENEFILE=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        d) GENE_ID_TYPE=$OPTARG;;
+        a) ANNOTATION=$OPTARG;;
+        p) PVALUE=$OPTARG;;
+        m) MAXCLASS=$OPTARG;;
+        n) MINGENE=$OPTARG;;
+        c) COMPARE_CLUSTER=1;;
+        f) COMPARE_CLUSTER_FORMULA=1;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$GENEFILE" -o -z "$OUTDIR" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+<<"COMMENT1"
+COMMENT1
+echo -n "Create directory structure... "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+echo "done"
+
+echo -n "Populating files based on input genome, $GENOME (`date`).. "
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.simpleRepeat.gz"
+    GENOME_NAME="mouse"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg19.simpleRepeat.gz"
+    GENOME_NAME="human"
+else
+    echo "Presently the program only support analysis for mm9, hg19 or danRer7"
+    echo
+    usage
+fi
+echo "done"
+
+## determine, if the input genes are from a file or stdin
+echo -n "Create gene file depending on if the input is from file or STDIN (`date`).. "
+if [ -f "$GENEFILE" ]; then
+    zless $GENEFILE | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/GENES_INTEREST.TXT 
+elif [ "$GENEFILE" == "stdin" ]; then
+        while read LINE; do echo ${LINE}; done | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/GENES_INTEREST.TXT
+else
+    usage
+fi
+echo "done"
+
+echo "Initiate GO analysis (`date`).. "
+if [ ! -z "$COMPARE_CLUSTER" ]; then
+    for ANNO in $(echo $ANNOTATION | sed 's/\,/ /g'); do
+        goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -n $MINGENE -c -s $OUTDIR/go_analysis_compareCluster.Rsession
+    done
+elif [ ! -z "$COMPARE_CLUSTER_FORMULA" ]; then
+    for ANNO in $(echo $ANNOTATION | sed 's/\,/ /g'); do
+        goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -m $MAXCLASS -n $MINGENE -f -s $OUTDIR/go_analysis_compareClusterCompare.Rsession
+    done
+else
+    for ANNO in $(echo $ANNOTATION | sed 's/\,/ /g'); do
+        goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -m $MAXCLASS -n $MINGENE -s $OUTDIR/go_analysis_list.Rsession
+    done
+fi
+echo "done"
+

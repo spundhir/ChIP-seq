@@ -1,0 +1,30 @@
+## old version
+-nms
+
+## new version
+-c 4 -o collapse
+
+## CHECK-1
+blockbuster.x -minClusterHeight 20 -minBlockHeight 20 -distance 70 -scale 0.6 -blockHeight abs h3k4me3_gm12878_Rep1.bam.tmpxchr11 | grep -v "^>" | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[5]\t$F[6]\t$F[4]\n";' | sortBed -i stdin > input.mergeBed
+
+## old version of mergeBed
+cat input.mergeBed | ~/software/bedtools2-2.19.1/bin/mergeBed -nms -scores sum -i - | perl -ane 'printf("%s\t%s\t%s\t%0.0f\n", $F[0], $F[1], $F[2], $F[4]);' > t1
+
+## new version of mergeBed
+input.mergeBed | bedtools merge -c 5 -o sum -i - | perl -ane 'printf("%s\t%s\t%s\t%0.0f\n", $F[0], $F[1], $F[2], $F[3]);' > t2
+
+## CHECK-2
+scp /home/pundhir/project/chip-seq-analysis/analysis/peak_calling_histone/human/h3k4me3_helas3/nfr/rep1/h3k4me3_helas3_Rep1.bam.tmpxchr11 .
+
+wc -l h3k4me3_helas3_Rep1.bam.bgxchr11
+1740 h3k4me3_helas3_Rep1.bam.bgxchr11
+
+## old version of mergeBed
+sortBed -i h3k4me3_helas3_Rep1.bam.tmpxchr11 | ~/software/bedtools2-2.19.1/bin/mergeBed -nms -scores sum -i - | perl -ane '$F[3]=~s/\,.*//g; $F[4]=sprintf("%0.2f", $F[4]); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t+\n";' > t1
+
+## old version of mergeBed
+sortBed -i h3k4me3_helas3_Rep1.bam.tmpxchr11 | bedtools merge -c 4,5 -o distinct,sum -i - | perl -ane '$F[3]=~s/\,.*//g; $F[4]=sprintf("%0.2f", $F[4]); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t+\n";' > t2
+
+wc -l t1 or t2 => 1740
+
+vimdiff t2 /home/pundhir/project/chip-seq-analysis/analysis/peak_calling_histone/human/h3k4me3_helas3/nfr/rep1/h3k4me3_helas3_Rep1.bam.bgxchr11

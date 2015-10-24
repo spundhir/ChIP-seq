@@ -1,0 +1,122 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+WINDOW=12500
+
+#### usage ####
+usage() {
+    echo
+	echo Program: "bed2superEnhancer (predict super enhancers based on read density of input ChIP-seq data)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2superEnhancer -i <file> -o <file> -a <file> -b <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file in BED format (can be stdin)]"
+    echo " -o <file>   [output file]"
+    echo " -a <file>   [input BAM file corresponding to ChIP-seq data]"
+    echo "             [if multiple, seperate them by a comma]"
+    echo " -b <file>   [input BAM file corresponding to control ChIP-seq data]"
+    echo "             [if multiple, seperate them by a comma]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo " -w <int>    [window size within which to merge coordinates (default: 12500)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:o:a:b:g:w:h ARG; do
+	case "$ARG" in
+		i) BEDFILE=$OPTARG;;
+        o) OUTFILE=$OPTARG;;
+		a) BAMFILE=$OPTARG;;
+		b) BAMFILE_CONTROL=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        w) WINDOW=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$BEDFILE" -o -z "$OUTFILE" -o -z "$BAMFILE" -o -z "$BAMFILE_CONTROL" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+OUTDIR=$(echo $OUTFILE | perl -ane '$_=~s/\/[^\/]+$//g; print $_;')
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+
+## populating files based on input genome
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+else
+    echo "Presently the program only support analysis for mm9 or hg19"
+echo
+    usage
+fi
+
+## parse input bam files in an array
+oIFS=$IFS
+IFS=","
+BAMFILES=($BAMFILE)
+BAMFILES_COUNT=${#BAMFILES[@]}
+IFS=$oIFS
+
+## index bam files, if does not exist
+for(( i=0; i<$BAMFILES_COUNT; i++ )); do
+    if [ ! -f "${BAMFILES[$i]}.bai" ]; then
+        samtools index ${BAMFILES[$i]} &
+    fi
+done
+wait
+
+## create temporary BED file if input is from stdin
+if [ "$BEDFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    BEDFILE=$TMP
+fi
+
+if [ ! -f "$OUTFILE" ]; then
+    if [ "$(($BAMFILES_COUNT%2))" -eq 0 ]; then
+        paste <(sortBed -i $BEDFILE | mergeBed -i stdin -d $WINDOW | bed2coverage -i stdin -j $BAMFILE,$BAMFILE_CONTROL -m -v 1 -g mm9) <(sortBed -i $BEDFILE | mergeBed -i stdin -d $WINDOW | bed2expr -i stdin -j $BAMFILE,$BAMFILE_CONTROL -d -v 1 -g mm9)
+    else
+        paste <(sortBed -i $BEDFILE | mergeBed -i stdin -d $WINDOW | bed2coverage -i stdin -j $BAMFILE,$BAMFILE_CONTROL -m -v 0 -g mm9) <(sortBed -i $BEDFILE | mergeBed -i stdin -d $WINDOW | bed2expr -i stdin -j $BAMFILE,$BAMFILE_CONTROL -d -v 0 -g mm9)
+    fi | perl -ane '$normExpr=$F[3]-$F[4]; $rawExpr=$F[8]-$F[9]; if($normExpr > 0 && $rawExpr > 0) { chomp($_); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[8]\t$F[9]\t$normExpr\t$rawExpr\n"; }' | sort -k 9n,9 > $OUTFILE
+else
+    sort -k 9n,9 $OUTFILE > "$OUTFILE".tmp
+    mv "$OUTFILE".tmp $OUTFILE
+fi
+
+THRESHOLD=$(bed2superEnhancer.py -i $OUTFILE -c)
+#echo "bed2superEnhancer.py -i $OUTFILE -c"; echo $THRESHOLD; exit
+
+bed2superEnhancer.R -i $OUTFILE -o "$OUTFILE".tmp -t $THRESHOLD
+mv "$OUTFILE".tmp $OUTFILE
+
+OUTFILE1=$(echo $OUTFILE | perl -ane '$_=~s/\..*//g; print $_;')
+grep -w Yes $OUTFILE | sortBed -i stdin > $OUTFILE1"_sig.bed"
+
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi

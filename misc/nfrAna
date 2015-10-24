@@ -1,0 +1,288 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+OUTDIR="nfr";
+RANDOMDIR="nfr_random";
+WINUP=200
+WINDOWN=1300
+MINCLUSTERHEIGHT=20
+MINBLOCKHEIGHT=20
+DISTANCE=70
+SCALE="0.6"
+BLOCKHEIGHT="abs"
+MINNFRLENGTH=20
+MAXNFRLENGTH=1000
+NFR_THRESHOLD="0.05"
+GENOME="mm9"
+SHUFFLECOUNT="100000"
+
+#### usage ####
+usage() {
+	echo Program: "nfrAna (determine nucleosome free regions using histone marks (two replicates))"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: nfrAna -i <file> -j <file> -k <file> -l <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [mapped reads in BAM format (replicate 1)]"
+	echo " -j <file>   [mapped reads in BAM format (replicate 2)]"
+	echo " -k <file>   [optimal histone peaks region (regionPeak file)]"
+	echo " -l <file>   [optimal histone peaks summit (summit file(s)]"
+	echo "             [if multiple, seperate them by a comma]"
+    echo "[OPTIONS]"
+    echo " -o <dir>    [output directory to store results (default: ./nfr)"
+    echo " -r <dir>    [output directory for randomly shuffled NFR (default: ./nfr_random)"
+    echo " -f <file>   [optimal TF (cebpa) peaks summit (summit file)]"
+    echo "             [used to optimize -u, -d, -c and -e parameters]"
+    echo " -m <string> [genome (default: mm9)]"
+    echo " -p          [run in parallel by dividing summit file into mutliple smaller summit files]"
+    echo " -u <int>    [nucleotides upstream to summit (default: 200)]"
+    echo " -d <int>    [nucleotides downstream to summit (default: 1300)]"
+    echo " -c <int>    [minimum number of read in the block group (default: 20)]"
+    echo " -e <int>    [minimum number of read in the block (default: 20)]"
+    echo " -x <int>    [maximum distance between the blocks (default: 70)]"
+    echo " -s <float>  [scale to define blocks (default: 0.6)]"
+    echo " -g <int>    [block height (abs or rel) (default: abs)]"
+    echo " -n <int>    [minimum length of nucleosome free region (default: 20)]"
+    echo " -v <int>    [maximum length of nucleosome free region (default: 1000)]"
+    echo " -t <float>  [FDR at which to consider a NFR as significant (default: 0.05)]"
+    echo " -u <int>    [number of times NFR regions should be shuffled to compute p-values (default: 100000)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:k:l:o:r:f:m:pu:d:c:e:x:s:g:n:v:t:u:h ARG; do
+	case "$ARG" in
+		i) REP1=$OPTARG;;
+		j) REP2=$OPTARG;;
+		k) PEAKREGION=$OPTARG;;
+		l) PEAKSUMMIT=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        r) RANDOMDIR=$OPTARG;;
+        f) TFSUMMIT=$OPTARG;;
+        m) GENOME=$OPTARG;;
+        p) PARALLEL=1;;
+        u) WINUP=$OPTARG;;
+        d) WINDOWN=$OPTARG;;
+        c) MINCLUSTERHEIGHT=$OPTARG;;
+        e) MINBLOCKHEIGHT=$OPTARG;;
+        x) DISTANCE=$OPTARG;;
+        s) SCALE=$OPTARG;;
+        g) BLOCKHEIGHT=$OPTARG;;
+        n) MINNFRLENGTH=$OPTARG;;
+        v) MAXNFRLENGTH=$OPTARG;;
+        t) NFR_THRESHOLD=$OPTARG;;
+        u) SHUFFLECOUNT=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ ! -f "$REP1" -o ! -f "$REP2" -o ! -f "$PEAKREGION" -o ! "$PEAKSUMMIT" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+echo -n "Create directory structure.. "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir $OUTDIR
+    mkdir $OUTDIR/rep1/
+    mkdir $OUTDIR/rep2/
+fi
+echo "done"
+
+echo -n "Populating files based on input genome ($GENOME)... "
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.simpleRepeat.gz"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg19.simpleRepeat.gz"
+else
+    echo "Presently the program only support analysis for mm9 or hg19"
+    echo
+    usage
+fi
+echo done
+
+<<"COMMENT1"
+COMMENT1
+## auto-compute the threshold for minimum number of reads in a block group
+if [ ! -s "optimizeThreshold/blockbuster_threshold.txt" ]; then
+    echo -n "Optimize the threshold for max length and min number of reads in a block group.. "
+    if [ -f "$TFSUMMIT" ]; then
+        blockbuster_threshold_nfr -i $REP1 -j $REP2 -k $PEAKREGION -l $TFSUMMIT -o optimizeThreshold -g $GENOME &>blockbuster_threshold_nfr.log
+    else
+        blockbuster_threshold_nfr -i $REP1 -j $REP2 -k $PEAKREGION -o optimizeThreshold -g $GENOME &>blockbuster_threshold_nfr.log
+    fi
+    echo "done"
+fi
+
+## initialize -u, -d, -c, -e parameters, if their optimal values are computed
+if [ -s "optimizeThreshold/blockbuster_threshold.txt" ]; then
+    echo -n "initialize -u, -d, -c, -e parameters (optimizeThreshold/blockbuster_threshold.txt exists).. "
+    HEIGHT_THRESHOLD=`grep -v "^\#" optimizeThreshold/blockbuster_threshold.txt | cut -f 4`;
+    MINCLUSTERHEIGHT=$HEIGHT_THRESHOLD
+    MINBLOCKHEIGHT=$HEIGHT_THRESHOLD
+
+    LENGTH_THRESHOLD=`grep -v "^\#" optimizeThreshold/blockbuster_threshold.txt | cut -f 3`;
+    WINDOWN=$(((($LENGTH_THRESHOLD*2)+400)-$WINUP))
+    echo "done"
+fi
+
+## print header with choosen parameters
+echo "#input BAM file (Rep1): $REP1
+#input BAM file (Rep2): $REP2
+#input histone peak region file: $PEAKREGION
+#input histone peaks summit file: $PEAKSUMMIT
+#output directory: $OUTDIR
+#output directory for randomly shuffled NFR: $RANDOMDIR
+#nucleotides upstream to summit: $WINUP
+#nucleotides downstream to summit: $WINDOWN
+#minimum reads in block group: $MINCLUSTERHEIGHT
+#minimum reads in block: $MINBLOCKHEIGHT
+#minimum distance between the blocks: $DISTANCE
+#scale to define blocks: $SCALE
+#block height: $BLOCKHEIGHT
+#minimum length of NFR: $MINNFRLENGTH
+#maximum length of NFR: $MAXNFRLENGTH
+#FDR at which to select significant NFR: $NFR_THRESHOLD
+#optimal TF peak summit file: $TFSUMMIT
+#reference genome: $GENOME" > $OUTDIR/PARAMETERS
+
+## index bam files and estimate size factors
+echo -n "Create index of input BAM files.. "
+if [ ! -e "$REP1.bai" ]; then
+    samtools index $REP1
+fi
+if [ ! -e "$REP2.bai" ]; then
+    samtools index $REP2
+fi
+echo "done"
+
+echo -n "Compute size factor for each replicate.. "
+if [ ! -e "$OUTDIR/sizeFactorCount" ]; then
+    estimateSizeFactor.pl -o b -b $REP1,$REP2 -x $PEAKREGION -r $OUTDIR/sizeFactorCount
+fi
+
+if [ ! -e "$OUTDIR/sizeFactor" ]; then
+    estimateSizeFactor.pl -o c -r $OUTDIR/sizeFactorCount > $OUTDIR/sizeFactor
+fi
+echo "done"
+
+SIZEFACTOR_REP1=`head -n 1 $OUTDIR/sizeFactor | cut -f 2`;
+SIZEFACTOR_REP2=`head -n 2 $OUTDIR/sizeFactor | tail -n 1 | cut -f 2`;
+
+## merge submit peaks, if multiple
+PEAKSUMMIT=`echo $PEAKSUMMIT | perl -ane '$_=~s/\,/ /g; print $_;'`;
+#zless $PEAKSUMMIT | sortBed -i stdin | mergeBed.pl | intersectBed -a stdin -b $REPEAT_FILE -v > $OUTDIR/SUMMIT_FILE.BED;
+zless $PEAKSUMMIT | sortBed -i stdin | mergeBed.pl > $OUTDIR/SUMMIT_FILE.BED;
+PEAKSUMMIT="$OUTDIR/SUMMIT_FILE.BED"
+
+## input parameters are ready. start NFR analysis
+if [ -z "$PARALLEL" ]; then
+    echo -n "Predict nucleosome free regions (NFR) for replicate 1.. "
+    #echo -n "findNFR.pl -s $PEAKSUMMIT -b $REP1 -o $OUTDIR/rep1/ -z $SIZEFACTOR_REP1 -u $WINUP -d $WINDOWN -c $MINCLUSTERHEIGHT -k $MINBLOCKHEIGHT -x $DISTANCE -l $SCALE -g $BLOCKHEIGHT -n $MINNFRLENGTH -v $MAXNFRLENGTH"; exit;
+    NFRFILE_REP1=`findNFR.pl -s $PEAKSUMMIT -b $REP1 -o $OUTDIR/rep1/ -z $SIZEFACTOR_REP1 -u $WINUP -d $WINDOWN -c $MINCLUSTERHEIGHT -k $MINBLOCKHEIGHT -x $DISTANCE -l $SCALE -g $BLOCKHEIGHT -n $MINNFRLENGTH -v $MAXNFRLENGTH`;
+    echo "done"
+
+    echo -n "Predict nucleosome free regions (NFR) for replicate 2.. "
+    NFRFILE_REP2=`findNFR.pl -s $PEAKSUMMIT -b $REP2 -o $OUTDIR/rep2/ -z $SIZEFACTOR_REP2 -u $WINUP -d $WINDOWN -c $MINCLUSTERHEIGHT -k $MINBLOCKHEIGHT -x $DISTANCE -l $SCALE -g $BLOCKHEIGHT -n $MINNFRLENGTH -v $MAXNFRLENGTH`;
+    echo "done"
+
+    echo -n "Determine common NFR between replicate 1 and 2.. "
+    commonNFR.pl -i $NFRFILE_REP1 -j $NFRFILE_REP2 -k $REP1 -l $REP2 -m $SIZEFACTOR_REP1 -n $SIZEFACTOR_REP2 -o $OUTDIR -g $MINNFRLENGTH
+    echo "All done. Bye"
+else
+    echo -n "Split summit file(s) into multiple smaller files.. "
+    if [ ! -d "$OUTDIR/parallel" ]; then
+        mkdir $OUTDIR/parallel
+        mkdir $OUTDIR/common/
+    fi
+    #RUN_DIR=`pwd`;
+    #cd $OUTDIR/parallel
+    #split -a 2 -d -n l/20 $RUN_DIR/$PEAKSUMMIT
+    #cd "$RUN_DIR"
+    indexBed.sh -i $PEAKSUMMIT -o $OUTDIR/parallel -x x
+    echo "done"
+
+    echo -n "Predict nucleosome free regions (NFR) for replicate 1 and 2.. "
+
+    i=0;
+    for file in `ls $OUTDIR/parallel/x*`; do
+        FILE_SUFFIX+=( $(echo $file | sed 's/^.*\///g') );
+
+        findNFR.pl -s $file -b $REP1 -o $OUTDIR/rep1/ -z $SIZEFACTOR_REP1 -f ${FILE_SUFFIX[$i]} -u $WINUP -d $WINDOWN -c $MINCLUSTERHEIGHT -k $MINBLOCKHEIGHT -x $DISTANCE -l $SCALE -g $BLOCKHEIGHT -n $MINNFRLENGTH -v $MAXNFRLENGTH -p a && \
+        findNFR.pl -s $file -b $REP1 -o $OUTDIR/rep1/ -z $SIZEFACTOR_REP1 -f ${FILE_SUFFIX[$i]} -u $WINUP -d $WINDOWN -c $MINCLUSTERHEIGHT -k $MINBLOCKHEIGHT -x $DISTANCE -l $SCALE -g $BLOCKHEIGHT -n $MINNFRLENGTH -v $MAXNFRLENGTH -p b && \
+        findNFR.pl -s $file -b $REP1 -o $OUTDIR/rep1/ -z $SIZEFACTOR_REP1 -f ${FILE_SUFFIX[$i]} -u $WINUP -d $WINDOWN -c $MINCLUSTERHEIGHT -k $MINBLOCKHEIGHT -x $DISTANCE -l $SCALE -g $BLOCKHEIGHT -n $MINNFRLENGTH -v $MAXNFRLENGTH -p c &
+
+        findNFR.pl -s $file -b $REP2 -o $OUTDIR/rep2/ -z $SIZEFACTOR_REP2 -f ${FILE_SUFFIX[$i]} -u $WINUP -d $WINDOWN -c $MINCLUSTERHEIGHT -k $MINBLOCKHEIGHT -x $DISTANCE -l $SCALE -g $BLOCKHEIGHT -n $MINNFRLENGTH -v $MAXNFRLENGTH -p a && \
+        findNFR.pl -s $file -b $REP2 -o $OUTDIR/rep2/ -z $SIZEFACTOR_REP2 -f ${FILE_SUFFIX[$i]} -u $WINUP -d $WINDOWN -c $MINCLUSTERHEIGHT -k $MINBLOCKHEIGHT -x $DISTANCE -l $SCALE -g $BLOCKHEIGHT -n $MINNFRLENGTH -v $MAXNFRLENGTH -p b && \
+        findNFR.pl -s $file -b $REP2 -o $OUTDIR/rep2/ -z $SIZEFACTOR_REP2 -f ${FILE_SUFFIX[$i]} -u $WINUP -d $WINDOWN -c $MINCLUSTERHEIGHT -k $MINBLOCKHEIGHT -x $DISTANCE -l $SCALE -g $BLOCKHEIGHT -n $MINNFRLENGTH -v $MAXNFRLENGTH -p c &
+
+        i=$((i+1))
+    done
+
+    wait_for_jobs_to_finish "Predict nucleosome free regions (NFR) for replicate 1 and 2"
+    echo "done"
+
+    echo -n "Determine common NFR between replicate 1 and 2.. "
+    ID_REP1=`echo $REP1 | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;'`;
+    ID_REP2=`echo $REP2 | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;'`;
+
+    for (( i=0; i<${#FILE_SUFFIX[@]}; i++ )); do
+        commonNFR.pl -i $OUTDIR/rep1/$ID_REP1.nfr.uniq${FILE_SUFFIX[$i]} -j $OUTDIR/rep2/$ID_REP2.nfr.uniq${FILE_SUFFIX[$i]} -k $REP1 -l $REP2 -m $SIZEFACTOR_REP1 -n $SIZEFACTOR_REP2 -o $OUTDIR/common/ -g $MINNFRLENGTH -f ${FILE_SUFFIX[$i]} &
+    done
+
+    wait_for_jobs_to_finish "Determine common NFR between replicate 1 and 2"
+    echo "done"
+
+    echo "Concatenate all result files into one file.. "
+    ID=`echo $REP1 | perl -ane '$_=~s/^.*\///g; $_=~s/Rep.*$//g; $_=~s/\_$//g; print $_;'`;
+
+    zless $OUTDIR/common/$ID.All.nfrx* > $OUTDIR/$ID.All.nfr
+
+    nfr2ucsc.pl -i $OUTDIR/$ID.All.nfr > $OUTDIR/$ID.All.nfr.ucsc
+    echo "done"
+fi
+
+## nfr analysis for randomly distributed nfr regions (associate p values)
+echo -n "check if size factor files already exist.. "
+if [ -s "$OUTDIR/sizeFactor" ]; then
+    scp $OUTDIR/sizeFactor $RANDOMDIR/sizeFactor
+    scp $OUTDIR/sizeFactorCount $RANDOMDIR/sizeFactorCount
+fi
+echo "done"
+
+echo -n "create file containing genomic coordinates within which to randomly shuffle the NFRs.. "
+perl -ane '$start=$F[1]-'$WINUP'; $end=$start+('$WINUP'+'$WINDOWN'); print "$F[0]\t$start\t$end\t$F[3]\t$F[4]\n";' $OUTDIR/SUMMIT_FILE.BED > $RANDOMDIR/INCLREGION.BED
+echo "done"
+
+echo -n "nfr analysis for randomly distributed nfr regions.. "
+ID=`echo $REP1 | perl -ane '$_=~s/^.*\///g; $_=~s/Rep.*$//g; $_=~s/\_$//g; print $_;'`;
+
+if [ ! -s "$RANDOMDIR/RANDOM_NFRREGION.BED" -o ! -s "$RANDOMDIR/RANDOM_NFRREGION.BED.SCORE" ]; then
+    randomNfrAna -i $REP1 -j $REP2 -k $PEAKREGION -l $OUTDIR/$ID.All.nfr -m $GENOME -o $RANDOMDIR -p -f $RANDOMDIR/INCLREGION.BED -n $SHUFFLECOUNT &>nfrAna_random.log
+else
+    echo "($RANDOMDIR/RANDOM_NFRREGION.BED and $RANDOMDIR/RANDOM_NFRREGION.BED.SCORE already exists).. "
+fi
+
+Rscript /home/pundhir/software/myScripts/PredictNFR_v0.01/randomNfrAna.R $OUTDIR/$ID.All.nfr $RANDOMDIR/RANDOM_NFRREGION.BED.SCORE $OUTDIR/$ID.All.nfrP
+
+perl -ane 'if($F[15]<'$NFR_THRESHOLD') { print $_; }' $OUTDIR/$ID.All.nfrP > $OUTDIR/$ID.All.nfr.sig
+
+nfr2ucsc.pl -i $OUTDIR/$ID.All.nfr.sig > $OUTDIR/$ID.All.nfr.sig.ucsc
+echo "done"

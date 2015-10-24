@@ -1,0 +1,71 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "chip2geneExprCor (correlate gene expression with ChIP-seq defined peaks or NFRs)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: chip2geneExprCor -i <file> -j <file(s)>"
+	echo "Options:"
+	echo " -i <file>   [input file containing genomic coordinate of peaks or NFRs in BED format (can be stdin)]"
+    echo " -j <file>   [input file containing gene expression values]"
+    echo " -k <int>    [number of samples for which gene expression has been computed]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:k:g:h ARG; do
+	case "$ARG" in
+		i) INPUTCHIPFILE=$OPTARG;;
+        j) INPUTEXPRFILE=$OPTARG;;
+        k) NSAMPLES=$OPTARG;; 
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INPUTCHIPFILE" -o -z "$INPUTEXPRFILE" -o -z "$NSAMPLES" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+else
+    echo "Presently the program only support analysis for mm9 or hg19"
+    echo
+    usage
+fi
+
+## compute number of columns in input chip file
+if [ "$INPUTCHIPFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do echo ${LINE}; done | perl -ane '$line=(); foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n"; '> $TMP
+    INPUTCHIPFILE=$TMP
+fi
+
+NCOL_CHIP=$(cat $INPUTCHIPFILE | head -n 1 | perl -ane 'print scalar(@F);')
+NCOL_EXPR=$(cat $INPUTEXPRFILE | head -n 1 | perl -ane 'print scalar(@F);')
+
+COL_EXPR=$(perl -e '$col="5,13,"; $end='$NCOL_CHIP'+'$NCOL_EXPR'; $start=$end-'$NSAMPLES'; for($i=$start+1; $i<=$end; $i++) { $col.="$i,"; } $col=~s/\,$//g; print $col;')
+
+COL_OUT=$(perl -e '$col="distinct,distinct,"; $end='$NCOL_CHIP'+'$NCOL_EXPR'; $start=$end-'$NSAMPLES'; for($i=$start; $i<$end; $i++) { $col.="sum,"; } $col=~s/\,$//g; print $col;')
+
+#echo "intersectBed -a $INPUTCHIPFILE -b <(cat $INPUTEXPRFILE | perl -ane '\$start='$NCOL_EXPR'-'$NSAMPLES'; \$end='$NCOL_EXPR'-1; \$sum=0; foreach(@F[\$start..\$end]) { \$sum+=\$_; } if(\$sum>=0) { print \$_; }') -wo | sortBed -i stdin | mergeBed -i stdin -c $COL_EXPR -o $COL_OUT"; exit
+intersectBed -a $INPUTCHIPFILE -b <(cat $INPUTEXPRFILE | perl -ane '$start='$NCOL_EXPR'-'$NSAMPLES'; $end='$NCOL_EXPR'-1; $sum=0; foreach(@F[$start..$end]) { $sum+=$_; } if($sum>=0) { print $_; }') -wo | sortBed -i stdin | mergeBed -i stdin -c $COL_EXPR -o $COL_OUT
+
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
+exit

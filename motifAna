@@ -1,0 +1,191 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9";
+MODE=1;
+TFBS="/home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe.motifs"
+LIST="1,2"
+PROCESSOR=1
+LENGTH="8,10,12" ## recommended 7,8,9,10,11,12,13,14 (Andersson et al. 2014)
+REDUCE_THRESHOLD="0.6" ## argument in compareMotifs.pl (-reduceThreshold)  ## recommended 0.75 (Andersson et al. 2014)
+#INFO="1.5" ## argument in compareMotifs.pl (-info)
+#MIN_T=50 ## argument in compareMotifs.pl (-minT)
+PVALUE="0.01" ## recommended 1e-15 (Andersson et al. 2014)
+MIN_P_T=0 ## recommended 3 (Andersson et al. 2014)
+B=100 ## recommended 30 (Andersson et al. 2014)
+S=25 ## recommended 100 (Andersson et al. 2014)
+
+#### usage ####
+usage() {
+	echo Program: "motifAna (annotate genomic regions for motifs corresponding to various TFBS)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: motifAna -i <file> -o <dir> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file having genomic regions in BED format (or stdin)]"
+    echo " -o <dir>    [output directory to store results]"
+    echo "[OPTIONS]"
+    echo " -m <int>    [running mode (default: 1)]"
+    echo "             [mode 1: Determine all TFBS motifs enriched in the input regions]"
+    echo "              -s <file>   [input file having PWM of TFBS motifs]"
+    echo "                          [default: /home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe.motifs]"
+    echo "              -t <string> [motif length (default=8,10,12)]"
+    echo "              -u <float>  [similarity threshold used to remove similar motifs (default: 0.6)]"
+    echo "              -v <float>  [remove motifs with information content less than # (default: not used)]"
+    echo "              -w <int>    [remove motifs with less than # number of target instances (default: not used)]"
+    echo "              -x <float>  [p-value cutoff (default: 0.01)]"
+    echo "              -y <float>  [remove motifs with target percentage less than # (default: 0)]"
+    echo "              -z <float>  [remove motifs with background percentage greater than # (default: 100)]"
+    echo "              -n <int>    [number of motifs to optimize for each motif length (default: 25)]"
+    echo "              -b <file>   [custom background file]"
+    echo "             [mode 2: analyze the enrichment of specific TFBS motifs in the input regions]"
+    echo "              -l <file>   [motif file for which enrichment will be analyzed]"
+    echo "                          [if multiple, separate them by a comma]"
+    echo "              -f          [output file as histogram (default: annotation)]"
+    echo " -g <string> [genome for which to perform the analysis (default: mm9)]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:g:p:fh ARG; do
+	case "$ARG" in
+		i) BEDFILE=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        m) MODE=$OPTARG;;
+        s) TFBS=$OPTARG;;
+        t) LENGTH=$OPTARG;;
+        u) REDUCE_THRESHOLD=$OPTARG;;
+        v) INFO=$OPTARG;;
+        w) MIN_T=$OPTARG;;
+        x) PVALUE=$OPTARG;;
+        y) MIN_P_T=$OPTARG;;
+        z) B=$OPTARG;;
+        n) S=$OPTARG;;
+        b) BKG_FILE=$OPTARG;;
+        l) LIST=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+        f) FORMAT_HIST=1;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$BEDFILE" -o -z "$OUTDIR" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+<<"COMMENT1"
+COMMENT1
+echo -n "Create directory structure... "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+echo "done"
+
+echo -n "Populating files based on input genome, $GENOME (`date`).. "
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.simpleRepeat.gz"
+    GENOME_MOTIF="mm9r"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg19.simpleRepeat.gz"
+    GENOME_MOTIF="hg19r"
+elif [ "$GENOME" == "danRer7" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.simpleRepeat.gz"
+    GENOME_MOTIF="danRer7r"
+else
+    echo "Presently the program only support analysis for mm9, hg19 or danRer7"
+    echo
+    usage
+fi
+echo done
+
+## determine, if the input regions are from a file or stdin
+echo -n "Create region file depending on if the input is from file or STDIN... "
+if [ -f "$BEDFILE" ]; then
+    zless $BEDFILE | perl -ane 'BEGIN { $counter=1; } $line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$F[0]\t$F[1]\t$F[2]\tREGION$counter\t1\t.\n"; $counter++;' > $OUTDIR/REGIONS_INTEREST.bed
+elif [ "$BEDFILE" == "stdin" ]; then
+    while read LINE; do echo ${LINE}; done | perl -ane 'BEGIN { $counter=1; } $line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$F[0]\t$F[1]\t$F[2]\tREGION$counter\t1\t.\n"; $counter++;' > $OUTDIR/REGIONS_INTEREST.bed
+else
+    usage
+fi
+echo "done"
+
+## determine motifs at input genomic regions
+if [ "$MODE" -eq 1 ]; then
+    ADDITIONAL_ARGUMENT=""
+    echo -n "Determine all TFBS motifs enriched in the input regions... "
+    if [ ! -z "$INFO" ]; then
+        ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -info $INFO"
+    fi
+    if [ ! -z "$MIN_T" ]; then
+        ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -minT $MIN_T"
+    fi
+
+    if [ -z "$BKG_FILE" ]; then
+        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS -mknown $TFBS -p $PROCESSOR -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -dumpFasta -S $S $ADDITIONAL_ARGUMENT &> $OUTDIR/findMotifs.log
+    else
+        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS -mknown $TFBS -p $PROCESSOR -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -dumpFasta -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE &> $OUTDIR/findMotifs.log
+    fi
+    echo "done"
+
+    echo -n "Create final output files (DENOVO_MOTIFS.TXT, KNOWN_MOTIFS.TXT)... "
+    REGIONS_INTEREST_COUNT=$(cat $OUTDIR/REGIONS_INTEREST.bed | wc -l)
+    if [ -f "$OUTDIR/homerResults.html" ]; then
+        grep png $OUTDIR/homerResults.html | grep -vE ">\*<" | perl -ane '$_=~s/<tr><td>//gi; $_=~s/<\/td><td>/\t/gi; $_=~s/<\/td><\/tr>//gi; $_=~s/^[0-9]*\s+//g; print $_;' | perl -an -F'/\t/' -e '$F[0]=~s/^.*\=\"//g; $F[0]=~s/\".*//g; $F[0]=~s/\.logo.*//g; $F[6]=~s/\<BR.*//g; print "$F[6]\t$F[1]\t$F[3]\t$F[4]\t'$OUTDIR/'$F[0].motif\t'$REGIONS_INTEREST_COUNT'\n";' | perl -ane '$pval=sprintf("%0.20f", $F[1]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[2]=~s/\%//g; $F[3]=~s/\%//g; if($pval < $my_pval && $F[2]>='$MIN_P_T' && $F[3]<='$B') { print "$_"; }' > $OUTDIR/DENOVO_MOTIFS.TXT
+    else
+        touch $OUTDIR/DENOVO_MOTIFS.TXT
+    fi
+    if [ -f "$OUTDIR/knownResults.html" ]; then
+        grep png $OUTDIR/knownResults.html | grep -vE ">\*<" | perl -ane '$_=~s/<tr><td>//gi; $_=~s/<\/td><td>/\t/gi; $_=~s/<\/td><\/tr>//gi; $_=~s/^[0-9]*\s+//g; print $_;' | perl -an -F'/\t/' -e '$F[0]=~s/^.*\=\"//g; $F[0]=~s/\".*//g; $F[0]=~s/\.logo.*//g; print "$F[1]\t$F[2]\t$F[6]\t$F[8]\t'$OUTDIR/'$F[0].motif\t'$REGIONS_INTEREST_COUNT'\n";' | perl -ane '$pval=sprintf("%0.20f", $F[1]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[2]=~s/\%//g; $F[3]=~s/\%//g; if($pval < $my_pval && $F[2]>='$MIN_P_T' && $F[3]<='$B') { print "$_"; }' > $OUTDIR/KNOWN_MOTIFS.TXT
+    else
+        touch $OUTDIR/KNOWN_MOTIFS.TXT
+    fi
+    if [ -f "$OUTDIR/DENOVO_MOTIFS.TXT" -a -f "$OUTDIR/KNOWN_MOTIFS.TXT" ]; then
+        cat $OUTDIR/DENOVO_MOTIFS.TXT $OUTDIR/KNOWN_MOTIFS.TXT | perl -ane '$F[0]=~s/\(.*//g; if(!$seen{$F[0]}) { print $_; $seen{$F[0]}=1; }' > $OUTDIR/UNIQ_MOTIFS.TXT
+    fi
+    echo "done"
+elif [ ! -z "$LIST" ]; then
+    oIFS=$IFS
+    IFS=","
+    FILE=($LIST)
+    IFS=$oIFS
+
+    PWM=""
+    for (( i=0; i<${#FILE[@]}; i++ )); do
+        PWM="$PWM ${FILE[$i]}"
+    done
+    echo -n "Analyze the enrichment of specific TFBS motifs in the input regions... "
+    if [ ! -z "$FORMAT_HIST" ]; then
+        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size 1000 -hist 10 > $OUTDIR/REGIONS_INTEREST.hist
+    else
+        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM > $OUTDIR/REGIONS_INTEREST.anno
+    fi
+    echo "done"
+else
+    usage
+fi
+
+#wait
+#wait_for_jobs_to_finish "Wait for jobs to finish... "
+#echo "done"
+

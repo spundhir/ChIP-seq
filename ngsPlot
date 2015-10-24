@@ -1,0 +1,274 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9";
+FORBIDIMG=0;
+YLIM=0;
+L=1000;
+SC="global";
+CO="red2";
+SHIFT=0;
+GO="none"
+RR=30
+RZ=0
+
+#### usage ####
+usage() {
+	echo Program: "ngsPlot (plot histone profiles for a set of genomic regions)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: ngsPlot -i <file | stdin> -j <dir> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file(s) having regions of interest in BED format]"
+    echo "             [if multiple seperate them by a comma]"
+	echo " -j <dir>    [input directory containing BAM files for various histone marks]"
+    echo "             [if multiple seperate them by a comma]"
+    echo " -o <dir>    [output directory to store results]"
+    echo "[OPTIONS]"
+    echo " -f <string> [filter BAM files matching identifiers eg. wt or gmp]"
+    echo "             [if multiple seperate them by a comma]"
+    echo " -d <string> [filter BAM files not matching identifiers eg. wt or gmp]"
+    echo "             [if multiple seperate them by a comma]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo " -t <string> [name of the output histone profile plot]"
+    echo " -u <string> [text identifier for input file(s)]"
+    echo "             [if multiple seperate them by a comma]"
+    echo " -c <string> [specify line color for average profile in hexadecimal code (enclose in double quotes)]"
+    echo "             [if multiple seperate them by a comma]"
+    echo " -r <string> [specify color for heatmap (default: red2)]"
+    echo "             [for bam-pair, use color-pair(neg_color:pos_color)]"
+    echo " -m          [merge replicates of input BAM files]"
+    echo " -e          [ngsPlot description file already exists]"
+    echo " -x <int>    [forbid image output if set to 1 (default: 0)]"
+    echo " -y <string> [y-axis limit (min,max)]"
+    echo " -s <string> [color scale for heatmap (min,max) (default: global)]"
+    echo "             [local: base on each individual heatmap]"
+    echo "             [region: base on all heatmaps belong to the same region]"
+    echo "             [global: base on all heatmaps together]"
+    echo "             [min_val,max_val: custom scale using a pair of numerics]"
+    echo " -l <int>    [flanking region size (default: 1000)]"
+    echo " -z <int>    [shift center position by input number of bases (default: 0)]"
+    echo " -a <string> [gene order algorithm for heatmap (default: none]"
+    echo "             [total, hc, max, prod, diff, km, none]"
+    echo " -b <int>    [reduce ratio for heatmap (default: 30)]"
+    echo "             [the parameter controls the heatmap height. The smaller the value, the taller the heatmap]"
+    echo " -k <int>    [remove all zero profiles in heatmap (default: 0) ]"
+    echo "             [set 1 to remove them]"
+    echo " -n          [scale signal profile between 0 and 1]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:o:f:d:g:t:u:c:r:mex:y:s:l:z:a:b:k:nh ARG; do
+	case "$ARG" in
+		i) REGION=$OPTARG;;
+		j) BAMDIR=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        f) FILTER_MATCH=$OPTARG;;
+        d) FILTER_NOMATCH=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        t) PLOTTITLE=$OPTARG;;
+        u) REGIONTITLE=$OPTARG;;
+        c) COLOR=$OPTARG;;
+        r) CO=$OPTARG;;
+        m) MERGE=1;;
+        e) EXIST=1;;
+        x) FORBIDIMG=$OPTARG;;
+        y) YLIM=$OPTARG;;
+        s) SC=$OPTARG;;
+        l) L=$OPTARG;;
+        z) SHIFT=$OPTARG;;
+        a) GO=$OPTARG;;
+        b) RR=$OPTARG;;
+        k) RZ=$OPTARG;;
+        n) SCALE=1;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$REGION" -o -z "$BAMDIR" -o -z "$OUTDIR" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+<<"COMMENT1"
+COMMENT1
+echo -n "Create directory structure... "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+echo "done"
+
+IFS=","
+REGIONS=($REGION)
+IFS=$'\n'
+
+## initialize a text title for each input file, if not provided
+if [ -z "$REGIONTITLE" ]; then
+    REGIONTITLE=""
+    for(( i=0; i<${#REGIONS[@]}; i++ )); do
+        REGIONTITLE="$REGIONTITLE,$i"
+    done
+    REGIONTITLE=`echo $REGIONTITLE | perl -ane '$_=~s/^\,//g; print $_;'`;
+fi
+
+IFS=","
+REGIONTITLES=($REGIONTITLE)
+IFS=$'\n'
+
+if [ "${#REGIONS[@]}" -ne "${#REGIONTITLES[@]}" ]; then
+    echo
+    echo "ERROR: a text title should be provided for each input file"
+    echo
+    usage
+fi
+
+if [ -z "$EXIST" ]; then
+    for (( j=0; j<${#REGIONS[@]}; j++ )); do
+        ## determine, if the input peaks are from a file or stdin
+        echo -n "Create peak file depending on if the input is from file or STDIN... " >&2
+        if [ -f "${REGIONS[$j]}" ]; then
+            #zless ${REGIONS[$j]} | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
+            zless ${REGIONS[$j]} | perl -ane '$mid=sprintf("%0.0f", ($F[1]+$F[2])/2); $mid=$mid+'$SHIFT'; $start=$mid; $end=$mid+1; $line="$F[0]\t$start\t$end"; foreach(@F[3..3]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
+        elif [ "${REGIONS[$j]}" == "stdin" ]; then
+            #while read LINE; do echo ${LINE}; done | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
+            while read LINE; do echo ${LINE}; done | perl -ane '$mid=sprintf("%0.0f", ($F[1]+$F[2])/2); $mid=$mid+'$SHIFT'; $start=$mid; $end=$mid+1; $line="$F[0]\t$start\t$end"; foreach(@F[3..3]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
+        else
+            usage
+        fi
+        echo "done" >&2
+
+        echo -n "Compute histone profile for each peak file... " >&2
+        IFS=","
+        FILTERS_MATCH=($FILTER_MATCH)
+        IFS=$'\n'
+
+        IFS=","
+        FILTERS_NOMATCH=($FILTER_NOMATCH)
+        IFS=$'\n'
+
+        REGIONS_COUNT=`less $OUTDIR/REGIONS_INTEREST$j.bed | wc -l`;
+
+        IFS=","
+        BAMDIRS=($BAMDIR)
+        IFS=$'\n'
+
+        for DIR in "${BAMDIRS[@]}"; do
+            for file in $DIR/*.bam; do
+                MATCH_COUNT=0
+                for (( i=0; i<${#FILTERS_MATCH[@]}; i++ )); do
+                    FOUND=`echo $file | perl -ane 'if($_=~/'${FILTERS_MATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
+                    #echo "${FILTERS_MATCH[$i]} $file $FOUND $i"
+                    MATCH_COUNT=$(($MATCH_COUNT + $FOUND))
+                done
+                
+                NOMATCH_COUNT=0
+                for (( i=0; i<${#FILTERS_NOMATCH[@]}; i++ )); do
+                    FOUND=`echo $file | perl -ane 'if($_=~/'${FILTERS_NOMATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
+                    #echo "${FILTERS_NOMATCH[$i]} $file $FOUND $i"
+                    NOMATCH_COUNT=$(($NOMATCH_COUNT + $FOUND))
+                done
+                
+                TITLE=`echo $file | sed 's/^.*\///g;' | sed 's/\..*//g' | perl -ane 'chomp($_); print "$_#'${REGIONTITLES[$j]}'";'`;
+                if [ "$MATCH_COUNT" == ${#FILTERS_MATCH[@]} -a "$NOMATCH_COUNT" -eq 0 ]; then
+                    echo -e "$file\t$OUTDIR/REGIONS_INTEREST$j.bed\t\"$TITLE\""
+                    #echo -e "$file\t$OUTDIR/REGIONS_INTEREST$j.bed\t\"$TITLE\"\t150\t\"${COLOR[$k]}\""
+                fi
+            done
+        done
+        echo "done" >&2
+    done > $OUTDIR/NGSPLOT.txt.tmp
+
+    ## define color codes (http://colorbrewer2.org)
+    if [ -z "$COLOR" ]; then
+        IFS=" "
+        COLORS=($(getRColor.R -i $(cat $OUTDIR/NGSPLOT.txt.tmp | wc -l) -p));
+        IFS=$'\n'
+    else
+        IFS=","
+        COLORS=($COLOR);
+        IFS=$'\n'
+    fi
+
+    k=0;
+    echo -n "using colors: " >&2
+    while read LINE; do
+        echo -e "${LINE}\t150\t\"${COLORS[$k]}\""
+        echo -n "${COLORS[$k]} " >&2
+        k=$(( k+1 ))
+    done < $OUTDIR/NGSPLOT.txt.tmp > $OUTDIR/NGSPLOT.txt
+    rm $OUTDIR/NGSPLOT.txt.tmp
+    echo "done" >&2
+fi
+
+echo -n "plot signal profile.. "
+if [ ! -z "$PLOTTITLE" ]; then
+    FORBIDIMG=1
+    ngs.plot.r -G $GENOME -R bed -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/$PLOTTITLE -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG
+else
+    ngs.plot.r -G $GENOME -R bed -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/combined -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG
+fi
+echo "done"
+
+FORBIDIMG=0
+if [ ! -z "$MERGE" ]; then
+    replotMergedReplicates.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 30
+    replotMergedReplicates.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 30 -CO $CO -RR $RR
+else
+    replot.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 30
+    replot.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 30 -CO $CO -RR $RR
+fi
+
+echo -n "scale signal profile between 0 and 1.. "
+if [ ! -z "$SCALE" ]; then
+    ngsPlot.R -i $OUTDIR/$PLOTTITLE.avgprof.RData -o $OUTDIR/$PLOTTITLE.avgprof.pdf
+fi
+echo "done"
+
+
+## OLD CODE
+
+<<"COMMENT"
+    ## merge replicates of input bam files
+    if [ ! -z "$MERGE" ]; then
+        for (( j=0; j<${#REGIONS[@]}; j++ )); do
+            for BAM_ID in $(cat $OUTDIR/NGSPLOT.txt | grep -w $OUTDIR/REGIONS_INTEREST$j | cut -f 1 | sed 's/_Rep.*//g' | sed 's/\.bam//g' | sort | uniq); do
+                BAM_FILES=$(grep $BAM_ID $OUTDIR/NGSPLOT.txt | grep -w $OUTDIR/REGIONS_INTEREST$j | perl -ane '$bam_file.="$F[0] "; END { print "$bam_file\n"; }');
+                NEW_BAM_ID=$(echo $BAM_ID | perl -ane '$_=~s/^.*\///g; print $_;')
+                if [ ! -f "$OUTDIR/$NEW_BAM_ID.bam" ]; then
+                    samtools merge $OUTDIR/$NEW_BAM_ID.bam $BAM_FILES
+                fi
+                grep $BAM_ID $OUTDIR/NGSPLOT.txt | grep -w $OUTDIR/REGIONS_INTEREST$j | head -n 1 | perl -ane 'print '$OUTDIR/$NEW_BAM_ID.bam'\t$F[1]\t'$NEW_BAM_ID'\t$F[3]\t$F[4]\n"; }';
+            done
+        done
+        #done > $OUTDIR/NGSPLOT.txt
+    fi
+    exit
+COMMENT
+
+#wait
+#wait_for_jobs_to_finish "Wait for jobs to finish... "
+#echo "done"
+
+#CURRDIR=`pwd`;
+#echo -n "plot a single plot showing the histone profile for all peaks... "
+#ngsPlot.R -i $CURRDIR/$OUTDIR -t "$PLOTTITLE ($REGIONS_COUNT)" -o $PLOTTITLE.pdf &>/dev/null
+
+#pdfjam $CURRDIR/$OUTDIR/*h3k4me1*heatmap.pdf $CURRDIR/$OUTDIR/*h3k4me3*heatmap.pdf $CURRDIR/$OUTDIR/*h3k27ac*heatmap.pdf --frame true --nup 6x1 --landscape -o $CURRDIR/$OUTDIR/REGIONS_INTEREST_HISTONE_PROFILE_HEAT.tmp.pdf && pdfcrop $CURRDIR/$OUTDIR/REGIONS_INTEREST_HISTONE_PROFILE_HEAT.tmp.pdf $CURRDIR/$OUTDIR/REGIONS_INTEREST_HISTONE_PROFILE_HEAT.pdf && rm $CURRDIR/$OUTDIR/REGIONS_INTEREST_HISTONE_PROFILE_HEAT.tmp.pdf
+#echo "done"
+

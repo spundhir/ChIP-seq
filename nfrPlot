@@ -1,0 +1,137 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9";
+PLOTTITLE="REGIONS_INTEREST_HISTONE_PROFILE";
+
+#### usage ####
+usage() {
+	echo Program: "nfrPlot (plot histone read density for a set of NFRs across multiple samples)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: nfrPlot -i <file | stdin> -j <file> -k <string> -o <dir> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file having NFRs. Ouput from nfrAna script]"
+	echo " -j <file>   [mapped reads in BAM format from all samples (seperated by a comma)]"
+    echo " -k <string> [size factor for each input sample or BAM files]"
+    echo " -o <dir>    [output directory to store results]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo " -t <string> [name of the output histone read density plot (default: REGIONS_INTEREST_HISTONE_PROFILE)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:k:o:g:t:h ARG; do
+	case "$ARG" in
+		i) NFRREGION=$OPTARG;;
+		j) BAMFILES=$OPTARG;;
+        k) SIZEFACTORS=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        d) PLOTTITLE=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$NFRREGION" -o -z "$BAMFILES" -o -z "$SIZEFACTORS" -o -z "$OUTDIR" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+
+echoerr() { echo "$@" 1>&2; }
+###############
+
+## check input
+echo -n "Check input.. "
+IFS=","
+BAMFILE=($BAMFILES)
+BAMFILE_COUNT=${#BAMFILE[@]}
+SIZEFACTOR=($SIZEFACTORS)
+SIZEFACTOR_COUNT=${#SIZEFACTOR[@]}
+
+if [ "$BAMFILE_COUNT" -ne "$SIZEFACTOR_COUNT" ]; then
+    echo -n "Please provide size factor for each input bam file";
+    usage
+fi
+echo "done"
+
+echo -n "Create directory structure... "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+echo "done"
+
+## determine, if the input NFRs are from a file or stdin
+echo -n "Create NFR file depending on if the input is from file or STDIN... "
+if [ -f "$NFRREGION" ]; then
+    zless $NFRREGION | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/NFR_INTEREST.bed
+elif [ "$NFRREGION" == "stdin" ]; then 
+    while read LINE; do echo ${LINE}; done | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/NFR_INTEREST.bed
+else
+    usage
+fi
+echo "done"
+
+echo -n "Analyze NFRs for histone read density... "
+for (( i=0; i<${#BAMFILE[@]}; i++)); do
+    ID=`echo ${BAMFILE[$i]} | perl -ane '$_=~s/^.*\///g; chomp($_); print "$_";'`;
+    if [ "$i" -eq 0 ]; then
+        OUTPUT="$ID (score)"
+        OUTPUT1="$ID (block expr)\t$ID (nfr expr)"
+    else
+        OUTPUT="$OUTPUT\t$ID (score)"
+        OUTPUT1="$OUTPUT1\t$ID (block expr)\t$ID (nfr expr)"
+    fi
+done
+echo -e "#chr\tstart\tend\t$OUTPUT\t$OUTPUT1" > $OUTDIR/NFR_INTEREST.bed.stat
+
+while read line; do
+    #echo -n ${line}
+    NFRCHR=`echo ${line} | perl -ane 'print "$F[0]";'`;
+    NFRSTART=`echo ${line} | perl -ane 'print "$F[1]";'`;
+    NFREND=`echo ${line} | perl -ane 'print "$F[2]";'`;
+    NFRCOOR=`echo ${line} | perl -ane 'print "$F[0]:$F[1]-$F[2]";'`;
+    NFRLEN=`echo ${line} | perl -ane '$len=($F[2]-$F[1])+1; print "$len";'`;
+    STARTBLOCKCOOR=`echo ${line} | perl -ane 'print "$F[6]";'`;
+    STARTBLOCKLEN=`echo ${line} | perl -ane '@t=split(/[\:\-]+/,$F[6]); $len=($t[2]-$t[1])+1; print "$len";'`;
+    ENDBLOCKCOOR=`echo ${line} | perl -ane 'print "$F[8]";'`;
+    ENDBLOCKLEN=`echo ${line} | perl -ane '@t=split(/[\:\-]+/,$F[8]); $len=($t[2]-$t[1])+1; print "$len";'`;
+<<"COMMENT1"
+COMMENT1
+    for (( i=0; i<${#BAMFILE[@]}; i++)); do
+        NFREXPR=`coor2reads -c $NFRCOOR -b ${BAMFILE[$i]} -s ${SIZEFACTOR[$i]} | perl -ane 'BEGIN { $expr=0.01; } $expr+=$F[4]; END { printf("%0.2f", $expr); }'`;
+        STARTBLOCKEXPR=`coor2reads -c $STARTBLOCKCOOR -b ${BAMFILE[$i]} -s ${SIZEFACTOR[$i]} | perl -ane 'BEGIN { $expr=0.01; } $expr+=$F[4]; END { printf("%0.2f", $expr); }'`;
+        ENDBLOCKEXPR=`coor2reads -c $ENDBLOCKCOOR -b ${BAMFILE[$i]} -s ${SIZEFACTOR[$i]} | perl -ane 'BEGIN { $expr=0.01; } $expr+=$F[4]; END { printf("%0.2f", $expr); }'`;
+        NFRSCORE=`perl -e '$score=((('$STARTBLOCKEXPR'/'$STARTBLOCKLEN')+('$ENDBLOCKEXPR'/'$ENDBLOCKLEN'))/('$NFREXPR'/'$NFRLEN')); printf("%0.4f", log($score));'`
+        BLOCKEXPRNORM=`perl -e '$expr=(('$STARTBLOCKEXPR'/'$STARTBLOCKLEN')+('$ENDBLOCKEXPR'/'$ENDBLOCKLEN')); printf("%0.2f", $expr);'`
+        NFREXPRNORM=`perl -e '$expr=('$NFREXPR'/'$NFRLEN'); printf("%0.2f", $expr);'`
+        #echo -e "$NFRCOOR\t$NFREXPR\t$NFRLEN\t$STARTBLOCKCOOR\t$STARTBLOCKEXPR\t$STARTBLOCKLEN\t$ENDBLOCKCOOR\t$ENDBLOCKEXPR\t$ENDBLOCKLEN\t$NFRSCORE"
+        if [ "$i" -eq 0 ]; then
+            OUTPUT="$NFRSCORE"
+            OUTPUT1="$BLOCKEXPRNORM\t$NFREXPRNORM"
+        else
+            OUTPUT="$OUTPUT\t$NFRSCORE"
+            OUTPUT1="$OUTPUT1\t$BLOCKEXPRNORM\t$NFREXPRNORM"
+        fi
+    done
+    echo -e "$NFRCHR\t$NFRSTART\t$NFREND\t$OUTPUT\t$OUTPUT1"
+done < $OUTDIR/NFR_INTEREST.bed >> $OUTDIR/NFR_INTEREST.bed.stat
+
+#grep -v "#" $OUTDIR/NFR_INTEREST.bed.stat | perl -ane '$dip=log((exp($F[3]+$F[4])/2)/(exp($F[5]+$F[6])/2)); chomp($_); print "$_\t"; printf("%0.3f\n", $dip);' | sort -k 12rn,12 | perl -ane 'if($F[11]<-1) { print $_; }' | wc -l
+
+echo "done"
