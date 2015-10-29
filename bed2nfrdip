@@ -8,11 +8,11 @@ GENOME="mm9"
 #### usage ####
 usage() {
     echo
-	echo Program: "bed2nfrdip (determine nfr dip for an input coordinates in BED format)"
+	echo Program: "bed2nfrdip (compute nfr dip corresponding to input coordinates in BED format)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: bed2nfrdip -i <file> -j <file> [OPTIONS]"
+	echo "Usage: bed2nfrdip -i <file> -j <file(s)> [OPTIONS]"
 	echo "Options:"
     echo " -i <file>   [input genomic coordinates in BED format (can be stdin)]"
     echo " -j <file>   [input mapped reads in BAM format]"
