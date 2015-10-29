@@ -12,7 +12,7 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: coor2nfrdip -i <coor> -j <file> -k <float> [OPTIONS]"
+	echo "Usage: coor2nfrdip -i <coor> -j <file> [OPTIONS]"
 	echo "Options:"
     echo " -i <coor>   [input genomic coordinate of NFR (chr:start-end)]"
     echo " -j <file>   [input mapped reads in BAM format]"

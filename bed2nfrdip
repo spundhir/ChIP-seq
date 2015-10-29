@@ -12,7 +12,7 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: bed2nfrdip -i <file> -j <file> -k <float> -o <file> [OPTIONS]"
+	echo "Usage: bed2nfrdip -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
     echo " -i <file>   [input genomic coordinates in BED format (can be stdin)]"
     echo " -j <file>   [input mapped reads in BAM format]"
