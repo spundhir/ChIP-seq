@@ -118,6 +118,7 @@ if [ ! -z "$SIZEFACTOR" ]; then
     SIZEFACTORS=($SIZEFACTOR)
     SIZEFACTORS_COUNT=${#SIZEFACTOR[@]}
     IFS=$oIFS
+    SIZEFACTOR="$SIZEFACTOR,$SIZEFACTOR,$SIZEFACTOR"
 
     if [ "$BAMFILES_COUNT" -ne "$SIZEFACTORS_COUNT" -o "$BAMFILES_COUNT" -ne "$EXTENDS_COUNT" ]; then
         echo -n "Please provide size factor and extend parameter for each input bam file";
@@ -125,10 +126,10 @@ if [ ! -z "$SIZEFACTOR" ]; then
     fi
 
     if [ -z "$REMOVE_DUPLICATE" ]; then
-        bedtools multicov -bams $BAMFILES -bed $BEDFILE -q 10 -D
+        paste <(bedtools multicov -bams $BAMFILES -bed $BEDFILE -q 10 -D) <(perl -ane '$start=$F[1]-'$FLANK_WIN_UP'; $end=$F[1]-1; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 -D | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";') <(perl -ane '$start=$F[2]+1; $end=$F[2]+'$FLANK_WIN_DOWN'; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 -D | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";')
     else
-        bedtools multicov -bams $BAMFILES -bed $BEDFILE -q 10
-    fi | perl -ane '@sizeFactors=split(/\,/, "'$SIZEFACTORS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", $_/$sizeFactors[$i]); $i++; } print "\n";'
+        paste <(bedtools multicov -bams $BAMFILES -bed $BEDFILE -q 10) <(perl -ane '$start=$F[1]-'$FLANK_WIN_UP'; $end=$F[1]-1; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";') <(perl -ane '$start=$F[2]+1; $end=$F[2]+'$FLANK_WIN_DOWN'; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";')
+    fi | perl -ane '@sizeFactors=split(/\,/, "'$SIZEFACTORS'"); $field_count=scalar(@F)-('$BAMFILES_COUNT'*3); foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", $_/$sizeFactors[$i]); $i++; } print "\n";'
 else
     MAPPEDREADS=""
     for(( i=0; i<$BAMFILES_COUNT; i++ )); do
@@ -150,7 +151,23 @@ else
     else
         paste <(bedtools multicov -bams $BAMFILES -bed $BEDFILE -q 10) <(perl -ane '$start=$F[1]-'$FLANK_WIN_UP'; $end=$F[1]-1; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";') <(perl -ane '$start=$F[2]+1; $end=$F[2]+'$FLANK_WIN_DOWN'; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";')
     fi | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-('$BAMFILES_COUNT'*3); foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", ($_*1000000)/$mappedReads[$i]); $i++; } print "\n";'
-fi
+fi | perl -ane '
+    $len=($F[2]-$F[1])+1;
+    $end=scalar(@F)-1;
+    $start=($end-('$BAMFILES_COUNT'*3))+1;
+    $score=();
+    for($i=0; $i<'$BAMFILES_COUNT'; $i++) {
+        $start=$start+$i;
+        $up=$start+'$BAMFILES_COUNT';
+        $down=$start+('$BAMFILES_COUNT'*2);
+        $nfr_expr=$F[$start]/$len;
+        $flanking_expr=($F[$up]+$F[$down])/('$FLANK_WIN_UP'+'$FLANK_WIN_DOWN');
+        $score.=sprintf("%0.4f\t", $nfr_expr-$flanking_expr);
+    }
+    $line=();
+    $start=($end-('$BAMFILES_COUNT'*3))+1;
+    foreach(@F[0..($start-1)]) { $line.="$_\t"; } $line=~s/\t+$//g; 
+    print "$line\t$score\n";'
 #| perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; for($i=$field_count; $i<scalar(@F); $i+=2) { if(!defined($F[$i+1])) { $F[$i+1]=$F[$i]; } printf("%0.5f\t", ($F[$i]+$F[$i+1])/2); } print "\n"; } else { print $_; }'
 
 if [ ! -z "$TMP" ]; then
