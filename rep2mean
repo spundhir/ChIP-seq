@@ -1,0 +1,67 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+START=7
+COUNT=2
+
+#### usage ####
+usage() {
+	echo Program: "rep2mean (compute mean value of a variable from multiple replicates)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: rep2mean -i <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input genomic coordinates in BED format (can be stdin)]"
+    echo "[OPTIONS]"
+    echo " -s <int>    [column number from where the information about value starts (default: 7)]"
+    echo " -n <int>    [number of replicates (default: 2)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:s:n:h ARG; do
+    case "$ARG" in
+    i) BEDFILE=$OPTARG;;
+    s) START=$OPTARG;;
+    n) COUNT=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$BEDFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$BEDFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    BEDFILE=$TMP
+fi
+
+cat $BEDFILE | perl -ane '
+    $field_count='$START'-1;
+    foreach(@F[0..$field_count-1]) {
+        print "$_\t";
+    }
+    $i=0;
+    for($i=$field_count; $i<scalar(@F); $i+='$COUNT') {
+        $sum=0;
+        for($j=0; $j<'$COUNT'; $j++) {
+            if(!defined($F[$i+$j])) { $F[$i+$j]=$F[$i]; }
+            $sum+=$F[$i+$j];
+        }
+        printf("%0.5f\t", $sum/'$COUNT');
+    }
+    print "\n";'
+
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
+exit
