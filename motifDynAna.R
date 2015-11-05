@@ -6,7 +6,8 @@ option_list <- list(
 	make_option(c("-i", "--inFile"), help="input file created by nfrDynaAna script"),
     make_option(c("-n", "--minFreq"), default="50", help="minimum frequency of NFRs in each nfr dynamic class (defaut=%default)"),
     make_option(c("-d", "--diffFreq"), default="0", help="minimum difference in enrichment between categories (defaut=%default)"),
-	make_option(c("-o", "--outPdfFile"), help="output pdf image file")
+	make_option(c("-o", "--outPdfFile"), help="output pdf image file"),
+    make_option(c("-f", "--onlyDiffFreq"), action="store_true", help="less stringent criteria. use only difference in frequency")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -48,13 +49,16 @@ row.names(mat) <- data[1:no_rows,2]
 #myCol <- brewer.pal(9, "OrRd")
 myCol <- rev(brewer.pal(11, "RdBu"))
 #sig_rows <- which(apply(dat, 1, function(x) max(x)>3))
-#sig_rows <- which(apply(mat, 1, function(x) max(x)-min(x)>as.numeric(opt$diffFreq)))
-sig_rows <- which(apply(mat, 1, function(x) max(x) > 0 & min(x) < 0 & max(x)-min(x) > as.numeric(opt$diffFreq)))
+if(!is.null(opt$onlyDiffFreq)) {
+    sig_rows <- which(apply(mat, 1, function(x) max(x)-min(x)>as.numeric(opt$diffFreq)))
+} else {
+    sig_rows <- which(apply(mat, 1, function(x) max(x) > 0 & min(x) < 0 & max(x)-min(x) > as.numeric(opt$diffFreq)))
+}
 #sig_rows <- which(apply(mat, 1, function(x) max(x) > as.numeric(opt$diffFreq) & min(x) < -1*as.numeric(opt$diffFreq) & max(x)-min(x) > 1))
 
 if(length(sig_rows)>3) {
     pdf(opt$outPdfFile)
-    heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,20), cexCol=1, cexRow=1)
+    heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1)
     #heatmap.2(mat, trace="none", col=myCol, margins=c(15,20), cexCol=1, cexRow=1)
     dev.off()
 } else if(length(sig_rows)>=1) {

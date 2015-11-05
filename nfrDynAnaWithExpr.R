@@ -85,7 +85,6 @@ if(grepl("_", data.melt$variable)[1]){
     data.melt$tf <- "NA"
 }
 
-## uncomment to order bar plot by gene expression
 #data.melt$class <- factor(data.melt$class, levels=c(
 #    as.vector(unique(data.melt$class[grep("^pregm,granulocytes_", data.melt$class)])), 
 #    as.vector(unique(data.melt$class[grep("^pregm,gmp,granulocytes_", data.melt$class)])), 
