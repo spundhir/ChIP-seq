@@ -176,7 +176,8 @@ elif [ ! -z "$LIST" ]; then
     done
     echo -n "Analyze the enrichment of specific TFBS motifs in the input regions... "
     if [ ! -z "$FORMAT_HIST" ]; then
-        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size 1000 -hist 10 > $OUTDIR/REGIONS_INTEREST.hist
+        ## parameter histNorm added on Nov 12, 2015 for Janus project 
+        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size 1000 -hist 10 -histNorm 5 > $OUTDIR/REGIONS_INTEREST.hist
     else
         annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM > $OUTDIR/REGIONS_INTEREST.anno
     fi
