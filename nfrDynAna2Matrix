@@ -1,0 +1,184 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+REPLICATES=2
+MIN_N_CLASS=500
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "nfrDynAna2Matrix (compute matrix containing activity features corresponding to input coordinates in BED format)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: nfrDynAna2Matrix -i <file> -o <int> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input genomic coordinates in BED format (can be stdin)]"
+    echo "             [output from nfrDynAna script]"
+    echo " -o <int>    [option]"
+    echo "[OPTION 1: compute nfr dip]"
+    echo " -j <file(s) [input mapped reads in BAM format]"
+    echo "             [if multiple separate them by a comma]"
+    echo "[OPTION 2: compute expression in TPM]"
+    echo " -j <file(s) [input mapped reads in BAM format]"
+    echo "             [if multiple separate them by a comma]"
+    echo "[OPTION 3: compute proximal gene expression (collapsed)"
+    echo " -j <file>   [input gene coordinates in BED format along with expression]"
+    echo "[OPTION 4: compute number of proximal genes (collapsed)"
+    echo " -j <file>   [input gene coordinates in BED format]"
+    echo "[OPTIONS]"
+    echo " -r <int>    [number of replicates. used to compute mean (default: 2)]"
+    echo " -n <int>    [minimum number of elements within each nfr dynamic class (default: 500)]"
+    echo " -g <string> [genome (default: mm9)]"
+	echo " -h          [help]"
+    echo "[NOTE]"
+    echo " In case of error: Could not open input BAM files, refer to:"
+    echo " https://groups.google.com/forum/#!msg/bedtools-discuss/_LNuoRWHn50/14MaqyzyzXsJ"
+    echo " i.e. make sure header of all input bam files is identical"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:o:j:r:n:gh ARG; do
+    case "$ARG" in
+    i) BEDFILE=$OPTARG;;
+    o) OPTION=$OPTARG;;
+    j) MEASUREFILE=$OPTARG;;
+    r) REPLICATES=$OPTARG;;
+    n) MIN_N_CLASS=$OPTARG;;
+    g) GENOME=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$BEDFILE" -o -z "$OPTION" -o -z "$MEASUREFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+else
+    echo "Presently the program only support analysis for mm9 or hg19"
+    echo
+    usage
+fi
+
+## parse input bam files in an array
+oIFS=$IFS
+IFS=","
+BAMFILES_ARR=($BAMFILE)
+BAMFILES_COUNT=${#BAMFILES_ARR[@]}
+IFS=$oIFS
+
+## initialize size factors, if both size factors and total reads not provided
+if [ -z "$SIZEFACTOR" -a -z "$CPM" ]; then
+    SIZEFACTOR=""
+    for(( i=0; i<$BAMFILES_COUNT; i++ )); do
+        SIZEFACTOR="$SIZEFACTOR,1"
+    done
+    SIZEFACTOR=`echo $SIZEFACTOR | perl -ane '$_=~s/^\,//g; print $_;'`;
+fi
+
+## initialize extend parameter, if not provided
+if [ -z "$EXTEND" ]; then
+    EXTEND=""
+    for(( i=0; i<$BAMFILES_COUNT; i++ )); do
+        EXTEND="$EXTEND,0"
+    done
+    EXTEND=`echo $EXTEND | perl -ane '$_=~s/^\,//g; print $_;'`;
+fi
+
+## parse extend parameter in an array
+IFS=","
+EXTENDS=($EXTEND)
+EXTENDS_COUNT=${#EXTENDS[@]}
+IFS=$oIFS
+
+## parse bam files in an array
+IFS=","
+BAMFILES=$(echo $BAMFILE | sed 's/\,/ /g')
+IFS=$oIFS
+
+## create temporary BED file if input is from stdin
+if [ "$BEDFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    BEDFILE=$TMP
+fi
+
+intersectBed -a nfr_dynamics/tf/NFR_DYNAMICS.TXT -b /home/pundhir/project/genome_annotations/ucscGenes_mm9_raw_expr_hematopoiesis_tss_40000bp.bed -wao | sortBed -i stdin | mergeBed -i stdin -c 19,20,21,22 -o sum | wc -l
+
+
+if [ ! -z "$SIZEFACTOR" ]; then
+    ## parse input size factors in an array
+    IFS=","
+    SIZEFACTORS=($SIZEFACTOR)
+    SIZEFACTORS_COUNT=${#SIZEFACTORS[@]}
+    IFS=$oIFS
+    SIZEFACTOR="$SIZEFACTOR,$SIZEFACTOR,$SIZEFACTOR"
+
+    if [ "$BAMFILES_COUNT" -ne "$SIZEFACTORS_COUNT" -o "$BAMFILES_COUNT" -ne "$EXTENDS_COUNT" ]; then
+        echo -n "Please provide size factor and extend parameter for each input bam file";
+        usage
+    fi
+
+    if [ -z "$REMOVE_DUPLICATE" ]; then
+        paste <(bedtools multicov -bams $BAMFILES -bed $BEDFILE -q 10 -D) <(perl -ane '$start=$F[1]-'$FLANK_WIN_UP'; $end=$F[1]-1; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 -D | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";') <(perl -ane '$start=$F[2]+1; $end=$F[2]+'$FLANK_WIN_DOWN'; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 -D | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";')
+    else
+        paste <(bedtools multicov -bams $BAMFILES -bed $BEDFILE -q 10) <(perl -ane '$start=$F[1]-'$FLANK_WIN_UP'; $end=$F[1]-1; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";') <(perl -ane '$start=$F[2]+1; $end=$F[2]+'$FLANK_WIN_DOWN'; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";')
+    fi | perl -ane '@sizeFactors=split(/\,/, "'$SIZEFACTOR'"); $field_count=scalar(@F)-('$BAMFILES_COUNT'*3); foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", $_/$sizeFactors[$i]); $i++; } print "\n";'
+else
+    MAPPEDREADS=""
+    for(( i=0; i<$BAMFILES_COUNT; i++ )); do
+        ## create index of input BAM file, if does not exist
+        if [ ! -f "${BAMFILES_ARR[$i]}.bai" ]; then
+            samtools index ${BAMFILES_ARR[$i]}
+        fi
+
+        COUNT=$(samtools idxstats ${BAMFILES_ARR[$i]} | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }');
+        MAPPEDREADS="$MAPPEDREADS,$COUNT"
+    done
+    MAPPEDREADS=$(echo $MAPPEDREADS | perl -ane '$_=~s/^\,//g; print $_;')
+    MAPPEDREADS="$MAPPEDREADS,$MAPPEDREADS,$MAPPEDREADS"
+    #echo $MAPPEDREADS; exit
+
+    #echo $MAPPEDREADS; exit
+    if [ -z "$REMOVE_DUPLICATE" ]; then
+        paste <(bedtools multicov -bams $BAMFILES -bed $BEDFILE -q 10 -D) <(perl -ane '$start=$F[1]-'$FLANK_WIN_UP'; $end=$F[1]-1; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 -D | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";') <(perl -ane '$start=$F[2]+1; $end=$F[2]+'$FLANK_WIN_DOWN'; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 -D | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";')
+    else
+        paste <(bedtools multicov -bams $BAMFILES -bed $BEDFILE -q 10) <(perl -ane '$start=$F[1]-'$FLANK_WIN_UP'; $end=$F[1]-1; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";') <(perl -ane '$start=$F[2]+1; $end=$F[2]+'$FLANK_WIN_DOWN'; print "$F[0]\t$start\t$end\n";' $BEDFILE | bedtools multicov -bams $BAMFILES -bed stdin -q 10 | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";')
+    fi | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-('$BAMFILES_COUNT'*3); foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", ($_*1000000)/$mappedReads[$i]); $i++; } print "\n";'
+fi | perl -ane '
+    $len=($F[2]-$F[1]);
+    $end=scalar(@F)-1;
+    $start=($end-('$BAMFILES_COUNT'*3))+1;
+    $up=$start+'$BAMFILES_COUNT';
+    $down=$start+('$BAMFILES_COUNT'*2);
+    $score=();
+    for($i=0; $i<'$BAMFILES_COUNT'; $i++) {
+        #print "$start\t$up\t$down\t$i\t$len\n";
+        $nfr_expr=$F[$start]/$len;
+        $flanking_expr=($F[$up]+$F[$down])/('$FLANK_WIN_UP'+'$FLANK_WIN_DOWN');
+        $score.=sprintf("%0.4f\t", $flanking_expr-$nfr_expr);
+        #print "$F[$start]\t$F[$up]\t$F[$down]\t$nfr_expr\t$flanking_expr\n";
+        $start++; $up++; $down++;
+    }
+    $line=();
+    $start=($end-('$BAMFILES_COUNT'*3))+1;
+    foreach(@F[0..($start-1)]) { $line.="$_\t"; } $line=~s/\t+$//g; 
+    print "$line\t$score\n";'
+<<"COMMENT"
+COMMENT
+#| perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; for($i=$field_count; $i<scalar(@F); $i+=2) { if(!defined($F[$i+1])) { $F[$i+1]=$F[$i]; } printf("%0.5f\t", ($F[$i]+$F[$i+1])/2); } print "\n"; } else { print $_; }'
+
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
+exit
