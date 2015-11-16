@@ -14,6 +14,7 @@ usage() {
 	echo " -i <file>   [input file containing genomic coordinate of peaks or NFRs in BED format (can be stdin)]"
     echo " -j <file>   [input file containing gene expression values]"
     echo " -k <int>    [number of samples for which gene expression has been computed]"
+    echo " -n          [also show enhancers having no proximal genes]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
 	echo " -h          [help]"
@@ -22,11 +23,12 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:k:g:h ARG; do
+while getopts i:j:k:ng:h ARG; do
 	case "$ARG" in
 		i) INPUTCHIPFILE=$OPTARG;;
         j) INPUTEXPRFILE=$OPTARG;;
         k) NSAMPLES=$OPTARG;; 
+        n) SHOWNULL=1;;
         g) GENOME=$OPTARG;;
 		h) HELP=1;;
 	esac
@@ -62,8 +64,12 @@ COL_EXPR=$(perl -e '$col="5,13,"; $end='$NCOL_CHIP'+'$NCOL_EXPR'; $start=$end-'$
 
 COL_OUT=$(perl -e '$col="distinct,distinct,"; $end='$NCOL_CHIP'+'$NCOL_EXPR'; $start=$end-'$NSAMPLES'; for($i=$start; $i<$end; $i++) { $col.="sum,"; } $col=~s/\,$//g; print $col;')
 
-#echo "intersectBed -a $INPUTCHIPFILE -b <(cat $INPUTEXPRFILE | perl -ane '\$start='$NCOL_EXPR'-'$NSAMPLES'; \$end='$NCOL_EXPR'-1; \$sum=0; foreach(@F[\$start..\$end]) { \$sum+=\$_; } if(\$sum>=0) { print \$_; }') -wo | sortBed -i stdin | mergeBed -i stdin -c $COL_EXPR -o $COL_OUT"; exit
-intersectBed -a $INPUTCHIPFILE -b <(cat $INPUTEXPRFILE | perl -ane '$start='$NCOL_EXPR'-'$NSAMPLES'; $end='$NCOL_EXPR'-1; $sum=0; foreach(@F[$start..$end]) { $sum+=$_; } if($sum>=0) { print $_; }') -wo | sortBed -i stdin | mergeBed -i stdin -c $COL_EXPR -o $COL_OUT
+if [ -z "$SHOWNULL" ]; then
+    #echo "intersectBed -a $INPUTCHIPFILE -b <(cat $INPUTEXPRFILE | perl -ane '\$start='$NCOL_EXPR'-'$NSAMPLES'; \$end='$NCOL_EXPR'-1; \$sum=0; foreach(@F[\$start..\$end]) { \$sum+=\$_; } if(\$sum>=0) { print \$_; }') -wo | sortBed -i stdin | mergeBed -i stdin -c $COL_EXPR -o $COL_OUT"; exit
+    intersectBed -a $INPUTCHIPFILE -b <(cat $INPUTEXPRFILE | perl -ane '$start='$NCOL_EXPR'-'$NSAMPLES'; $end='$NCOL_EXPR'-1; $sum=0; foreach(@F[$start..$end]) { $sum+=$_; } if($sum>=0) { print $_; }') -wo | sortBed -i stdin | mergeBed -i stdin -c $COL_EXPR -o $COL_OUT
+else
+    intersectBed -a $INPUTCHIPFILE -b <(cat $INPUTEXPRFILE | perl -ane '$start='$NCOL_EXPR'-'$NSAMPLES'; $end='$NCOL_EXPR'-1; $sum=0; foreach(@F[$start..$end]) { $sum+=$_; } if($sum>=0) { print $_; }') -wao | sortBed -i stdin | mergeBed -i stdin -c $COL_EXPR -o $COL_OUT
+fi
 
 if [ ! -z "$TMP" ]; then
     rm $TMP
