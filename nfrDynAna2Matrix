@@ -144,7 +144,8 @@ COMMENT
 ## compute fraction of nfr (co)-bound by TFs
 if [ ! -z "$BED_FILE_COBOUND" ]; then
     intersectBed -a $OUTDIR/$BED_FILE -b $BED_FILE_COBOUND -wao | sortBed -i stdin | mergeBed -i stdin -c 4,5,6,7,8,9,14 -o distinct | perl -ane 'if($F[9]=~/pu1/ && $F[9]=~/cebpa/) { $F[9]="pu1,cebpa"; } elsif($F[9]=~/pu1/) { $F[9]="pu1"; } elsif($F[9]=~/cebpa/) { $F[9]="cebpa"; } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\n";' > $OUTDIR/$BED_FILE.cobound
-    intersectBed -a $OUTDIR/$BED_FILE -b $BED_FILE_COBOUND -wao | sortBed -i stdin | mergeBed -i stdin -c 4,5,6,7,8,9,14 -o distinct | cut -f 5,10 | perl -ane 'if($F[1]=~/pu1/ && $F[1]=~/cebpa/) { $F[1]="pu1,cebpa"; } elsif($F[1]=~/pu1/) { $F[1]="pu1"; } elsif($F[1]=~/cebpa/) { $F[1]="cebpa"; } print "$F[0]\t$F[1]\n";' | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 3,3 | perl -ane '$count{$F[1]}+=$F[0]; push(@data, $_); END { foreach(@data) { @T=split(/\s+/,$_); $fraction=sprintf("%0.6f", $_/$count{$T[1]}); chomp($_); print "$_\t$fraction\n"; } }' > $OUTDIR/$BED_FILE.cobound.summary
+    ## R-code is doing this now
+    #intersectBed -a $OUTDIR/$BED_FILE -b $BED_FILE_COBOUND -wao | sortBed -i stdin | mergeBed -i stdin -c 4,5,6,7,8,9,14 -o distinct | cut -f 5,10 | perl -ane 'if($F[1]=~/pu1/ && $F[1]=~/cebpa/) { $F[1]="pu1,cebpa"; } elsif($F[1]=~/pu1/) { $F[1]="pu1"; } elsif($F[1]=~/cebpa/) { $F[1]="cebpa"; } print "$F[0]\t$F[1]\n";' | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 3,3 | perl -ane '$count{$F[1]}+=$F[0]; push(@data, $_); END { foreach(@data) { @T=split(/\s+/,$_); $fraction=sprintf("%0.6f", $_/$count{$T[1]}); chomp($_); print "$_\t$fraction\n"; } }' > $OUTDIR/$BED_FILE.cobound.summary
 fi
 
 ## join all files into one
@@ -155,7 +156,7 @@ NCOL_expr=$(head $OUTDIR/$BED_FILE.expr -n 1 | perl -ane '$ncol=scalar(@F); prin
 NCOL_count=$(head $OUTDIR/$BED_FILE.count -n 1 | perl -ane '$ncol=scalar(@F); print "$ncol";')
 NCOL_cobound=$(head $OUTDIR/$BED_FILE.cobound -n 1 | perl -ane '$ncol=scalar(@F); print "$ncol";')
 
-paste $OUTDIR/$BED_FILE <(cut -f $NCOL-$NCOL_nfrdip $OUTDIR/$BED_FILE.nfrdip) <(cut -f $NCOL-$NCOL_tpm $OUTDIR/$BED_FILE.tpm) <(cut -f 6-$NCOL_expr $OUTDIR/$BED_FILE.expr) <(cut -f $NCOL-$NCOL_count $OUTDIR/$BED_FILE.count) <(cut -f $NCOL-$NCOL_cobound $OUTDIR/$BED_FILE.cobound) > $OUTDIR/$BED_FILE.stat
+paste $OUTDIR/$BED_FILE <(cut -f $NCOL-$NCOL_nfrdip $OUTDIR/$BED_FILE.nfrdip) <(cut -f $NCOL-$NCOL_tpm $OUTDIR/$BED_FILE.tpm) <(cut -f 5-$NCOL_expr $OUTDIR/$BED_FILE.expr) <(cut -f $NCOL-$NCOL_count $OUTDIR/$BED_FILE.count) <(cut -f $NCOL-$NCOL_cobound $OUTDIR/$BED_FILE.cobound) > $OUTDIR/$BED_FILE.stat
 #echo -e "$NCOL\t$NCOL_nfrdip\t$NCOL_tpm\t$NCOL_expr\t$NCOL_count\t$NCOL_cobound"
 
 ## remove temporary file
