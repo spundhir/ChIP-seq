@@ -14,9 +14,9 @@ echo Program: "goAna (perform gene ontology analysis on input gene list)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: goAna -i <file or stdin> -o <dir> [OPTIONS]"
+	echo "Usage: goAna -i <file> -o <dir> [OPTIONS]"
 	echo "Options:"
-	echo " -i <file>   [input file containing gene list(s)]"
+	echo " -i <file>   [input file containing gene list(s) (can be stdin)]"
     echo "             [single gene list format (default)]"
     echo "             => column 1: <gene>; column 2: <fold change> (optional)"
     echo "             [multiple gene list format (required with -c parameter)]"

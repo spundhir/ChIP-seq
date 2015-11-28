@@ -34,7 +34,7 @@ if((is.null(opt$inFile) | is.null(opt$genome) | is.null(opt$outDir)) & is.null(o
 suppressPackageStartupMessages(library(DOSE))
 suppressPackageStartupMessages(library(ReactomePA))
 suppressPackageStartupMessages(library(clusterProfiler))
-suppressPackageStartupMessages(library(mygene))
+#suppressPackageStartupMessages(library(mygene))
 suppressPackageStartupMessages(library(RDAVIDWebService))
 suppressPackageStartupMessages(library(session))
 suppressPackageStartupMessages(library(ggplot2))

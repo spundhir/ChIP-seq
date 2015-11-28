@@ -3,7 +3,8 @@
 
 GENOME="mm9";
 FORBIDIMG=0;
-YLIM=0;
+#YLIM="0";
+YLIM="auto";
 L=1000;
 SC="global";
 CO="red2";
@@ -11,6 +12,7 @@ SHIFT=0;
 GO="none"
 RR=30
 RZ=0
+KNC=5
 
 #### usage ####
 usage() {
@@ -53,6 +55,7 @@ usage() {
     echo "             [total, hc, max, prod, diff, km, none]"
     echo " -b <int>    [reduce ratio for heatmap (default: 30)]"
     echo "             [the parameter controls the heatmap height. The smaller the value, the taller the heatmap]"
+    echo " -q <int>    [K-means or HC number of clusters (default=5)"
     echo " -k <int>    [remove all zero profiles in heatmap (default: 0) ]"
     echo "             [set 1 to remove them]"
     echo " -n          [scale signal profile between 0 and 1]"
@@ -62,7 +65,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:o:f:d:g:t:u:c:r:mex:y:s:l:z:a:b:k:nh ARG; do
+while getopts i:j:o:f:d:g:t:u:c:r:mex:y:s:l:z:a:b:q:k:nh ARG; do
 	case "$ARG" in
 		i) REGION=$OPTARG;;
 		j) BAMDIR=$OPTARG;;
@@ -83,6 +86,7 @@ while getopts i:j:o:f:d:g:t:u:c:r:mex:y:s:l:z:a:b:k:nh ARG; do
         z) SHIFT=$OPTARG;;
         a) GO=$OPTARG;;
         b) RR=$OPTARG;;
+        q) KNC=$OPTARG;;
         k) RZ=$OPTARG;;
         n) SCALE=1;;
 		h) HELP=1;;
@@ -219,19 +223,19 @@ fi
 echo -n "plot signal profile.. "
 if [ ! -z "$PLOTTITLE" ]; then
     FORBIDIMG=1
-    ngs.plot.r -G $GENOME -R bed -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/$PLOTTITLE -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG
+    ngs.plot.r -G $GENOME -R bed -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/$PLOTTITLE -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG -KNC $KNC
 else
-    ngs.plot.r -G $GENOME -R bed -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/combined -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG
+    ngs.plot.r -G $GENOME -R bed -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/combined -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG -KNC $KNC
 fi
 echo "done"
 
 FORBIDIMG=0
 if [ ! -z "$MERGE" ]; then
-    replotMergedReplicates.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 30
-    replotMergedReplicates.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 30 -CO $CO -RR $RR
+    replotMergedReplicates.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 30 -GO $GO -KNC $KNC
+    replotMergedReplicates.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 30 -CO $CO -RR $RR -GO $GO -KNC $KNC
 else
-    replot.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 30
-    replot.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 30 -CO $CO -RR $RR
+    replot.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 30 -GO $GO -KNC $KNC
+    replot.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 30 -CO $CO -RR $RR -GO $GO -KNC $KNC
 fi
 
 echo -n "scale signal profile between 0 and 1.. "

@@ -20,19 +20,21 @@ usage() {
     echo "             [default: ~/software/RNAPipe/data/Mus_musculus/Ensembl/NCBIM37/ChromInfoRef.txt]"
     echo " -k          [keep bedGraph file also]"
     echo " -e <int>    [extend 3' end of reads by input number of bases (useful for ChIP-seq data)]"
+    echo " -s          [scale the coverage to TPM]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:c:ke:h ARG; do
+while getopts i:o:c:ke:sh ARG; do
 	case "$ARG" in
 		i) BAMFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         c) CHRSIZE=$OPTARG;;
         k) KEEP=1;;
         e) EXTEND=$OPTARG;;
+        s) SCALE=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -44,10 +46,20 @@ fi
 
 ## retrieve file name
 if [ ! -z "$OUTDIR" ]; then
+    if [ ! -d "$OUTDIR" ]; then
+        mkdir -p $OUTDIR
+    fi
+
     ID=`echo $BAMFILE | perl -ane '$_=~s/^.+\///g; $_=~s/\..+$//g; print $_;'`;
 
     ## create bigwig files for viualization at the UCSC genome browser
-    bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $CHRSIZE -s -l 0 -r $EXTEND | bedtools genomecov -bg -i stdin -g $CHRSIZE -split > $OUTDIR/$ID.bedGraph
+    if [ -z "$SCALE" ]; then
+        bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $CHRSIZE -s -l 0 -r $EXTEND | bedtools genomecov -bg -i stdin -g $CHRSIZE -split > $OUTDIR/$ID.bedGraph
+    else
+        MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
+        SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
+        bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $CHRSIZE -s -l 0 -r $EXTEND | bedtools genomecov -bg -i stdin -g $CHRSIZE -split -scale $SCALE_FACTOR > $OUTDIR/$ID.bedGraph
+    fi
 
     bedGraphToBigWig $OUTDIR/$ID.bedGraph $CHRSIZE $OUTDIR/$ID.bw
 
@@ -58,7 +70,13 @@ else
     ID=`echo $BAMFILE | perl -ane '$_=~s/\.bam*//g; print $_;'`;
 
     ## create bigwig files for viualization at the UCSC genome browser
-    bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $CHRSIZE -s -l 0 -r $EXTEND | bedtools genomecov -bg -i stdin -g $CHRSIZE -split > $ID.bedGraph
+    if [ -z "$SCALE" ]; then
+        bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $CHRSIZE -s -l 0 -r $EXTEND | bedtools genomecov -bg -i stdin -g $CHRSIZE -split > $ID.bedGraph
+    else
+        MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
+        SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
+        bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $CHRSIZE -s -l 0 -r $EXTEND | bedtools genomecov -bg -i stdin -g $CHRSIZE -split -scale $MAPPEDREADS > $ID.bedGraph
+    fi
 
     bedGraphToBigWig $ID.bedGraph $CHRSIZE $ID.bw
 
