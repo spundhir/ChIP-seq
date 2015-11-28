@@ -32,6 +32,7 @@ suppressPackageStartupMessages(library(caTools))
 suppressPackageStartupMessages(library(session))
 suppressPackageStartupMessages(library(ggplot2))
 
+####################
 #### plotlib.r ####
 # This contains the library for plotting related functions.
 #
@@ -41,7 +42,7 @@ suppressPackageStartupMessages(library(ggplot2))
 # Last updated: May 21, 2013
 #
 
-SetupHeatmapDevice <- function(reg.list, uniq.reg, ng.list, pts, font.size=12,
+SetupHeatmapDevice <- function(reg.list, uniq.reg, ng.list, pts, 
                                unit.width=4, reduce.ratio=30) {
 # Configure parameters for heatmap output device. The output is used by 
 # external procedures to setup pdf device ready for heatmap plotting.
@@ -50,7 +51,6 @@ SetupHeatmapDevice <- function(reg.list, uniq.reg, ng.list, pts, font.size=12,
 #   uniq.reg: unique region list.
 #   ng.list: number of genes per heatmap in the order as config file.
 #   pts: data points (number of columns of heatmaps).
-#   font.size: font size.
 #   unit.width: image width per heatmap.
 #   reduce.ratio: how compressed are genes in comparison to data points? This 
 #                 controls image height.
@@ -64,20 +64,11 @@ SetupHeatmapDevice <- function(reg.list, uniq.reg, ng.list, pts, font.size=12,
                     ng.list[ri]
                 })
 
-    # Adjustment ratio.
-    origin.fs <- 12  # default font size.
-    fs.adj.ratio <- font.size / origin.fs
-    # Margin size (in lines) adjusted by ratio.
-    m.bot <- fs.adj.ratio * 2
-    m.lef <- fs.adj.ratio * 1.5
-    m.top <- fs.adj.ratio * 2
-    m.rig <- fs.adj.ratio * 1.5 
-    key.in <- fs.adj.ratio * 1.0  # colorkey in inches.
-    m.lef.diff <- (fs.adj.ratio - 1) * 1.5
-    m.rig.diff <- (fs.adj.ratio - 1) * 1.5
     # Setup image size.
-    hm.width <- (unit.width + m.lef.diff + m.rig.diff) * max(reg.np)
+    hm.width <- unit.width * max(reg.np)
     ipl <- .2 # inches per line. Obtained from par->'mai', 'mar'.
+    m.bot <- 2; m.lef <- 1.5; m.top <- 2; m.rig <- 1.5 # margin size in lines.
+    key.in <- 1.0  # colorkey in inches.
     # Convert #gene to image height.
     reg.hei <- sapply(reg.ng, function(r) {
                     c(key.in,  # colorkey + margin.
@@ -267,10 +258,9 @@ genXticks <- function(reg2plot, pint, lgint, pts, flanksize, flankfactor,
 }
 
 plotmat <- function(regcovMat, title2plot, plot.colors, bam.pair, xticks, 
-                    pts, m.pts, f.pts, pint, shade.alp=0, confiMat=NULL, mw=1,
-                    ymin, ymax, ylab, box_color,
-                    misc.options=list(yscale='auto', legend=T, box=T, vline=T, 
-                                      xylab=T, line.wd=3)) {
+                    pts, m.pts, f.pts, pint, shade.alp=0, confiMat=NULL, mw=1, ymin, ymax, ylab, box_color,
+                    misc.options=list(legend=T, box=T, vline=T, xylab=T, 
+                                      line.wd=3)) {
 # Plot avg. profiles and standard errors around them.
 # Args:
 #   regcovMat: matrix for avg. profiles.
@@ -285,7 +275,7 @@ plotmat <- function(regcovMat, title2plot, plot.colors, bam.pair, xticks,
 #   shade.alp: shading area alpha
 #   confiMat: matrix for standard errors.
 #   mw: moving window size for smoothing function.
-#   misc.options: list of misc. options - y-axis scale, legend, box around plot, 
+#   misc.options: list of misc. options - legend, box around plot, 
 #       verticle lines, X- and Y-axis labels, line width.
 
     # Smooth avg. profiles if specified.
@@ -297,7 +287,17 @@ plotmat <- function(regcovMat, title2plot, plot.colors, bam.pair, xticks,
     # Choose colors.
     if(any(is.na(plot.colors))) {
         ncurve <- ncol(regcovMat)
-        if(ncurve <= 8) {
+        replicates <- 0
+        if(length(which(grepl("Rep1", title2plot, ignore.case=T)==TRUE))>0 & length(which(grepl("Rep2", title2plot, ignore.case=T)==TRUE))>0) {
+            replicates <- 1
+        }
+        cat(class(title2plot))
+
+        if(ncurve <= 8 & replicates==1) {
+            #col2use <- brewer.pal(8,'Dark2')
+            #col2use <- c(col2use[1], col2use[5], col2use[2], col2use[6], col2use[3], col2use[8])
+            col2use <- c("#FF0000", "#FF9900", "#00FF00", "#00ECA3", "#0000FF", "#3399FF", "#404040", "#847C6A");
+        } else if(ncurve <= 8) {
             suppressMessages(require(RColorBrewer, warn.conflicts=F))
             col2use <- brewer.pal(ifelse(ncurve >= 3, ncurve, 3), 'Dark2')
             col2use <- col2use[1:ncurve]
@@ -310,31 +310,21 @@ plotmat <- function(regcovMat, title2plot, plot.colors, bam.pair, xticks,
     col2use <- col2alpha(col2use, 0.8)
 
     # Plot profiles.
-    #ytext <- ifelse(bam.pair, "log2(Fold change vs. control)", 
-    #                          "Read count Per Million mapped reads")
     ytext <- ifelse(bam.pair, "log2(Fold change vs. control)", sprintf("TPM (%s)", ylab))
+    #ytext <- ifelse(bam.pair, "log2(Fold change vs. control)", "TPM")
     xrange <- 0:pts
-    y.lim <- NULL
-    if(length(misc.options$yscale) == 2) {
-        y.lim <- misc.options$yscale
-    }
     if(ymax != 0) {
-        matplot(xrange, regcovMat, 
-                xaxt='n', type="l", col=col2use, ylim=c(ymin,ymax),
-                lty="solid", lwd=misc.options$line.wd, frame.plot=F, ann=F)
+        matplot(xrange, regcovMat, xaxt='n', type="l", col=col2use, lty="solid", lwd=misc.options$line.wd, frame.plot=F, ann=F, ylim=c(ymin,ymax))
     } else {
-        matplot(xrange, regcovMat, 
-                xaxt='n', type="l", col=col2use, ylim=y.lim,
-                lty="solid", lwd=misc.options$line.wd, frame.plot=F, ann=F)
+        matplot(xrange, regcovMat, xaxt='n', type="l", col=col2use, lty="solid", lwd=misc.options$line.wd, frame.plot=F, ann=F)
     }
+    #matplot(xrange, regcovMat, xaxt='n', type="l", col=col2use, lty="solid", lwd=misc.options$line.wd, frame.plot=F, ann=F, ylim=c(0,(max(regcovMat)+0.05)))
     if(misc.options$xylab) {
         #title(xlab="Genomic Region (5' -> 3')", ylab=ytext)
         title(xlab="", ylab=ytext)
     }
-    axis(1, at=xticks$pos, labels=xticks$lab, lwd=3, lwd.ticks=3)
     if(misc.options$box) {
         # box around plot.
-        #box()
         box(col=box_color, lwd=2)
         axis(1, at=xticks$pos, labels=xticks$lab, lwd=3, lwd.ticks=3)
     }
@@ -393,116 +383,112 @@ spline_mat <- function(mat, n=100){
     }
 }
 
-RankNormalizeMatrix <- function(mat, low.cutoff) {
-# Rank-based normalization for a data matrix.
-# Args:
-#   mat: data matrix.
-#   low.cutoff: low value cutoff.
-# Return: rank normalized matrix.
-
-    stopifnot(is.matrix(mat))
-
-    concat.dat <- c(mat)
-    low.mask <- concat.dat < low.cutoff
-    concat.r <- rank(concat.dat)
-    concat.r[low.mask] <- 0
-
-    matrix(concat.r, nrow=nrow(mat))
-}
-
-OrderGenesHeatmap <- function(enrichList, lowCutoffs,
+OrderGenesHeatmap <- function(n, enrichCombined, 
                               method=c('total', 'max', 'prod', 'diff', 'hc', 
-                                       'none', 'km'),
-                              go.paras=list(knc=5, max.iter=20, nrs=30)) {
-# Order genes with a list of heatmap data.
+                                       'pca', 'none')) {
+# Order genes in combined heatmap data.
 # Args: 
-#   enrichList: heatmap data in a list.
-#   lowCutoffs: low count cutoff for normalized count data.
+#   n: number of plots(such as histone marks) in the combined data.
+#   enrichCombined: combined heatmap data.
 #   method: algorithm used to order genes.
-#   go.paras: gene ordering parameters.
-# Returns: a vector of REVERSED gene orders. 
-# NOTE: due to the design of image function, the order needs to be reversed
-#       so that the genes will be shown correctly. 
+# Return: list of vectors of gene orders. In case of PCA, it may return more 
+#   than one vectors of gene orders. Otherwise, the list length is 1.
 
-    rankList <- mapply(RankNormalizeMatrix, 
-                       mat=enrichList, low.cutoff=lowCutoffs, SIMPLIFY=F)
-    np <- length(enrichList)
-
-    if(method == 'hc') {
-        rankCombined <- do.call('cbind', rankList)
+    npts <- ncol(enrichCombined) / n  # number of data points for each profile.
+    
+    if(method == 'hc') {  # hierarchical clustering
+        # Filter genes with zero sd.
+        g.sd <- apply(enrichCombined, 1, sd)
+        g.nz <- which(g.sd > 0)
+        g.ze <- which(g.sd == 0)
+        enrichCombined <- enrichCombined[g.nz, ]
         # Clustering and order genes.
-        hc <- hclust(dist(rankCombined, method='euclidean'), 
-                     method='complete')
-        memb <- cutree(hc, k = go.paras$knc)
-        list(rev(hc$order), memb)  # reversed!
-    } else if(method == 'km') {
-        rankCombined <- do.call('cbind', rankList)
-        km <- kmeans(rankCombined, centers=go.paras$knc, 
-                     iter.max=go.paras$max.iter, nstart=go.paras$nrs)
-        list(rev(order(km$cluster)), km$cluster)  # reversed!
-    } else if(method == 'total' || method == 'diff' && np == 1) {  
-        list(order(rowSums(rankList[[1]])), NULL)
+        hc <- hclust(as.dist(1-cor(t(enrichCombined))), method='complete')
+        # Notes: do NOT forget hc is applied to non-zero sd genes only.
+        # The original gene indices must be recovered before return values.
+        list(hc=c(g.nz[hc$order], g.ze))
+    } else if(method == 'total' || method == 'diff' && n == 1) {  
+        # overall enrichment of the 1st profile.
+        list(total=order(rowSums(enrichCombined[, 1:npts])))
     } else if(method == 'max') {  # peak enrichment value of the 1st profile.
-        list(order(apply(rankList[[1]], 1, max)), NULL)
+        list(max=order(apply(enrichCombined[, 1:npts], 1, max)))
     } else if(method == 'prod') {  # product of all profiles.
-        rs.mat <- sapply(rankList, rowSums)
-        g.prod <- apply(rs.mat, 1, prod)
-        list(order(g.prod), NULL)
-    } else if(method == 'diff' && np > 1) {  # difference between 2 profiles.
-        list(order(rowSums(rankList[[1]]) - rowSums(rankList[[2]])), NULL)
+        g.prod <- foreach(r=iter(enrichCombined, by='row'), .combine='c', 
+                            .multicombine=T, .maxcombine=1000) %dopar% {
+            foreach(i=icount(n),  # go through each profile.
+                    .combine='prod', .multicombine=T) %do% {
+                col.sta <- (i - 1) * npts + 1
+                col.end <- i * npts
+                sum(r[col.sta:col.end], na.rm=T)
+            }
+        }
+        list(prod=order(g.prod))
+    } else if(method == 'diff' && n > 1) {  # difference between 2 profiles.
+        list(diff=order(rowSums(enrichCombined[, 1:npts]) - 
+                        rowSums(enrichCombined[, (npts + 1):(npts * 2)])))
+    } else if(method == 'pca') {  # principal component analysis.
+        # Reduce the data to a small number of bins per profile.
+        nbin <- 10
+        enrich.reduced <- foreach(i=icount(n), .combine='cbind', 
+                                .multicombine=T) %do% {
+            # Go through each profile.
+            col.sta <- (i - 1) * npts + 1
+            col.end <- i * npts
+            # Column breaks represent bin boundaries.
+            col.breaks <- seq(col.sta, col.end, length.out=nbin + 1)
+            foreach(j=icount(nbin), .combine='cbind', .multicombine=T) %dopar% {
+                # Go through each bin.
+                rowSums(enrichCombined[, col.breaks[j]:col.breaks[j + 1]])
+            }
+        }
+        # Pull out all pc's that equal at least 10% variance of the 1st pc.
+        enrich.pca <- prcomp(enrich.reduced, center=F, scale=F, tol=sqrt(.1))
+        # Order genes according to each pc.
+        pc.order <- foreach(i=icount(ncol(enrich.pca$x))) %dopar% {
+            order(enrich.pca$x[, i])
+        }
+        names(pc.order) <- paste('pc', 1:ncol(enrich.pca$x), sep='')
+        pc.order
     } else if(method == 'none') {  # according to the order of input gene list.
         # Because the image function draws from bottom to top, the rows are 
         # reversed to give a more natural look.
-        list(rev(1:nrow(enrichList[[1]])),NULL)
+        list(none=rev(1:nrow(enrichCombined)))
     } else {
         # pass.
     }
 }
 
 
-plotheat <- function(reg.list, uniq.reg, enrichList, v.low.cutoff, go.algo, 
-                     go.paras, title2plot, bam.pair, xticks, flood.q=.02, 
-                     do.plot=T, hm.color="default", color.distr=.6, 
-                     color.scale='local') {
+plotheat <- function(reg.list, uniq.reg, enrichList, go.algo, title2plot, 
+                     bam.pair, xticks, rm.zero=1, flood.q=.02, do.plot=T,
+                     hm.color="default", color.scale='local') {
 # Plot heatmaps with genes ordered according to some algorithm.
 # Args:
 #   reg.list: factor vector of regions as in configuration.
 #   uniq.reg: character vector of unique regions.
 #   enrichList: list of heatmap data.
-#   v.low.cutoff: low count cutoff for normalized count data.
 #   go.algo: gene order algorithm.
-#   go.paras: gene ordering parameters.
 #   title2plot: title for each heatmap. Same as the legends in avgprof.
 #   bam.pair: boolean tag for bam-pair.
 #   xticks: info for X-axis ticks.
+#   rm.zero: tag for removing all zero profiles.
 #   flood.q: flooding percentage.
 #   do.plot: boolean tag for plotting heatmaps.
 #   hm.color: string for heatmap colors.
-#   color.distr: positive number for color distribution.
-#   color.scale: string for the method to adjust color scale.
+#   scale: string for the method to adjust color scale.
 # Returns: ordered gene names for each unique region as a list.
 
     # Setup basic parameters.
     ncolor <- 256
     if(bam.pair) {
         if(hm.color != "default") {
-            tri.colors <- unlist(strsplit(hm.color, ':'))
-            neg.color <- tri.colors[1]
-            if(length(tri.colors) == 2) {
-                neu.color <- 'black'
-                pos.color <- tri.colors[2]
-            } else {
-                neu.color <- tri.colors[2]
-                pos.color <- tri.colors[3]
-            }
-            enrich.palette <- colorRampPalette(c(neg.color, neu.color, 
-                                                 pos.color), 
-                                               bias=color.distr, 
-                                               interpolate='spline')
+            two.colors <- unlist(strsplit(hm.color, ':'))
+            enrich.palette <- colorRampPalette(c(two.colors[1], 'black', 
+                                                 two.colors[2]), 
+                                               bias=.6, interpolate='spline')
         } else {
-            enrich.palette <- colorRampPalette(c('blue', 'black', 'yellow'), 
-                                               bias=color.distr, 
-                                               interpolate='spline')
+            enrich.palette <- colorRampPalette(c('green', 'black', 'red'), 
+                                               bias=.6, interpolate='spline')
         }
     } else {
         if(hm.color != "default") {
@@ -560,58 +546,48 @@ plotheat <- function(reg.list, uniq.reg, enrichList, v.low.cutoff, go.algo,
     # Go through each unique region. 
     # Do NOT use "dopar" in the "foreach" loops here because this will disturb
     # the image order.
-    go.list <- vector('list', length(uniq.reg))
-    go.cluster <- vector('list', length(uniq.reg))
-
+    go.list <- vector('list', length=length(uniq.reg))
     names(go.list) <- uniq.reg
-    names(go.cluster) <- uniq.reg
-
-    for(ur in uniq.reg) {
-        # ur <- uniq.reg[i]
+    for(i in 1:length(uniq.reg)) {
+        ur <- uniq.reg[i]
         plist <- which(reg.list==ur)  # get indices in the config file.
 
         # Combine all profiles into one.
-        # enrichCombined <- do.call('cbind', enrichList[plist])
-        enrichSelected <- enrichList[plist]
+        enrichCombined <- do.call('cbind', enrichList[plist])
+
+        # Remove profiles that are all zero. They may correspond to unmappable
+        # genes.
+        if(rm.zero) {
+            enrichCombined <- enrichCombined[rowSums(enrichCombined) != 0, ]
+        }
 
         # If color scale is region, calculate breaks and quantile here.
         if(color.scale == 'region') {
-            flood.pts <- quantile(c(enrichSelected, recursive=T), 
+            flood.pts <- quantile(c(enrichCombined, recursive=T), 
                                   c(flood.q, 1-flood.q))
             brk.use <- ColorBreaks(flood.pts[2], flood.pts[1], bam.pair, ncolor)
         }
 
         # Order genes.
-        if(is.matrix(enrichSelected[[1]]) && nrow(enrichSelected[[1]]) > 1) {
-            if(bam.pair) {
-                lowCutoffs <- 0
-            } else {
-                lowCutoffs <- v.low.cutoff[plist]
-            }
-            g.order.list <- OrderGenesHeatmap(enrichSelected, lowCutoffs, 
-                                              go.algo, go.paras)
-            g.order <- g.order.list[[1]]
-            g.cluster <- g.order.list[[2]]
-            if(is.null(g.cluster)) {
-                go.cluster[[ur]] <- NA
-            } else{
-                go.cluster[[ur]] <- rev(g.cluster[g.order])
-            }
-            go.list[[ur]] <- rev(rownames(enrichSelected[[1]][g.order, ]))
-        } else {
-            go.cluster[[ur]] <- NULL
-            go.list[[ur]] <- NULL
+        if(nrow(enrichCombined) > 1) {
+            g.order <- OrderGenesHeatmap(length(plist), enrichCombined, go.algo)
+            enrichCombined <- enrichCombined[g.order[[1]], ]
         }
+        # for now, just use the 1st gene order. p.s.: pca will provide more than
+        # one orders.
+        go.list[[i]] <- rev(rownames(enrichCombined))
 
         if(!do.plot) {
             next
         }
   
         # Go through each sample and do plot.
-        for(pj in plist) {
-            if(!is.null(g.order)) {
-                enrichList[[pj]] <- enrichList[[pj]][g.order, ]
-            }
+        for(j in 1:length(plist)) {
+            pj <- plist[j]  # index in the original config.
+
+            # Split combined profiles back into individual heatmaps.
+            enrichList[[pj]] <- enrichCombined[, ((j-1)*hm_cols+1) : 
+                                                 (j*hm_cols)]
 
             # If color scale is local, calculate breaks and quantiles here.
             if(color.scale == 'local') {
@@ -640,7 +616,7 @@ plotheat <- function(reg.list, uniq.reg, enrichList, v.low.cutoff, go.algo,
             axis(1, at=xticks$pos, labels=xticks$lab, lwd=1, lwd.ticks=1)
         }
     }
-    list(go.list,go.cluster)
+    go.list
 }
 
 trim <- function(x, p){
@@ -692,8 +668,8 @@ CalcSem <- function(x, rb=.05){
 # } else {
 #   png(plot.name, width, height, pointsize=pointsize, type=type)
 # }
-
 ####################
+
 sessionFile <- unlist(strsplit(opt$sessionFile, ","))
 sessionFileDes <- unlist(strsplit(opt$sessionFileDes, ","))
 if(!is.null(opt$regionCounts)) {
