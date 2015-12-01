@@ -13,6 +13,7 @@ GO="none"
 RR=30
 RZ=0
 KNC=5
+REORDER_NGSPLOT="lsk,pregm,gmp,granulocytes"
 
 #### usage ####
 usage() {
@@ -51,7 +52,7 @@ usage() {
     echo "             [min_val,max_val: custom scale using a pair of numerics]"
     echo " -l <int>    [flanking region size (default: 1000)]"
     echo " -z <int>    [shift center position by input number of bases (default: 0)]"
-    echo " -a <string> [gene order algorithm for heatmap (default: none]"
+    echo " -a <string> [gene order algorithm for heatmap (default: none)]"
     echo "             [total, hc, max, prod, diff, km, none]"
     echo " -b <int>    [reduce ratio for heatmap (default: 30)]"
     echo "             [the parameter controls the heatmap height. The smaller the value, the taller the heatmap]"
@@ -59,13 +60,14 @@ usage() {
     echo " -k <int>    [remove all zero profiles in heatmap (default: 0) ]"
     echo "             [set 1 to remove them]"
     echo " -n          [scale signal profile between 0 and 1]"
+    echo " -v <string> [reorder NGSPLOT.TXT based on input keywords (default: lsk,pregm,gmp,granulocytes)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:o:f:d:g:t:u:c:r:mex:y:s:l:z:a:b:q:k:nh ARG; do
+while getopts i:j:o:f:d:g:t:u:c:r:mex:y:s:l:z:a:b:q:k:nv:h ARG; do
 	case "$ARG" in
 		i) REGION=$OPTARG;;
 		j) BAMDIR=$OPTARG;;
@@ -89,6 +91,7 @@ while getopts i:j:o:f:d:g:t:u:c:r:mex:y:s:l:z:a:b:q:k:nh ARG; do
         q) KNC=$OPTARG;;
         k) RZ=$OPTARG;;
         n) SCALE=1;;
+        v) REORDER_NGSPLOT=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -118,9 +121,10 @@ if [ ! -d "$OUTDIR" ]; then
 fi
 echo "done"
 
+oIFS=$IFS
 IFS=","
 REGIONS=($REGION)
-IFS=$'\n'
+IFS=$oIFS
 
 ## initialize a text title for each input file, if not provided
 if [ -z "$REGIONTITLE" ]; then
@@ -133,7 +137,7 @@ fi
 
 IFS=","
 REGIONTITLES=($REGIONTITLE)
-IFS=$'\n'
+IFS=$oIFS
 
 if [ "${#REGIONS[@]}" -ne "${#REGIONTITLES[@]}" ]; then
     echo
@@ -160,17 +164,17 @@ if [ -z "$EXIST" ]; then
         echo -n "Compute histone profile for each peak file... " >&2
         IFS=","
         FILTERS_MATCH=($FILTER_MATCH)
-        IFS=$'\n'
+        IFS=$oIFS
 
         IFS=","
         FILTERS_NOMATCH=($FILTER_NOMATCH)
-        IFS=$'\n'
+        IFS=$oIFS
 
         REGIONS_COUNT=`less $OUTDIR/REGIONS_INTEREST$j.bed | wc -l`;
 
         IFS=","
         BAMDIRS=($BAMDIR)
-        IFS=$'\n'
+        IFS=$oIFS
 
         for DIR in "${BAMDIRS[@]}"; do
             for file in $DIR/*.bam; do
@@ -198,15 +202,27 @@ if [ -z "$EXIST" ]; then
         echo "done" >&2
     done > $OUTDIR/NGSPLOT.txt.tmp
 
+    ## reorder NGSPLOT file
+    #IFS=","
+    #REORDER_ITEM=($REORDER_NGSPLOT)
+    #IFS=$oIFS
+
+    #for ITEM in "${REORDER_ITEM[@]}"; do
+    #    grep "_"$ITEM"_" $OUTDIR/NGSPLOT.txt.tmp
+    #done > $OUTDIR/NGSPLOT.txt.tmp.reorder
+
+    #comm -3 <(sort $OUTDIR/NGSPLOT.txt.tmp.reorder) <(sort $OUTDIR/NGSPLOT.txt.tmp) | sed -E 's/^\s+//g' >> $OUTDIR/NGSPLOT.txt.tmp.reorder
+    #mv $OUTDIR/NGSPLOT.txt.tmp.reorder $OUTDIR/NGSPLOT.txt.tmp
+
     ## define color codes (http://colorbrewer2.org)
     if [ -z "$COLOR" ]; then
         IFS=" "
         COLORS=($(getRColor.R -i $(cat $OUTDIR/NGSPLOT.txt.tmp | wc -l) -p));
-        IFS=$'\n'
+        IFS=$oIFS
     else
         IFS=","
         COLORS=($COLOR);
-        IFS=$'\n'
+        IFS=$oIFS
     fi
 
     k=0;
@@ -231,11 +247,11 @@ echo "done"
 
 FORBIDIMG=0
 if [ ! -z "$MERGE" ]; then
-    replotMergedReplicates.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 30 -GO $GO -KNC $KNC
-    replotMergedReplicates.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 30 -CO $CO -RR $RR -GO $GO -KNC $KNC
+    replotMergedReplicates.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 20 -GO $GO -KNC $KNC
+    replotMergedReplicates.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 20 -CO $CO -RR $RR -GO $GO -KNC $KNC
 else
-    replot.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 30 -GO $GO -KNC $KNC
-    replot.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 30 -CO $CO -RR $RR -GO $GO -KNC $KNC
+    replot.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 20 -GO $GO -KNC $KNC
+    replot.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 20 -CO $CO -RR $RR -GO $GO -KNC $KNC
 fi
 
 echo -n "scale signal profile between 0 and 1.. "

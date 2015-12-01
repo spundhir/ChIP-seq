@@ -11,7 +11,8 @@ option_list <- list(
     make_option(c("-x", "--yMax"), help="maximum limit to y-axis"),
     make_option(c("-y", "--yMin"), help="minimum limit to y-axis"),
     make_option(c("-t", "--tfProfile"), help="plot profile for transcription factor instead", action="store_true"),
-    make_option(c("-l", "--logScale"), help="plot histone profile in log scale", action="store_true")
+    make_option(c("-l", "--logScale"), help="plot histone profile in log scale", action="store_true"),
+    make_option(c("-m", "--heatMap"), default="none", help="plot heat map with given algorithm (total, hc, max, prod, diff, km, none. default: %default)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -702,102 +703,138 @@ if(!is.null(opt$regionCounts)) {
     regionCounts <- vector("list", length(sessionFileDes))
 }
 
-## determine maximum ylim
-if(is.null(opt$yMax)) {
-    ymax <- -100
+if(!is.null(opt$heatMap)) {
+    ## plot heat map
+    ## determine maximum and minimum value
+    max <- -1000000
+    min <- 1000000
     for(row in 1:length(sessionFile)) {
-        load(sessionFile[row])
-        if(max(regcovMat) > ymax) {
-            if(!is.null(opt$logScale)) {
-                ymax <- max(log(regcovMat))
-            } else {
-                ymax <- max(regcovMat)
-            }
+        load(sprintf("%s.heatmap.RData", sessionFile[row]))
+        if(max(unlist(lapply(enrichList, function(x) x[which.max(x)]))) > max) {
+            max <- max(unlist(lapply(enrichList, function(x) x[which.max(x)])))
         }
+        if(min(unlist(lapply(enrichList, function(x) x[which.min(x)]))) < min) {
+            min <- min(unlist(lapply(enrichList, function(x) x[which.min(x)])))
+        }
+    }
+
+    ## replot normalized heatmap
+    for(row in 1:length(sessionFile)) {
+        load(sprintf("%s.heatmap.RData", sessionFile[row]))
+        enrichListNorm <- lapply(enrichList, function(x) ((x-min)/(max-min)))
+        out.hm <- paste(oname, '.pdf', sep='')
+        font.size=20
+        pdf(out.hm, width=hm.width, height=hm.height, pointsize=font.size)
+        par(mai=heatmap.mar)
+        layout(lay.mat, heights=reg.hei)
+
+        v.low.cutoff <- low.count.ratio * v.low.cutoff
+        go.list <- plotheat(reg.list, uniq.reg, enrichList, v.low.cutoff, opt$heatMap, 
+                            go.paras, ctg.tbl$title, bam.pair, xticks, flood.frac, 
+                            do.plot=T, hm.color=hm.color, color.distr=color.distr, 
+                            color.scale=color.scale)
+        out.dev <- dev.off()
     }
 } else {
-    ymax=as.numeric(opt$yMax)
-}
-
-if(is.null(opt$yMin)) {
-    ymin <- 100
-    for(row in 1:length(sessionFile)) {
-        load(sessionFile[row])
-        if(min(regcovMat) < ymin) {
-            if(!is.null(opt$logScale)) {
-                ymin <- min(log(regcovMat))
-            } else {
-                ymin <- min(regcovMat)
+    ## plot line plot
+    ## determine maximum ylim
+    if(is.null(opt$yMax)) {
+        ymax <- -100
+        for(row in 1:length(sessionFile)) {
+            load(sprintf("%s.avgprof.RData", sessionFile[row]))
+            if(max(regcovMat) > ymax) {
+                if(!is.null(opt$logScale)) {
+                    ymax <- max(log(regcovMat))
+                } else {
+                    ymax <- max(regcovMat)
+                }
             }
         }
-    }
-} else {
-    ymin=as.numeric(opt$yMin)
-}
-
-## plot the dynamics
-pdf(opt$outPdfFile, height=length(sessionFile)*2)
-for(row in 1:length(sessionFile)) {
-    load(sessionFile[row])
-
-    ## comment to set identical ylim for all plots
-    if(ymax<=0) {
-        ymax <- max(regcovMat)
+    } else {
+        ymax=as.numeric(opt$yMax)
     }
 
-    if(!is.null(opt$plotOrder)) {
-        plotOrder <- unlist(strsplit(opt$plotOrder, ","))
-        if(row==1) {
-            par(mfrow=c(length(sessionFile), length(plotOrder)))
+    if(is.null(opt$yMin)) {
+        ymin <- 100
+        for(row in 1:length(sessionFile)) {
+            load(sprintf("%s.avgprof.RData", sessionFile[row]))
+            if(min(regcovMat) < ymin) {
+                if(!is.null(opt$logScale)) {
+                    ymin <- min(log(regcovMat))
+                } else {
+                    ymin <- min(regcovMat)
+                }
+            }
         }
-        for(col in 1:length(plotOrder)) {
-            if('TRUE' %in% grepl(plotOrder[col], colnames(regcovMat))) {
-                col_order <- grep(plotOrder[col], colnames(regcovMat))
-                prof.misc$legend=F
-                box_color <- ifelse(grepl(plotOrder[col], sessionFileDes[row]), "black", "white")
+    } else {
+        ymin=as.numeric(opt$yMin)
+    }
+
+    ## plot the dynamics
+    pdf(opt$outPdfFile, height=length(sessionFile)*2)
+    for(row in 1:length(sessionFile)) {
+        load(sprintf("%s.avgprof.RData", sessionFile[row]))
+
+        ## comment to set identical ylim for all plots
+        if(ymax<=0) {
+            ymax <- max(regcovMat)
+        }
+
+        if(!is.null(opt$plotOrder)) {
+            plotOrder <- unlist(strsplit(opt$plotOrder, ","))
+            if(row==1) {
+                par(mfrow=c(length(sessionFile), length(plotOrder)))
+            }
+            for(col in 1:length(plotOrder)) {
+                if('TRUE' %in% grepl(plotOrder[col], colnames(regcovMat))) {
+                    col_order <- grep(plotOrder[col], colnames(regcovMat))
+                    prof.misc$legend=F
+                    box_color <- ifelse(grepl(plotOrder[col], sessionFileDes[row]), "black", "white")
+                    if(!is.null(opt$tfProfile)) {
+                        if(length(col_order) <= 4) {
+                            color[col_order] <- c("#e7298a", "#1b9e77", "#e6ab02", "#7570b3")
+                        } else {
+                            color[col_order] <- NA
+                        }
+                        ## comment to see x-axis and box around the plots
+                        prof.misc$box <- "FALSE"
+                    } else {
+                        color[col_order] <- "#762a83"
+                    }
+                    if(!is.null(opt$logScale)) {
+                        plotmat(log(regcovMat[,col_order]), plotOrder[col], color[col_order], bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, as.matrix(confiMat[,col_order]), mw, ymin, ymax, regionCounts[row], box_color, prof.misc)
+                    } else {
+                        plotmat(regcovMat[,col_order], plotOrder[col], color[col_order], bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, as.matrix(confiMat[,col_order]), mw, ymin, ymax, regionCounts[row], box_color, prof.misc)
+                    }
+                } else {
+                    plot.new()
+                }
+            }
+        } else {
+            if(row==1) {
+                par(mfrow=c(length(sessionFile), ncol(regcovMat)))
+            }
+            for(col in 1:ncol(regcovMat)) {
+                box_color <- "black"
                 if(!is.null(opt$tfProfile)) {
                     if(length(col_order) <= 4) {
                         color[col_order] <- c("#e7298a", "#1b9e77", "#e6ab02", "#7570b3")
                     } else {
                         color[col_order] <- NA
                     }
-                    ## comment to see x-axis and box around the plots
-                    prof.misc$box <- "FALSE"
                 } else {
                     color[col_order] <- "#762a83"
                 }
-                if(!is.null(opt$logScale)) {
-                    plotmat(log(regcovMat[,col_order]), plotOrder[col], color[col_order], bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, as.matrix(confiMat[,col_order]), mw, ymin, ymax, regionCounts[row], box_color, prof.misc)
-                } else {
-                    plotmat(regcovMat[,col_order], plotOrder[col], color[col_order], bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, as.matrix(confiMat[,col_order]), mw, ymin, ymax, regionCounts[row], box_color, prof.misc)
-                }
-            } else {
-                plot.new()
-            }
-        }
-    } else {
-        if(row==1) {
-            par(mfrow=c(length(sessionFile), ncol(regcovMat)))
-        }
-        for(col in 1:ncol(regcovMat)) {
-            box_color <- "black"
-            if(!is.null(opt$tfProfile)) {
-                if(length(col_order) <= 4) {
-                    color[col_order] <- c("#e7298a", "#1b9e77", "#e6ab02", "#7570b3")
-                } else {
-                    color[col_order] <- NA
-                }
-            } else {
-                color[col_order] <- "#762a83"
-            }
 
-            if(!is.null(opt$logScale)) {
-                plotmat(log(regcovMat[,col]), title[col], color[col], bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, as.matrix(confiMat[,col]), mw, ymin, ymax, regionCounts[,col_order], box_color, prof.misc)
-            } else {
-                plotmat(regcovMat[,col], title[col], color[col], bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, as.matrix(confiMat[,col]), mw, ymin, ymax, regionCounts[,col_order], box_color, prof.misc)
+                if(!is.null(opt$logScale)) {
+                    plotmat(log(regcovMat[,col]), title[col], color[col], bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, as.matrix(confiMat[,col]), mw, ymin, ymax, regionCounts[,col_order], box_color, prof.misc)
+                } else {
+                    plotmat(regcovMat[,col], title[col], color[col], bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, as.matrix(confiMat[,col]), mw, ymin, ymax, regionCounts[,col_order], box_color, prof.misc)
+                }
             }
         }
     }
+    dev.off()
 }
-dev.off()
+
 q()

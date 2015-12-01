@@ -5,6 +5,7 @@ OUTDIR="nfr_dynamics";
 GENOME="mm9"
 PROCESSOR=1
 MIN_N_CLASS=50
+GENE_ORDER="none"
 
 #### usage ####
 usage() {
@@ -40,13 +41,15 @@ usage() {
     echo " -p <int>            [number of processor to use (default: 1)]"
     echo " -x <float>          [maximum limit to y-axis in nfr dynamics plot (default: computed automatically)]"
     echo " -y <int>            [minimum number of elements within each nfr dynamic class to plot (default: 50)]"
+    echo " -a <string>         [gene order algorithm for heatmap (default: none)]"
+    echo "                     [total, hc, max, prod, diff, km, none]"
 	echo " -h                  [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:k:l:vo:f:d:g:te:n:m:p:rx:y:h ARG; do
+while getopts i:j:k:l:vo:f:d:g:te:n:m:p:rx:y:a:h ARG; do
 	case "$ARG" in
 		i) NFR=$OPTARG;;
 		j) NFRID=$OPTARG;;
@@ -65,6 +68,7 @@ while getopts i:j:k:l:vo:f:d:g:te:n:m:p:rx:y:h ARG; do
         p) PROCESSOR=$OPTARG;;
         x) YMAX=$OPTARG;;
         y) MIN_N_CLASS=$OPTARG;;
+        a) GENE_ORDER=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -106,6 +110,9 @@ if [ ! -d "$OUTDIR/motifs" -a -z "$TFPROFILE" ]; then
 fi
 if [ ! -d "$OUTDIR/go_analysis" ]; then
     mkdir $OUTDIR/go_analysis
+fi
+if [ ! -d "$OUTDIR/heatmap" ]; then
+    mkdir $OUTDIR/heatmap
 fi
 echo "done"
 
@@ -153,24 +160,30 @@ echo -n "Plot ChIP profile for each NFR dynamic class (`date`).. "
 SESSION_FILES=""
 PLOT_TITLES=""
 REGIONS_INTEREST_COUNTS=""
+HEATMAP_FILES=""
 for CLASS in $(cat $OUTDIR/NFR_DYNAMICS.TXT | cut -f 5 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1 | perl -ane 'if($F[0]>50) { print "$F[1]\n"; }'); do
     PLOT_TITLE=$(echo $CLASS | sed 's/\,/_/g')
     REGIONS_INTEREST_COUNT=$(perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | wc -l)
 
     if [ ! -f "$OUTDIR/$PLOT_TITLE.avgprof.RData" ]; then
         if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
-            perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | ngsPlot -i stdin -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t $PLOT_TITLE -m -x 1
+            perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | ngsPlot -i stdin -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t $PLOT_TITLE -m -x 1 -a $GENE_ORDER
         elif [ ! -z "$CHIP_INCL_FILTER" ]; then
-            perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | ngsPlot -i stdin -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t $PLOT_TITLE -m -x 1
+            perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | ngsPlot -i stdin -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t $PLOT_TITLE -m -x 1 -a $GENE_ORDER
         elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
-            perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | ngsPlot -i stdin -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t $PLOT_TITLE -m -x 1
+            perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | ngsPlot -i stdin -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t $PLOT_TITLE -m -x 1 -a $GENE_ORDER
         else
-            perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | ngsPlot -i stdin -j $CHIPDIR -o $OUTDIR -g $GENOME -t $PLOT_TITLE -m -x 1
+            perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | ngsPlot -i stdin -j $CHIPDIR -o $OUTDIR -g $GENOME -t $PLOT_TITLE -m -x 1 -a $GENE_ORDER
         fi
     fi
-    SESSION_FILES="$SESSION_FILES,$OUTDIR/$PLOT_TITLE.avgprof.RData"
+
+    SESSION_FILES="$SESSION_FILES,$OUTDIR/$PLOT_TITLE"
     PLOT_TITLES="$PLOT_TITLES,$PLOT_TITLE"
     REGIONS_INTEREST_COUNTS="$REGIONS_INTEREST_COUNTS,$REGIONS_INTEREST_COUNT"
+
+    ## create files for plotting normalized heatmap
+    HEATMAP_FILES="$HEATMAP_FILES,$OUTDIR/heatmap/$PLOT_TITLE"".bed"
+    perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT > $OUTDIR/heatmap/$PLOT_TITLE.bed
 done
 echo "done"
 
@@ -178,7 +191,23 @@ echo -n "Plot NFR dynamics across different samples (`date`).. "
 SESSION_FILES=$(echo $SESSION_FILES | sed -E 's/^\,//g')
 PLOT_TITLES=$(echo $PLOT_TITLES | sed -E 's/^\,//g')
 REGIONS_INTEREST_COUNTS=$(echo $REGIONS_INTEREST_COUNTS | sed -E 's/^\,//g')
+HEATMAP_FILES=$(echo $HEATMAP_FILES | sed -E 's/^\,//g')
 
+## plot nfr dynamics as heatmap
+if [ ! -f "$OUTDIR/heatmap/heatmap.avgprof.RData" ]; then
+    if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR/heatmap -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER
+    elif [ ! -z "$CHIP_INCL_FILTER" ]; then
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR/heatmap -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER
+    elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR/heatmap -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER
+    else
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR/heatmap -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER
+    fi
+fi
+nfrDynAna.R -i $OUTDIR/heatmap/heatmap -j heatmap -o NONE -m $GENE_ORDER
+
+## plot nfr dynamics as line plot
 if [ ! -z "$TFPROFILE" ]; then
     if [ ! -z "$YMAX" ]; then
         nfrDynAna.R -i $SESSION_FILES -j $PLOT_TITLES -k $REGIONS_INTEREST_COUNTS -o $OUTDIR/nfr_dynamics.pdf -r $NFRID -t -x $YMAX
@@ -209,7 +238,9 @@ if [ -z "$TFPROFILE" ]; then
 
     echo -n "Perform dynamics in the enrichment of motifs across NFR classes (`date`).. "
     INPUT_MOTIF_DYN_ANA=$(echo $INPUT_MOTIF_DYN_ANA | sed -E 's/^\,//')
-    motifDynAna -i $INPUT_MOTIF_DYN_ANA -o $OUTDIR -g $GENOME -p $PROCESSOR -c 50 -u 0.75 -v 1.5 -x 1.1 
+    if [ ! -f "$OUTDIR/motif_dynamics.pdf" ]; then
+        motifDynAna -i $INPUT_MOTIF_DYN_ANA -o $OUTDIR -g $GENOME -p $PROCESSOR -c 50 -u 0.75 -v 1.5 -x 1.1 
+    fi
     echo "done"
 else
     echo -n "Perform expression analysis of TF at each NFR dynamic class (`date`).. "
