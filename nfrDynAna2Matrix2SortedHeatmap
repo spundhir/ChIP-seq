@@ -1,0 +1,165 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+OUTDIR="matrix";
+GENOME="mm9"
+PROCESSOR=1
+MIN_N_CLASS=50
+GENE_ORDER="none"
+
+#### usage ####
+usage() {
+	echo Program: "nfrDynAna2Matrix2SortedHeatmap (plot sorted heatmap for different nfr dynamic classes)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: nfrDynAna2Matrix2SortedHeatmap -i <file> -k <dir> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>           [file containing NFR with statistics from nfrDyna2Matrix script]"
+    echo " -k <dir>            [input directory containing BAM files for various histone marks]"
+    echo "[OPTIONS]"
+    echo " -l <file | stdin>   [file containing TF coordinate. Analyze NFRs which overlap the TF coordinate]"
+    echo " -v                  [exclude NFRs which overlap the TF coordinate]"
+    echo " -o <dir>            [output directory to store results (default: ./matrix)"
+    echo " -f <string>         [filter BAM files matching identifiers eg. wt or gmp]"
+    echo "                     [if multiple, seperate them by a comma]"
+    echo " -d <string>         [filter BAM files not matching identifiers eg. wt or gmp]"
+    echo "                     [if multiple seperate them by a comma]"
+    echo " -g <string>         [genome (default: mm9]"
+    echo " -p <int>            [number of processor to use (default: 1)]"
+    echo " -y <int>            [minimum number of elements within each nfr dynamic class to plot (default: 50)]"
+    echo " -a <string>         [gene order algorithm for heatmap (default: none)]"
+    echo "                     [total, hc, max, prod, diff, km, none]"
+	echo " -h                  [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:k:l:vo:f:d:g:p:y:a:h ARG; do
+	case "$ARG" in
+		i) NFR=$OPTARG;;
+        k) CHIPDIR=$OPTARG;;
+		l) TFSUMMIT=$OPTARG;;
+        v) TFSUMMIT_EXCL=1;;
+        o) OUTDIR=$OPTARG;;
+        f) CHIP_INCL_FILTER=$OPTARG;;
+        d) CHIP_EXCL_FILTER=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+        y) MIN_N_CLASS=$OPTARG;;
+        a) GENE_ORDER=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+echo
+if [ "$HELP" ]; then
+    usage
+fi
+
+echo
+echo -n "Check, if all required parameters and files are provided (`date`).. "
+## usage, if necessary file and directories are given/exist
+if [ -z "$NFR" -o -z "$CHIPDIR" ]; then
+    echo
+    echo "Error: one or more required paramter values not provided"
+    echo
+	usage
+fi
+echo "done"
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+echo -n "Create directory structure (`date`).. "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+echo "done"
+
+echo -n "Populating files based on input genome, $GENOME (`date`).. "
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.simpleRepeat.gz"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg19.simpleRepeat.gz"
+else
+    echo "Presently the program only support analysis for mm9 or hg19"
+    echo
+    usage
+fi
+echo done
+
+if [ ! -z "$TFSUMMIT" ]; then
+    echo -n "Create TF summit file (`date`).. "
+    if [ "$TFSUMMIT" == "stdin" ]; then
+        while read LINE; do
+            echo ${LINE}
+        done | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n"' > $OUTDIR/TFSUMMIT.BED
+    elif [ -f "$TFSUMMIT" ]; then
+        scp $TFSUMMIT $OUTDIR/TFSUMMIT.BED
+    else
+        usage
+    fi
+    echo "done"
+
+    echo -n "Retrieve NFR to analyse based on input criteria (`date`).. "
+    if [ -z "$TFSUMMIT_EXCL" ]; then
+        intersectBed -a $NFR -b $OUTDIR/TFSUMMIT.BED -u > $OUTDIR/NFR_DYNAMICS.TXT
+    else
+        intersectBed -a $NFR -b $OUTDIR/TFSUMMIT.BED -v > $OUTDIR/NFR_DYNAMICS.TXT
+    fi
+    echo "done"
+else
+    scp $NFR $OUTDIR/NFR_DYNAMICS.TXT
+fi
+
+echo -n "Create files for each NFR dynamic class sorted by h3k27ac signal (`date`).. "
+PLOT_TITLES=""
+REGIONS_INTEREST_COUNTS=""
+HEATMAP_FILES=""
+for CLASS in $(cat $OUTDIR/NFR_DYNAMICS.TXT | cut -f 5 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1 | perl -ane 'if($F[0]>50) { print "$F[1]\n"; }'); do
+    PLOT_TITLE=$(echo $CLASS | sed 's/\,/_/g')
+    REGIONS_INTEREST_COUNT=$(perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | wc -l)
+
+    PLOT_TITLES="$PLOT_TITLES,$PLOT_TITLE"
+    REGIONS_INTEREST_COUNTS="$REGIONS_INTEREST_COUNTS,$REGIONS_INTEREST_COUNT"
+
+    ## create files for plotting normalized heatmap
+    HEATMAP_FILES="$HEATMAP_FILES,$OUTDIR/$PLOT_TITLE"".bed"
+    #perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[15]+$F[16]+$F[17]+$F[18])/4); foreach(@F[0..8]) { print "$_\t"; } print "$mean\n";' | sort -k 10rn,10 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
+    perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[15]+$F[16]+$F[17]+$F[18])/4); chomp($_); print "$_\t$mean\n";' | sort -k 44r,44 -k 45rn,10 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
+    #perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | sort -k 44r,44 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
+done
+echo "done"
+
+echo -n "Plot NFR dynamics across different samples (`date`).. "
+PLOT_TITLES=$(echo $PLOT_TITLES | sed -E 's/^\,//g')
+REGIONS_INTEREST_COUNTS=$(echo $REGIONS_INTEREST_COUNTS | sed -E 's/^\,//g')
+HEATMAP_FILES=$(echo $HEATMAP_FILES | sed -E 's/^\,//g')
+
+## plot nfr dynamics as heatmap
+#if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
+    if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER
+    elif [ ! -z "$CHIP_INCL_FILTER" ]; then
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER
+    elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER
+    else
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER
+    fi
+#fi
+nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER
+

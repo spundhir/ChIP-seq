@@ -139,7 +139,6 @@ fi
 if [ ! -z "$BED_FILE_EXPR" ]; then
     intersectBed -a $OUTDIR/$BED_FILE -b $BED_FILE_EXPR -c > $OUTDIR/$BED_FILE.count
 fi
-COMMENT
 
 ## compute fraction of nfr (co)-bound by TFs
 if [ ! -z "$BED_FILE_COBOUND" ]; then
@@ -147,6 +146,7 @@ if [ ! -z "$BED_FILE_COBOUND" ]; then
     ## R-code is doing this now
     #intersectBed -a $OUTDIR/$BED_FILE -b $BED_FILE_COBOUND -wao | sortBed -i stdin | mergeBed -i stdin -c 4,5,6,7,8,9,14 -o distinct | cut -f 5,10 | perl -ane 'if($F[1]=~/pu1/ && $F[1]=~/cebpa/) { $F[1]="pu1,cebpa"; } elsif($F[1]=~/pu1/) { $F[1]="pu1"; } elsif($F[1]=~/cebpa/) { $F[1]="cebpa"; } print "$F[0]\t$F[1]\n";' | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 3,3 | perl -ane '$count{$F[1]}+=$F[0]; push(@data, $_); END { foreach(@data) { @T=split(/\s+/,$_); $fraction=sprintf("%0.6f", $_/$count{$T[1]}); chomp($_); print "$_\t$fraction\n"; } }' > $OUTDIR/$BED_FILE.cobound.summary
 fi
+COMMENT
 
 ## join all files into one
 NCOL=$(head $OUTDIR/$BED_FILE -n 1 | perl -ane '$ncol=scalar(@F)+1; print "$ncol";')

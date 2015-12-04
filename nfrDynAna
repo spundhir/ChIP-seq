@@ -103,7 +103,7 @@ function wait_for_jobs_to_finish {
 
 echo -n "Create directory structure (`date`).. "
 if [ ! -d "$OUTDIR" ]; then
-    mkdir $OUTDIR
+    mkdir -p $OUTDIR
 fi
 if [ ! -d "$OUTDIR/motifs" -a -z "$TFPROFILE" ]; then
     mkdir $OUTDIR/motifs
@@ -145,6 +145,7 @@ if [ ! -z "$TFSUMMIT" ]; then
 fi
 
 echo -n "Retrieve NFR to analyse based on input criteria (`date`).. "
+if [ ! -f "$NFR" ]; then
     if [ ! -z "$TFSUMMIT" ]; then
         if [ -z "$TFSUMMIT_EXCL" ]; then
             intersectBed -a <(multiIntersectBed.sh -i $NFR -j $NFRID) -b $OUTDIR/TFSUMMIT.BED -u > $OUTDIR/NFR_DYNAMICS.TXT
@@ -154,8 +155,24 @@ echo -n "Retrieve NFR to analyse based on input criteria (`date`).. "
     else
         multiIntersectBed.sh -i $NFR -j $NFRID > $OUTDIR/NFR_DYNAMICS.TXT
     fi
+else
+    if [ ! -z "$TFSUMMIT" ]; then
+        if [ -z "$TFSUMMIT_EXCL" ]; then
+            intersectBed -a $NFR -b $OUTDIR/TFSUMMIT.BED -u | cut -f 1-9 > $OUTDIR/NFR_DYNAMICS.TXT
+        else
+            intersectBed -a $NFR -b $OUTDIR/TFSUMMIT.BED -v | cut -f 1-9 > $OUTDIR/NFR_DYNAMICS.TXT
+        fi
+    else
+        cat $NFR | cut -f 1-9 > $OUTDIR/NFR_DYNAMICS.TXT
+    fi
+fi
 echo "done"
 
+## collapse classes into smaller classes
+for CLASS in $(less $OUTDIR/NFR_DYNAMICS.TXT | cut -f 5 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1 | perl -ane 'if($F[0]>500) { print "$F[1]\n"; }'); do perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT; done | perl -ane 'if($F[4]=~/^lsk/) { if($F[4]=~/granulocytes/) { $F[4]="lsk,pregm,gmp,granulocytes"; } else { $F[4]="lsk,pregm,gmp"; } } elsif($F[4]=~/^pregm/) { if($F[4]=~/granulocytes/) { $F[4]="pregm,gmp,granulocytes"; } else { $F[4]="pregm,gmp"; } } elsif($F[4]=~/^gmp/) { if($F[4]=~/granulocytes/) { $F[4]="gmp,granulocytes"; } else { $F[4]="gmp"; } } $line=(); foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/NFR_DYNAMICS.TXT.TMP
+mv $OUTDIR/NFR_DYNAMICS.TXT.TMP $OUTDIR/NFR_DYNAMICS.TXT
+
+exit
 echo -n "Plot ChIP profile for each NFR dynamic class (`date`).. "
 SESSION_FILES=""
 PLOT_TITLES=""
@@ -205,7 +222,7 @@ if [ ! -f "$OUTDIR/heatmap/heatmap.avgprof.RData" ]; then
         ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR/heatmap -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER
     fi
 fi
-nfrDynAna.R -i $OUTDIR/heatmap/heatmap -j heatmap -o NONE -m $GENE_ORDER
+nfrDynAna.R -i $OUTDIR/heatmap/heatmap -j heatmap -o NONE -m -a $GENE_ORDER
 
 ## plot nfr dynamics as line plot
 if [ ! -z "$TFPROFILE" ]; then

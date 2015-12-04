@@ -12,7 +12,11 @@ option_list <- list(
     make_option(c("-y", "--yMin"), help="minimum limit to y-axis"),
     make_option(c("-t", "--tfProfile"), help="plot profile for transcription factor instead", action="store_true"),
     make_option(c("-l", "--logScale"), help="plot histone profile in log scale", action="store_true"),
-    make_option(c("-m", "--heatMap"), default="none", help="plot heat map with given algorithm (total, hc, max, prod, diff, km, none. default: %default)")
+    make_option(c("-m", "--heatMap"), help="plot heatmap instead", action="store_true"),
+    make_option(c("-a", "--go"), help="gene order algorithm for heatmap (total, hc, max, prod, diff, km, none)"),
+    make_option(c("-b", "--sc"), help="color scale for heatmap (min,max; local; region; global)"),
+    make_option(c("-c", "--co"), help="Color for heatmap (like red2, blue2, darkgreen yellow)"),
+    make_option(c("-d", "--cd"), help="Color distribution for heatmap (between 0 and 1)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -724,12 +728,16 @@ if(!is.null(opt$heatMap)) {
         enrichListNorm <- lapply(enrichList, function(x) ((x-min)/(max-min)))
         out.hm <- paste(oname, '.pdf', sep='')
         font.size=20
+        if(!is.null(opt$go)) { go.algo <- opt$go; } 
+        if(!is.null(opt$sc)) { color.scale <- opt$sc; } 
+        if(!is.null(opt$co)) { hm.color <- opt$co; } 
+        if(!is.null(opt$cd)) { color.distr <- as.numeric(opt$cd); } 
         pdf(out.hm, width=hm.width, height=hm.height, pointsize=font.size)
         par(mai=heatmap.mar)
         layout(lay.mat, heights=reg.hei)
 
         v.low.cutoff <- low.count.ratio * v.low.cutoff
-        go.list <- plotheat(reg.list, uniq.reg, enrichList, v.low.cutoff, opt$heatMap, 
+        go.list <- plotheat(reg.list, uniq.reg, enrichList, v.low.cutoff, go.algo, 
                             go.paras, ctg.tbl$title, bam.pair, xticks, flood.frac, 
                             do.plot=T, hm.color=hm.color, color.distr=color.distr, 
                             color.scale=color.scale)
