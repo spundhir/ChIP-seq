@@ -139,17 +139,19 @@ fi
 if [ ! -z "$BED_FILE_EXPR" ]; then
     intersectBed -a $OUTDIR/$BED_FILE -b $BED_FILE_EXPR -c > $OUTDIR/$BED_FILE.count
 fi
+COMMENT
 
 ## compute fraction of nfr (co)-bound by TFs
+NCOL=$(head $OUTDIR/$BED_FILE -n 1 | perl -ane '$ncol=scalar(@F)+1; print "$ncol";')
 if [ ! -z "$BED_FILE_COBOUND" ]; then
-    intersectBed -a $OUTDIR/$BED_FILE -b $BED_FILE_COBOUND -wao | sortBed -i stdin | mergeBed -i stdin -c 4,5,6,7,8,9,14 -o distinct | perl -ane 'if($F[9]=~/pu1/ && $F[9]=~/cebpa/) { $F[9]="pu1,cebpa"; } elsif($F[9]=~/pu1/) { $F[9]="pu1"; } elsif($F[9]=~/cebpa/) { $F[9]="cebpa"; } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\n";' > $OUTDIR/$BED_FILE.cobound
+    MERGE_COL=$(echo $NCOL | perl -ane '$val=(); foreach($i=4; $i<'$NCOL'; $i++) { $val.="$i,"; } $val=~s/\,$//g; print "$val";')
+    MERGE_COL=$(perl -e '$val='$NCOL'+4; chomp($_); print "'$MERGE_COL',$val";')
+    intersectBed -a $OUTDIR/$BED_FILE -b $BED_FILE_COBOUND -wao | sortBed -i stdin | mergeBed -i stdin -c $MERGE_COL -o distinct | perl -ane '$col=scalar(@F)-1; if($F[$col]=~/pu1/ && $F[$col]=~/cebpa/) { $F[$col]="pu1,cebpa"; } elsif($F[$col]=~/pu1/) { $F[$col]="pu1"; } elsif($F[$col]=~/cebpa/) { $F[$col]="cebpa"; } $line=(); foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/$BED_FILE.cobound
     ## R-code is doing this now
     #intersectBed -a $OUTDIR/$BED_FILE -b $BED_FILE_COBOUND -wao | sortBed -i stdin | mergeBed -i stdin -c 4,5,6,7,8,9,14 -o distinct | cut -f 5,10 | perl -ane 'if($F[1]=~/pu1/ && $F[1]=~/cebpa/) { $F[1]="pu1,cebpa"; } elsif($F[1]=~/pu1/) { $F[1]="pu1"; } elsif($F[1]=~/cebpa/) { $F[1]="cebpa"; } print "$F[0]\t$F[1]\n";' | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 3,3 | perl -ane '$count{$F[1]}+=$F[0]; push(@data, $_); END { foreach(@data) { @T=split(/\s+/,$_); $fraction=sprintf("%0.6f", $_/$count{$T[1]}); chomp($_); print "$_\t$fraction\n"; } }' > $OUTDIR/$BED_FILE.cobound.summary
 fi
-COMMENT
 
 ## join all files into one
-NCOL=$(head $OUTDIR/$BED_FILE -n 1 | perl -ane '$ncol=scalar(@F)+1; print "$ncol";')
 NCOL_nfrdip=$(head $OUTDIR/$BED_FILE.nfrdip -n 1 | perl -ane '$ncol=scalar(@F); print "$ncol";')
 NCOL_tpm=$(head $OUTDIR/$BED_FILE.tpm -n 1 | perl -ane '$ncol=scalar(@F); print "$ncol";')
 NCOL_expr=$(head $OUTDIR/$BED_FILE.expr -n 1 | perl -ane '$ncol=scalar(@F); print "$ncol";')

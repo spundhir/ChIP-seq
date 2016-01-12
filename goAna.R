@@ -34,7 +34,7 @@ if((is.null(opt$inFile) | is.null(opt$genome) | is.null(opt$outDir)) & is.null(o
 suppressPackageStartupMessages(library(DOSE))
 suppressPackageStartupMessages(library(ReactomePA))
 suppressPackageStartupMessages(library(clusterProfiler))
-#suppressPackageStartupMessages(library(mygene))
+suppressPackageStartupMessages(library(mygene))
 suppressPackageStartupMessages(library(RDAVIDWebService))
 suppressPackageStartupMessages(library(session))
 suppressPackageStartupMessages(library(ggplot2))
@@ -70,11 +70,13 @@ if(!is.null(opt$listAnnotation)) {
         if(opt$annotation=="DAVID"){
             results=compareCluster(geneList, fun="enrichDAVID", idType="ENTREZ_GENE_ID", listType="Gene", annotation="GOTERM_BP_ALL", david.user = "pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$qValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="KEGG_PATHWAY") {
-            results=compareCluster(gene, fun="enrichKEGG", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$qValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(geneList, fun="enrichKEGG", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$qValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="DISEASE_ONTOLOGY") {
-            results=compareCluster(gene, fun="enrichDO", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$qValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(geneList, fun="enrichDO", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$qValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="REACTOME_PATHWAY") {
-            results=compareCluster(gene, fun="enrichPathway", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$qValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(geneList, fun="enrichPathway", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$qValue), minGSSize=as.numeric(opt$minGene))
+        } else {
+            results=compareCluster(geneList, fun="enrichGO", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$qValue), minGSSize=as.numeric(opt$minGene))
         }
 
     } else {
@@ -85,10 +87,10 @@ if(!is.null(opt$listAnnotation)) {
     #plot(results, includeAll=TRUE, showCategory=NULL)
     #dev.off()
 
+    library(ggplot2)
+    data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
     if(nrow(data)>=1) {
         outFile <- sprintf("%s/go_analysis_compareCluster_%s.pdf", opt$outDir, opt$annotation)
-        library(ggplot2)
-        data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
         data$GeneDensity <- apply(data, 1, function(x) as.numeric(unlist(strsplit(x[4],"/"))[1])/as.numeric(unlist(strsplit(x[4],"/"))[2]))
         data$BgDensity <- apply(data, 1, function(x) as.numeric(unlist(strsplit(x[5],"/"))[1])/as.numeric(unlist(strsplit(x[5],"/"))[2]))
         data$fc <- log2(data$GeneDensity/data$BgDensity)
@@ -101,7 +103,8 @@ if(!is.null(opt$listAnnotation)) {
             geom_point(aes(colour=pvalue,size=Count)) +
             scale_colour_gradient(low="red", high="white") +
             scale_size(range=c(1,10))
-        ggsave(p, dpi=300, height=10, width=10, filename=outFile, useDingbats=FALSE)
+        ggsave(p, dpi=300, height=as.numeric(opt$maxClass)*1.5, width=length(unique(data_sig$Cluster))*1.5, filename=outFile, useDingbats=FALSE)
+        #ggsave(p, dpi=300, height=12, width=7, filename=outFile, useDingbats=FALSE)
     }
 
     outFile <- sprintf("%s/go_analysis_compareCluster_%s.xls", opt$outDir, opt$annotation)
@@ -162,8 +165,8 @@ if(!is.null(opt$listAnnotation)) {
             scale_colour_gradient(low="red", high="white") +
             scale_size(range=c(5,10)) +
             theme(text=element_text(size=10), axis.text.x=element_text(angle=90))
-        #ggsave(p, dpi=300, height=10, width=length(unique(data_sig$Cluster))*3, filename=outFile, useDingbats=FALSE)
-        ggsave(p, dpi=300, height=10, width=10, filename=outFile, useDingbats=FALSE)
+        ggsave(p, dpi=300, height=as.numeric(opt$maxClass)*1.5, width=length(unique(data_sig$Cluster))*2, filename=outFile, useDingbats=FALSE)
+        #ggsave(p, dpi=300, height=12, width=7, filename=outFile, useDingbats=FALSE)
     }
 
     outFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.xls", opt$outDir, opt$annotation)
@@ -195,9 +198,10 @@ if(!is.null(opt$listAnnotation)) {
             ## annotation options: GOTERM_BP_ALL, GOTERM_MF_ALL, GOTERM_CC_ALL, UP_TISSUE, UCSC_TFBS
             results <- enrichDAVID(gene=gene$ENTREZID, idType="ENTREZ_GENE_ID", listType="Gene", annotation="GOTERM_BP_ALL", david.user="pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="KEGG_PATHWAY"){
-            results=enrichKEGG(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue))
+            results=enrichKEGG(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
+            #results=enrichKEGG(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene), use_internal_data=TRUE)
         } else if(opt$annotation=="DISEASE_ONTOLOGY"){
-            results=enrichDO(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue))
+            results=enrichDO(gene$ENTREZID, pvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="REACTOME_PATHWAY"){
             results=enrichPathway(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="GOTERM_BP_ALL"){
@@ -211,21 +215,25 @@ if(!is.null(opt$listAnnotation)) {
         load(opt$sessionFile)
     }
 
+    save.session(opt$sessionFile)
     ## compute gene enrichment network for up- and down-regulated genes
     if(is.numeric(gene$V2) & nrow(summary(results))>=1) {
         geneList <- structure(gene$V2, names=gene$ENTREZID)
-        pdf(sprintf("%s/go_analysis_list_cnetplot_%s.pdf", opt$outDir, opt$annotation))
+        pdf(sprintf("%s/go_analysis_list_cnetplot_%s.pdf", opt$outDir, opt$annotation), width=20, height=20)
         cnetplot(results, categorySize="pvalue", foldChange=geneList, showCategory = 3)
         dev.off()
     }
 
     outFile <- sprintf("%s/go_analysis_list_%s.xls", opt$outDir, opt$annotation)
     data <- as.data.frame(summary(results))
-    data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[8], "/")), function(x) gene[which(gene$ENTREZID==x),]$V1)), collapse="/"))
+    if(nrow(data)>=1) {
+        data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[8], "/")), function(x) gene[which(gene$ENTREZID==x),]$V1)), collapse="/"))
+    }
     write.table(data, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
-    #pdf(sprintf("%s/go_analysis_list_%s.pdf", opt$outDir, opt$annotation))
-    #barplot(results)
-    #dev.off()
+    pdf(sprintf("%s/go_analysis_list_%s.pdf", opt$outDir, opt$annotation))
+    #dotplot(results, x="count", showCategory=opt$maxClass, colorBy="qvalue")
+    barplot(results)
+    dev.off()
 
     save.session(opt$sessionFile)
 }

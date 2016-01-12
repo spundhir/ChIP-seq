@@ -5,14 +5,14 @@ suppressPackageStartupMessages(library("optparse"))
 option_list <- list(
 	make_option(c("-i", "--sessionFile"), help="input session file saved during previous ngsPlot run (if multiple, seperate them by a comma)"),
     make_option(c("-j", "--sessionFileDes"), help="description of each session file"),
-    make_option(c("-k", "--regionCounts"), help="region count corresponding to each session file"),
 	make_option(c("-o", "--outPdfFile"), help="output pdf image file"),
-    make_option(c("-r", "--plotOrder"), help="order in which sample profile should be plotted"),
-    make_option(c("-x", "--yMax"), help="maximum limit to y-axis"),
-    make_option(c("-y", "--yMin"), help="minimum limit to y-axis"),
-    make_option(c("-t", "--tfProfile"), help="plot profile for transcription factor instead", action="store_true"),
-    make_option(c("-l", "--logScale"), help="plot histone profile in log scale", action="store_true"),
-    make_option(c("-m", "--heatMap"), help="plot heatmap instead", action="store_true"),
+    make_option(c("-k", "--regionCounts"), help="region count corresponding to each session file (optional)"),
+    make_option(c("-r", "--plotOrder"), help="order in which sample profile should be plotted (optional)"),
+    make_option(c("-x", "--yMax"), help="maximum limit to y-axis (optional)"),
+    make_option(c("-y", "--yMin"), help="minimum limit to y-axis (optional)"),
+    make_option(c("-t", "--tfProfile"), help="plot profile for transcription factor instead (optional)", action="store_true"),
+    make_option(c("-l", "--logScale"), help="plot histone profile in log scale (optional)", action="store_true"),
+    make_option(c("-m", "--heatMap"), help="plot heatmap instead (optional)", action="store_true"),
     make_option(c("-a", "--go"), help="gene order algorithm for heatmap (total, hc, max, prod, diff, km, none)"),
     make_option(c("-b", "--sc"), help="color scale for heatmap (min,max; local; region; global)"),
     make_option(c("-c", "--co"), help="Color for heatmap (like red2, blue2, darkgreen yellow)"),
@@ -737,6 +737,7 @@ if(!is.null(opt$heatMap)) {
         layout(lay.mat, heights=reg.hei)
 
         v.low.cutoff <- low.count.ratio * v.low.cutoff
+        #gsub("_[^#]+_", "_", ctg.tbl$title, perl=T)
         go.list <- plotheat(reg.list, uniq.reg, enrichList, v.low.cutoff, go.algo, 
                             go.paras, ctg.tbl$title, bam.pair, xticks, flood.frac, 
                             do.plot=T, hm.color=hm.color, color.distr=color.distr, 
@@ -834,6 +835,7 @@ if(!is.null(opt$heatMap)) {
                     color[col_order] <- "#762a83"
                 }
 
+                #gsub("_[^#]+_", "_", title[col], perl=T)
                 if(!is.null(opt$logScale)) {
                     plotmat(log(regcovMat[,col]), title[col], color[col], bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, as.matrix(confiMat[,col]), mw, ymin, ymax, regionCounts[,col_order], box_color, prof.misc)
                 } else {

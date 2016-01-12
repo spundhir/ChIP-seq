@@ -1,0 +1,170 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "nfrDynAna2MatrixGene (compute matrix containing activity features corresponding to genes in BED format)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: nfrDynAna2MatrixGene -i <file> -j <file> -o <dir> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input genomic coordinates in BED format]"
+    echo "             [output from nfrDynAna script]"
+	echo " -j <file>   [input gene coordinates in BED format (can be stdin)]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:g:h ARG; do
+    case "$ARG" in
+    i) BED_FILE=$OPTARG;;
+    j) GENE_FILE=$OPTARG;;
+    g) GENOME=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$BED_FILE" -o ! -f "$GENE_FILE" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+else
+    echo "Presently the program only support analysis for mm9 or hg19"
+    echo
+    usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$BED_FILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    BED_FILE=$TMP
+fi
+
+## perform gene centric analysis
+intersectBed -a $GENE_FILE -b <(cut -f 1-3,5,18,24,30,35,44 $BED_FILE | grep -v "start") -wao | sortBed -i stdin | perl -ane '
+    $id="$F[0]_$F[1]_$F[2]";
+    if($i==0) {
+        foreach(@F[0..14]) { $des.="$_\t"; $seen{$id}=1; }
+        $des=~s/\t$//g;
+        $stage.="$F[18]";
+        $h3k27ac.="$F[19]";
+        $h3k4me1.="$F[20]";
+        $pu1.="$F[21]";
+        $cebpa.="$F[22]";
+        if($F[23]=~/^\.$/ && $F[19]>0) { $F[23]="other"; }
+        $cobound.="$F[23]";
+    }
+    elsif($i>0 && !defined($seen{$id})) {
+        print "$des\t$stage\t$h3k27ac\t$h3k4me1\t$pu1\t$cebpa\t$cobound\n";
+        $des=(); $h3k27ac=(); $h3k4me1=(); $stage=(); $pu1=(); $cebpa=(); $cobound=();
+        foreach(@F[0..14]) { $des.="$_\t"; $seen{$id}=1; }
+        $des=~s/\t$//g;
+        $stage.="$F[18]";
+        $h3k27ac.="$F[19]";
+        $h3k4me1.="$F[20]";
+        $pu1.="$F[21]";
+        $cebpa.="$F[22]";
+        if($F[23]=~/^\.$/ && $F[19]>0) { $F[23]="other"; }
+        $cobound.="$F[23]";
+    }
+    else {
+        $stage.=";$F[18]";
+        $h3k27ac.=";$F[19]";
+        $h3k4me1.=";$F[20]";
+        $pu1.=";$F[21]";
+        $cebpa.=";$F[22]";
+        if($F[23]=~/^\.$/ && $F[19]>0) { $F[23]="other"; }
+        $cobound.=";$F[23]";
+    } $i++;' | perl -ane '
+        $cobound{"other"}{'stage'}=".";
+        $cobound{"pu1"}{'stage'}=".";
+        $cobound{"cebpa"}{'stage'}=".";
+        $cobound{"pu1,cebpa"}{'stage'}=".";
+        $cobound{"other"}{'count'}=0;
+        $cobound{"pu1"}{'count'}=0;
+        $cobound{"cebpa"}{'count'}=0;
+        $cobound{"pu1,cebpa"}{'count'}=0;
+        $cobound{"other"}{'h3k27ac'}=0;
+        $cobound{"pu1"}{'h3k27ac'}=0;
+        $cobound{"cebpa"}{'h3k27ac'}=0; 
+        $cobound{"pu1,cebpa"}{'h3k27ac'}=0;
+        $cobound{"other"}{'h3k4me1'}=0;
+        $cobound{"pu1"}{'h3k4me1'}=0;
+        $cobound{"cebpa"}{'h3k4me1'}=0;
+        $cobound{"pu1,cebpa"}{'h3k4me1'}=0;
+        $cobound{"other"}{'pu1'}=0;
+        $cobound{"pu1"}{'pu1'}=0;
+        $cobound{"cebpa"}{'pu1'}=0;
+        $cobound{"pu1,cebpa"}{'pu1'}=0;
+        $cobound{"other"}{'cebpa'}=0;
+        $cobound{"pu1"}{'cebpa'}=0;
+        $cobound{"cebpa"}{'cebpa'}=0;
+        $cobound{"pu1,cebpa"}{'cebpa'}=0;
+        @stage=split(/\;/,$F[15]);
+        @h3k27ac=split(/\;/,$F[16]);
+        @h3k4me1=split(/\;/,$F[17]);
+        @pu1=split(/\;/,$F[18]);
+        @cebpa=split(/\;/,$F[19]);
+        @binding=split(/\;/,$F[20]);
+        #print "$_\n";
+        for($i=0; $i<scalar(@binding); $i++) {
+            #if($h3k27ac[$i] > $cobound{$binding[$i]}{'h3k27ac'}) {
+                $cobound{$binding[$i]}{'h3k27ac'}+=$h3k27ac[$i];
+                $cobound{$binding[$i]}{'h3k4me1'}+=$h3k4me1[$i];
+                $cobound{$binding[$i]}{'pu1'}+=$pu1[$i];
+                $cobound{$binding[$i]}{'cebpa'}+=$cebpa[$i];
+            #}
+            $cobound{$binding[$i]}{'count'}++;
+            #print "Hello\t$binding[$i]\t$h3k27ac[$i]\t$h3k4me1[$i]\t$pu1[$i]\t$cebpa[$i]\n\n";
+        }
+        foreach(@F[0..15]) { print "$_\t"; }
+        #foreach $keys(keys(%cobound)) {
+        #    if($cobound{$keys}{'count'}>0) {
+        #        $cobound{$keys}{'h3k27ac'}=sprintf("%0.5f", $cobound{$keys}{'h3k27ac'}/$cobound{$keys}{'count'});
+        #        $cobound{$keys}{'h3k4me1'}=sprintf("%0.5f", $cobound{$keys}{'h3k4me1'}/$cobound{$keys}{'count'});
+        #        $cobound{$keys}{'pu1'}=sprintf("%0.5f", $cobound{$keys}{'pu1'}/$cobound{$keys}{'count'});
+        #        $cobound{$keys}{'cebpa'}=sprintf("%0.5f", $cobound{$keys}{'cebpa'}/$cobound{$keys}{'count'});
+        #    }
+        #    print "Hi\t$keys\t$cobound{$keys}{'h3k27ac'}\t$cobound{$keys}{'h3k4me1'}\t$cobound{$keys}{'pu1'}\t$cobound{$keys}{'cebpa'}\n";
+        #}
+        printf("%d\t%d\t%d\t%d\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\n", $cobound{"other"}{'count'}, $cobound{"pu1"}{'count'}, $cobound{"cebpa"}{'count'}, $cobound{"pu1,cebpa"}{'count'}, $cobound{"other"}{'h3k27ac'}, $cobound{"pu1"}{'h3k27ac'}, $cobound{"cebpa"}{'h3k27ac'}, $cobound{"pu1,cebpa"}{'h3k27ac'}, $cobound{"other"}{'h3k4me1'}, $cobound{"pu1"}{'h3k4me1'}, $cobound{"cebpa"}{'h3k4me1'}, $cobound{"pu1,cebpa"}{'h3k4me1'}, $cobound{"other"}{'pu1'}, $cobound{"pu1"}{'pu1'}, $cobound{"cebpa"}{'pu1'}, $cobound{"pu1,cebpa"}{'pu1'}, $cobound{"other"}{'cebpa'}, $cobound{"pu1"}{'cebpa'}, $cobound{"cebpa"}{'cebpa'}, $cobound{"pu1,cebpa"}{'cebpa'});' | perl -ane '
+        $sum=$F[16]+$F[17]+$F[18]+$F[19];
+        chomp($_);
+        $class="none";
+        if($sum>0) {
+            $max_index=1; $max=0; $i=1;
+            foreach(@F[20..23]) {
+                if($_ > $max) {
+                    $max=$_;
+                    $max_index=$i;
+                }
+                $i++;
+            }
+            #print "Hello\t$max_index\n\n";
+            if($max_index==1) { $class="other"; }
+            elsif($max_index==2) { $class="pu1"; }
+            elsif($max_index==3) { $class="cebpa"; }
+            else { $class="pu1,cebpa"; }
+        }
+        print "$_\t$class\n";' > $BED_FILE.gene
+
+## remove temporary file
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi

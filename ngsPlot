@@ -247,11 +247,11 @@ echo "done"
 
 FORBIDIMG=0
 if [ ! -z "$MERGE" ]; then
-    replotMergedReplicates.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 20 -GO $GO -KNC $KNC
-    replotMergedReplicates.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 20 -CO $CO -RR $RR -GO $GO -KNC $KNC
+    replotMergedReplicates.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 10 -GO $GO -KNC $KNC
+    replotMergedReplicates.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 15 -CO $CO -RR $RR -GO $GO -KNC $KNC
 else
-    replot.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 20 -GO $GO -KNC $KNC
-    replot.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 20 -CO $CO -RR $RR -GO $GO -KNC $KNC
+    replot.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 10 -GO $GO -KNC $KNC
+    replot.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 15 -CO $CO -RR $RR -GO $GO -KNC $KNC
 fi
 
 echo -n "scale signal profile between 0 and 1.. "

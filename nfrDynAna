@@ -168,11 +168,10 @@ else
 fi
 echo "done"
 
-## collapse classes into smaller classes
+## UNCOMMENT TO COLLAPSE CLASSES INTO SMALLER CLASSES
 for CLASS in $(less $OUTDIR/NFR_DYNAMICS.TXT | cut -f 5 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1 | perl -ane 'if($F[0]>500) { print "$F[1]\n"; }'); do perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT; done | perl -ane 'if($F[4]=~/^lsk/) { if($F[4]=~/granulocytes/) { $F[4]="lsk,pregm,gmp,granulocytes"; } else { $F[4]="lsk,pregm,gmp"; } } elsif($F[4]=~/^pregm/) { if($F[4]=~/granulocytes/) { $F[4]="pregm,gmp,granulocytes"; } else { $F[4]="pregm,gmp"; } } elsif($F[4]=~/^gmp/) { if($F[4]=~/granulocytes/) { $F[4]="gmp,granulocytes"; } else { $F[4]="gmp"; } } $line=(); foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/NFR_DYNAMICS.TXT.TMP
 mv $OUTDIR/NFR_DYNAMICS.TXT.TMP $OUTDIR/NFR_DYNAMICS.TXT
 
-exit
 echo -n "Plot ChIP profile for each NFR dynamic class (`date`).. "
 SESSION_FILES=""
 PLOT_TITLES=""
