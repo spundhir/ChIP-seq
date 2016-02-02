@@ -14,7 +14,9 @@ option_list <- list(
     make_option(c("-c", "--compareCluster"), help="input file contains multiple gene lists (one per column)", action="store_true"),
     make_option(c("-f", "--formula"), help="input file contains multiple gene lists (column 1: genes; column 2: class)", action="store_true"),
     make_option(c("-l", "--listAnnotation"), help="just list different GO annotation options", action="store_true"),
-    make_option(c("-s", "--sessionFile"), default="go_analysis.Rsession", help="output session file. It will be used, if already exist")
+    make_option(c("-s", "--sessionFile"), default="go_analysis.Rsession", help="output session file. It will be used, if already exist"),
+    make_option(c("-w", "--figWidth"), default="10", help="width of output figure"),
+    make_option(c("-t", "--figHeight"), default="20", help="height of output figure")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -65,18 +67,22 @@ if(!is.null(opt$listAnnotation)) {
             geneList <- lapply(gene, function(x) { list <- bitr(x[!is.na(x)], fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Hs.eg.db")$ENTREZID; list[which(!is.na(list))]; } )
         }
 
+        if(opt$geneIdType=="ENSEMBLTRANS") {
+            geneList <- unique(geneList[,c(2,3)])
+        }
+
         ## compute go enrichment
         #opt$pValue <- 0.9
         if(opt$annotation=="DAVID"){
-            results=compareCluster(geneList, fun="enrichDAVID", idType="ENTREZ_GENE_ID", listType="Gene", annotation="GOTERM_BP_ALL", david.user = "pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$qValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(geneList, fun="enrichDAVID", idType="ENTREZ_GENE_ID", listType="Gene", annotation="GOTERM_BP_ALL", david.user = "pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="KEGG_PATHWAY") {
-            results=compareCluster(geneList, fun="enrichKEGG", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$qValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(geneList, fun="enrichKEGG", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="DISEASE_ONTOLOGY") {
-            results=compareCluster(geneList, fun="enrichDO", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$qValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(geneList, fun="enrichDO", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="REACTOME_PATHWAY") {
-            results=compareCluster(geneList, fun="enrichPathway", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$qValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(geneList, fun="enrichPathway", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else {
-            results=compareCluster(geneList, fun="enrichGO", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$qValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(geneList, fun="enrichGO", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         }
 
     } else {
@@ -103,8 +109,9 @@ if(!is.null(opt$listAnnotation)) {
             geom_point(aes(colour=pvalue,size=Count)) +
             scale_colour_gradient(low="red", high="white") +
             scale_size(range=c(1,10))
-        ggsave(p, dpi=300, height=as.numeric(opt$maxClass)*1.5, width=length(unique(data_sig$Cluster))*1.5, filename=outFile, useDingbats=FALSE)
-        #ggsave(p, dpi=300, height=12, width=7, filename=outFile, useDingbats=FALSE)
+        #ggsave(p, dpi=300, height=as.numeric(opt$maxClass)*1.5, width=length(unique(data_sig$Cluster))*1.5, filename=outFile, useDingbats=FALSE)
+        #ggsave(p, dpi=300, height=as.numeric(opt$figHeight), width=as.numeric(opt$figWidth), filename=outFile, useDingbats=FALSE)
+        ggsave(p, dpi=300, height=20, width=10, filename=outFile, useDingbats=FALSE)
     }
 
     outFile <- sprintf("%s/go_analysis_compareCluster_%s.xls", opt$outDir, opt$annotation)
@@ -130,6 +137,10 @@ if(!is.null(opt$listAnnotation)) {
         geneList_conv <- as.data.frame(geneList_conv)
         geneList <- merge(geneList, geneList_conv, by.x="V1", by.y=opt$geneIdType)
         geneList <- geneList[which(!is.na(geneList$ENTREZID)),]
+
+        if(opt$geneIdType=="ENSEMBLTRANS") {
+            geneList <- unique(geneList[,c(2,3)])
+        }
 
         ## compute go enrichment
         if(opt$annotation=="DAVID"){
@@ -165,8 +176,9 @@ if(!is.null(opt$listAnnotation)) {
             scale_colour_gradient(low="red", high="white") +
             scale_size(range=c(5,10)) +
             theme(text=element_text(size=10), axis.text.x=element_text(angle=90))
-        ggsave(p, dpi=300, height=as.numeric(opt$maxClass)*1.5, width=length(unique(data_sig$Cluster))*2, filename=outFile, useDingbats=FALSE)
-        #ggsave(p, dpi=300, height=12, width=7, filename=outFile, useDingbats=FALSE)
+        #ggsave(p, dpi=300, height=as.numeric(opt$maxClass)*1.5, width=length(unique(data_sig$Cluster))*2, filename=outFile, useDingbats=FALSE)
+        #ggsave(p, dpi=300, height=as.numeric(opt$figHeight), width=as.numeric(opt$figWidth), filename=outFile, useDingbats=FALSE)
+        ggsave(p, dpi=300, height=20, width=10, filename=outFile, useDingbats=FALSE)
     }
 
     outFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.xls", opt$outDir, opt$annotation)

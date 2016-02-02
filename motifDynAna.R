@@ -61,7 +61,7 @@ if(!is.null(opt$onlyDiffFreq)) {
 }
 #sig_rows <- which(apply(dat, 1, function(x) max(x)>3))
 
-if(length(sig_rows)>3) {
+if(length(sig_rows)>2) {
     pdf(opt$outPdfFile, height=15)
     heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1)
     #heatmap.2(mat, trace="none", col=myCol, margins=c(15,20), cexCol=1, cexRow=1)

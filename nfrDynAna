@@ -43,13 +43,14 @@ usage() {
     echo " -y <int>            [minimum number of elements within each nfr dynamic class to plot (default: 50)]"
     echo " -a <string>         [gene order algorithm for heatmap (default: none)]"
     echo "                     [total, hc, max, prod, diff, km, none]"
+    echo " -z                  [NFR_DYNAMICS.TXT file already present in the output directory]"
 	echo " -h                  [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:k:l:vo:f:d:g:te:n:m:p:rx:y:a:h ARG; do
+while getopts i:j:k:l:vo:f:d:g:te:n:m:p:rx:y:a:zh ARG; do
 	case "$ARG" in
 		i) NFR=$OPTARG;;
 		j) NFRID=$OPTARG;;
@@ -69,6 +70,7 @@ while getopts i:j:k:l:vo:f:d:g:te:n:m:p:rx:y:a:h ARG; do
         x) YMAX=$OPTARG;;
         y) MIN_N_CLASS=$OPTARG;;
         a) GENE_ORDER=$OPTARG;;
+        z) INFILE_EXIST=1;;
 		h) HELP=1;;
 	esac
 done
@@ -144,33 +146,43 @@ if [ ! -z "$TFSUMMIT" ]; then
     echo "done"
 fi
 
-echo -n "Retrieve NFR to analyse based on input criteria (`date`).. "
-if [ ! -f "$NFR" ]; then
-    if [ ! -z "$TFSUMMIT" ]; then
-        if [ -z "$TFSUMMIT_EXCL" ]; then
-            intersectBed -a <(multiIntersectBed.sh -i $NFR -j $NFRID) -b $OUTDIR/TFSUMMIT.BED -u > $OUTDIR/NFR_DYNAMICS.TXT
+if [ -z "$INFILE_EXIST" ]; then
+    echo -n "Retrieve NFR to analyse based on input criteria (`date`).. "
+    if [ ! -f "$NFR" ]; then
+        if [ ! -z "$TFSUMMIT" ]; then
+            if [ -z "$TFSUMMIT_EXCL" ]; then
+                intersectBed -a <(multiIntersectBed.sh -i $NFR -j $NFRID) -b $OUTDIR/TFSUMMIT.BED -u > $OUTDIR/NFR_DYNAMICS.TXT
+            else
+                intersectBed -a <(multiIntersectBed.sh -i $NFR -j $NFRID) -b $OUTDIR/TFSUMMIT.BED -v > $OUTDIR/NFR_DYNAMICS.TXT
+            fi
         else
-            intersectBed -a <(multiIntersectBed.sh -i $NFR -j $NFRID) -b $OUTDIR/TFSUMMIT.BED -v > $OUTDIR/NFR_DYNAMICS.TXT
+            multiIntersectBed.sh -i $NFR -j $NFRID > $OUTDIR/NFR_DYNAMICS.TXT
         fi
     else
-        multiIntersectBed.sh -i $NFR -j $NFRID > $OUTDIR/NFR_DYNAMICS.TXT
+        if [ ! -z "$TFSUMMIT" ]; then
+            if [ -z "$TFSUMMIT_EXCL" ]; then
+                intersectBed -a $NFR -b $OUTDIR/TFSUMMIT.BED -u | cut -f 1-9 > $OUTDIR/NFR_DYNAMICS.TXT
+            else
+                intersectBed -a $NFR -b $OUTDIR/TFSUMMIT.BED -v | cut -f 1-9 > $OUTDIR/NFR_DYNAMICS.TXT
+            fi
+        else
+            cat $NFR | cut -f 1-9 > $OUTDIR/NFR_DYNAMICS.TXT
+        fi
     fi
+    echo "done"
 else
-    if [ ! -z "$TFSUMMIT" ]; then
-        if [ -z "$TFSUMMIT_EXCL" ]; then
-            intersectBed -a $NFR -b $OUTDIR/TFSUMMIT.BED -u | cut -f 1-9 > $OUTDIR/NFR_DYNAMICS.TXT
-        else
-            intersectBed -a $NFR -b $OUTDIR/TFSUMMIT.BED -v | cut -f 1-9 > $OUTDIR/NFR_DYNAMICS.TXT
-        fi
+    if [ -f "$NFR" ]; then
+        scp $NFR $OUTDIR/NFR_DYNAMICS.TXT
+    elif [ "$NFR" == "stdin" ]; then
+        while read LINE; do echo ${LINE}; done | perl -ane '$line=(); foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/NFR_DYNAMICS.TXT
     else
-        cat $NFR | cut -f 1-9 > $OUTDIR/NFR_DYNAMICS.TXT
+        usage
     fi
 fi
-echo "done"
 
 ## UNCOMMENT TO COLLAPSE CLASSES INTO SMALLER CLASSES
-for CLASS in $(less $OUTDIR/NFR_DYNAMICS.TXT | cut -f 5 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1 | perl -ane 'if($F[0]>500) { print "$F[1]\n"; }'); do perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT; done | perl -ane 'if($F[4]=~/^lsk/) { if($F[4]=~/granulocytes/) { $F[4]="lsk,pregm,gmp,granulocytes"; } else { $F[4]="lsk,pregm,gmp"; } } elsif($F[4]=~/^pregm/) { if($F[4]=~/granulocytes/) { $F[4]="pregm,gmp,granulocytes"; } else { $F[4]="pregm,gmp"; } } elsif($F[4]=~/^gmp/) { if($F[4]=~/granulocytes/) { $F[4]="gmp,granulocytes"; } else { $F[4]="gmp"; } } $line=(); foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/NFR_DYNAMICS.TXT.TMP
-mv $OUTDIR/NFR_DYNAMICS.TXT.TMP $OUTDIR/NFR_DYNAMICS.TXT
+#for CLASS in $(less $OUTDIR/NFR_DYNAMICS.TXT | cut -f 5 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1 | perl -ane 'if($F[0]>500) { print "$F[1]\n"; }'); do perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT; done | perl -ane 'if($F[4]=~/^lsk/) { if($F[4]=~/granulocytes/) { $F[4]="lsk,pregm,gmp,granulocytes"; } else { $F[4]="lsk,pregm,gmp"; } } elsif($F[4]=~/^pregm/) { if($F[4]=~/granulocytes/) { $F[4]="pregm,gmp,granulocytes"; } else { $F[4]="pregm,gmp"; } } elsif($F[4]=~/^gmp/) { if($F[4]=~/granulocytes/) { $F[4]="gmp,granulocytes"; } else { $F[4]="gmp"; } } $line=(); foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/NFR_DYNAMICS.TXT.TMP
+#mv $OUTDIR/NFR_DYNAMICS.TXT.TMP $OUTDIR/NFR_DYNAMICS.TXT
 
 echo -n "Plot ChIP profile for each NFR dynamic class (`date`).. "
 SESSION_FILES=""
@@ -210,6 +222,8 @@ REGIONS_INTEREST_COUNTS=$(echo $REGIONS_INTEREST_COUNTS | sed -E 's/^\,//g')
 HEATMAP_FILES=$(echo $HEATMAP_FILES | sed -E 's/^\,//g')
 
 ## plot nfr dynamics as heatmap
+<<"COMMENT"
+COMMENT
 if [ ! -f "$OUTDIR/heatmap/heatmap.avgprof.RData" ]; then
     if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
         ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR/heatmap -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER
