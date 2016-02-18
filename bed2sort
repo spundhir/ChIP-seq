@@ -1,0 +1,43 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+#### usage ####
+usage() {
+	echo Program: "bed2sort (sort input BED file by width of region)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2sort -i <file> -j <file(s)>"
+	echo "Options:"
+	echo " -i <file>   [input file containing genomic coordinate in BED format (can be stdin)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:h ARG; do
+	case "$ARG" in
+		i) INPUTBEDFILE=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INPUTBEDFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$INPUTBEDFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    INPUTBEDFILE=$TMP
+fi
+
+## sort input bed file by width
+NCOL=$(head -n 1 $INPUTBEDFILE | perl -ane 'printf("%d", scalar(@F));')
+NEW_COL=$(head -n 1 $INPUTBEDFILE | perl -ane 'printf("%d", scalar(@F)+1);')
+less $INPUTBEDFILE | perl -ane '$len=$F[2]-$F[1]; chomp($_); print "$_\t$len\n";' | sort -k $NEW_COL"n",$NEW_COL | cut -f 1-$NCOL

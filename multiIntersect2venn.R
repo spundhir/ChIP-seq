@@ -4,7 +4,8 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 option_list <- list(
 	make_option(c("-i", "--inFile"), help="input BED file created using multiIntersectBed (can be stdin)"),
-	make_option(c("-o", "--outFile"), help="output pdf file")
+	make_option(c("-o", "--outFile"), help="output pdf file"),
+	make_option(c("-l", "--list"), help="input file contains list (format: id condition; eg. ENSG00000001617 WT)", action="store_true")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -29,8 +30,13 @@ if(opt$inFile=="stdin") {
 } else {
     data <- read.table(opt$inFile)
 }
-vec <- as.vector(unique(data[!grepl(",", data$V5),]$V5))
-data$id <- sprintf("%d_%d", data$V2, data$V3)
+if(is.null(opt$list)) {
+    vec <- as.vector(unique(data[!grepl(",", data$V5),]$V5))
+    data$id <- sprintf("%d_%d", data$V2, data$V3)
+} else {
+    colnames(data) <- c("id", "V5")
+    vec <- as.vector(unique(data[!grepl(",", data$V5),]$V5))
+}
 lst <- list()
 k <- 1
 for(i in vec) { 

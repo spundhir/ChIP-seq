@@ -4,15 +4,14 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 option_list <- list(
 	make_option(c("-d", "--datasetFile"), help="input dataset description file"),
-	make_option(c("-f", "--outFile"), help="output file having differentially bound regions"),
-	make_option(c("-s", "--sessionFile"), help="output session file")
+	make_option(c("-o", "--outDir"), help="output directory having differentially bound regions")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
 opt <- parse_args(parser)
 
 ## check, if all required arguments are given
-if(is.null(opt$datasetFile) | is.null(opt$sessionFile) | is.null(opt$outFile)) {
+if(is.null(opt$datasetFile) | is.null(opt$outDir)) {
 	cat("\nProgram: diffPeaks.R (R script to identify differentially bound regions)\n")
 	cat("Author: University of Copenhagen, Denmark\n")
 	cat("Version: 1.0\n")
@@ -30,42 +29,53 @@ if(!file.exists(opt$datasetFile)) { cat("Cannot locate dataset description file\
 dataset <- dba(sampleSheet=opt$datasetFile, peakCaller="macs", scoreCol=8)
 
 ## calculate differentially bound regions (peaks)
-data <- dba.count(dataset, minOverlap=2)
+data <- dba.count(dataset, minOverlap=1)
 data <- dba.contrast(data, categories=DBA_CONDITION, minMembers=2)
 data <- dba.analyze(data)
-data.DB <- dba.report(data)
+
+## report for all regions compared for differential binding analysis
+data.DB <- dba.report(data, bCalled=T, th=1)
 data.DB <- as.data.frame(data.DB)
-write.table(data.DB, file=opt$outFile, sep="\t", quote=F, col.names=T, row.name=F)
-write.table(data.DB[which(data.DB$Fold > 0),], file=sprintf("%s.onlywt", opt$outFile), sep="\t", quote=F, col.names=T, row.name=F)
-write.table(data.DB[which(data.DB$Fold < 0),], file=sprintf("%s.onlyko", opt$outFile), sep="\t", quote=F, col.names=T, row.name=F)
+write.table(data.DB, file=sprintf("%s/peaks.de", opt$outDir), sep="\t", quote=F, col.names=T, row.name=F)
+write.table(data.DB[which(data.DB$Fold > 0),], file=sprintf("%s/peaks.de.onlywt", opt$outDir), sep="\t", quote=F, col.names=T, row.name=F)
+write.table(data.DB[which(data.DB$Fold < 0),], file=sprintf("%s/peaks.de.onlyko", opt$outDir), sep="\t", quote=F, col.names=T, row.name=F)
+
+## report for only differentially binding regions
+data.DB <- dba.report(data, bCalled=T, th=0.1)
+data.DB <- as.data.frame(data.DB)
+write.table(data.DB, file=sprintf("%s/peaks.de.sig", opt$outDir), sep="\t", quote=F, col.names=T, row.name=F)
+write.table(data.DB[which(data.DB$Fold > 0),], file=sprintf("%s/peaks.de.onlywt.sig", opt$outDir), sep="\t", quote=F, col.names=T, row.name=F)
+write.table(data.DB[which(data.DB$Fold < 0),], file=sprintf("%s/peaks.de.onlyko.sig", opt$outDir), sep="\t", quote=F, col.names=T, row.name=F)
 
 ## plot quality features
-pdf("ma_plot.pdf")
+pdf(sprintf("%s/ma_plot.pdf", opt$outDir))
 dba.plotMA(data)
 dev.off()
 
-pdf("pca_plot.pdf")
+pdf(sprintf("%s/pca_plot.pdf", opt$outDir))
 par(mfrow=c(1,2))
 dba.plotPCA(data, DBA_REPLICATE, attributes=DBA_CONDITION)
 dba.plotPCA(data, contrast=1, th=0.05, attributes=DBA_CONDITION)
 dev.off()
 
-pdf("box_plot.pdf")
+pdf(sprintf("%s/box_plot.pdf", opt$outDir))
 pvals <- dba.plotBox(data)
 dev.off()
 
-pdf("heatmap_plot.pdf")
+pdf(sprintf("%s/heatmap_plot.pdf", opt$outDir))
 corvals = dba.plotHeatmap(data, contrast=1, correlations=FALSE)
 dev.off()
 
 ## determine and plot overlap rate between peaks from the input samples 
-pdf("overlap_rate.pdf")
+pdf(sprintf("%s/overlap_rate.pdf", opt$outDir))
 olap.rate <- dba.overlap(dataset, mode=DBA_OLAP_RATE)
 plot(olap.rate, type='b', ylab='# peaks', xlab='Overlap at least this many peaksets')
 dev.off()
 
 ## determine peaks unique to the wt and ko
-pdf("unique_count.pdf")
+## NOTE: above differential binding analysis is solely based on tag count between two conditions
+##       overlap analysis below is based on if peaks are called by peak caller (macs2) between two conditions
+pdf(sprintf("%s/unique_count.pdf", opt$outDir))
 dba.overlap(dataset, dataset$masks$cebpa_wt, mode=DBA_OLAP_RATE)
 dba.overlap(dataset, dataset$masks$cebpa_ko, mode=DBA_OLAP_RATE)
 data <- dba.peakset(dataset, consensus=DBA_CONDITION, minOverlap=1)
@@ -73,8 +83,8 @@ dba.plotVenn(data, data$masks$Consensus)
 dev.off()
 
 data.OL <- dba.overlap(data, data$masks$Consensus)
-write.table(as.data.frame(data.OL$onlyA), file=sprintf("%s.onlywtOccupancy", opt$outFile), sep="\t", quote=F, col.names=T, row.name=F)
-write.table(as.data.frame(data.OL$onlyB), file=sprintf("%s.onlykoOccupancy", opt$outFile), sep="\t", quote=F, col.names=T, row.name=F)
+write.table(as.data.frame(data.OL$onlyA), file=sprintf("%s/peaks.de.onlywtOccupancy", opt$outDir), sep="\t", quote=F, col.names=T, row.name=F)
+write.table(as.data.frame(data.OL$onlyB), file=sprintf("%s/peaks.de.onlykoOccupancy", opt$outDir), sep="\t", quote=F, col.names=T, row.name=F)
 
 ## save the session for further use
-save.session(opt$sessionFile)
+save.session(sprintf("%s/peaks.de.session", opt$outDir))

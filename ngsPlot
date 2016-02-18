@@ -53,7 +53,7 @@ usage() {
     echo " -l <int>    [flanking region size (default: 1000)]"
     echo " -z <int>    [shift center position by input number of bases (default: 0)]"
     echo " -a <string> [gene order algorithm for heatmap (default: none)]"
-    echo "             [total, hc, max, prod, diff, km, none]"
+    echo "             [total, hc, max, prod, diff, km, width, none]"
     echo " -b <int>    [reduce ratio for heatmap (default: 30)]"
     echo "             [the parameter controls the heatmap height. The smaller the value, the taller the heatmap]"
     echo " -q <int>    [K-means or HC number of clusters (default=5)"
@@ -158,6 +158,13 @@ if [ -z "$EXIST" ]; then
             while read LINE; do echo ${LINE}; done | perl -ane '$mid=sprintf("%0.0f", ($F[1]+$F[2])/2); $mid=$mid+'$SHIFT'; $start=$mid; $end=$mid+1; $line="$F[0]\t$start\t$end"; foreach(@F[3..3]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
         else
             usage
+        fi
+        ## sort input bed file by width, if required
+        if [ $GO == "width" ]; then
+            TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+            bed2sort -i $OUTDIR/REGIONS_INTEREST$j.bed > $TMP
+            mv $TMP $OUTDIR/REGIONS_INTEREST$j.bed
+            GO="none"
         fi
         echo "done" >&2
 
