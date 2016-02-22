@@ -16,7 +16,8 @@ option_list <- list(
     make_option(c("-l", "--listAnnotation"), help="just list different GO annotation options", action="store_true"),
     make_option(c("-s", "--sessionFile"), default="go_analysis.Rsession", help="output session file. It will be used, if already exist"),
     make_option(c("-w", "--figWidth"), default="10", help="width of output figure"),
-    make_option(c("-t", "--figHeight"), default="20", help="height of output figure")
+    make_option(c("-t", "--figHeight"), default="20", help="height of output figure"),
+    make_option(c("-u", "--allowDuplicates"), default=0, help="Plot top -m classes even if some are common between classes")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -100,10 +101,17 @@ if(!is.null(opt$listAnnotation)) {
         data$GeneDensity <- apply(data, 1, function(x) as.numeric(unlist(strsplit(x[4],"/"))[1])/as.numeric(unlist(strsplit(x[4],"/"))[2]))
         data$BgDensity <- apply(data, 1, function(x) as.numeric(unlist(strsplit(x[5],"/"))[1])/as.numeric(unlist(strsplit(x[5],"/"))[2]))
         data$fc <- log2(data$GeneDensity/data$BgDensity)
-        data <- subset(data, !duplicated(ID))
+        if(as.numeric(opt$allowDuplicates)==0) {
+            data <- subset(data, !duplicated(ID))
+        }
         data <- data[order(data$Cluster), ]
         data_sig <- Reduce(rbind, by(data, data["Cluster"], head, n=as.numeric(opt$maxClass)))
-        data_sig$Description <-factor(data_sig$Description, levels=data_sig$Description)
+        if(as.numeric(opt$allowDuplicates)==1) {
+            data_sig <- data[data$Description %in% data_sig$Description,]
+            data_sig$Description <-factor(data_sig$Description, levels=unique(data_sig$Description))
+        } else { 
+            data_sig$Description <-factor(data_sig$Description, levels=data_sig$Description)
+        }
         p <- ggplot(data_sig, aes(x = Cluster, y = Description)) +
             #geom_point(aes(colour=pvalue,size=GeneDensity)) +
             geom_point(aes(colour=pvalue,size=Count)) +
@@ -144,15 +152,15 @@ if(!is.null(opt$listAnnotation)) {
 
         ## compute go enrichment
         if(opt$annotation=="DAVID"){
-            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichDAVID", idType="ENTREZ_GENE_ID", listType="Gene", annotation="GOTERM_BP_ALL", david.user = "pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichDAVID", idType="ENTREZ_GENE_ID", listType="Gene", annotation="GOTERM_BP_ALL", david.user = "pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="KEGG_PATHWAY"){
-            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichKEGG", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue))
+            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichKEGG", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="DISEASE_ONTOLOGY"){
-            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichDO", pvalueCutoff=as.numeric(opt$pValue))
+            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichDO", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="REACTOME_PATHWAY"){
-            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichPathway", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue))
+            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichPathway", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else {
-            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue))
+            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         }
     } else {
         load(opt$sessionFile)
@@ -167,10 +175,17 @@ if(!is.null(opt$listAnnotation)) {
         data$GeneDensity <- apply(data, 1, function(x) as.numeric(unlist(strsplit(x[4],"/"))[1])/as.numeric(unlist(strsplit(x[4],"/"))[2]))
         data$BgDensity <- apply(data, 1, function(x) as.numeric(unlist(strsplit(x[5],"/"))[1])/as.numeric(unlist(strsplit(x[5],"/"))[2]))
         data$fc <- log2(data$GeneDensity/data$BgDensity)
-        data <- subset(data, !duplicated(ID))
+        if(as.numeric(opt$allowDuplicates)==0) {
+            data <- subset(data, !duplicated(ID))
+        }
         data <- data[order(data$Cluster), ]
         data_sig <- Reduce(rbind, by(data, data["Cluster"], head, n=as.numeric(opt$maxClass)))
-        data_sig$Description <-factor(data_sig$Description, levels=data_sig$Description)
+        if(as.numeric(opt$allowDuplicates)==1) {
+            data_sig <- data[data$Description %in% data_sig$Description,]
+            data_sig$Description <-factor(data_sig$Description, levels=unique(data_sig$Description))
+        } else {
+            data_sig$Description <-factor(data_sig$Description, levels=data_sig$Description)
+        }
         p <- ggplot(data_sig, aes(x = Cluster, y = Description)) +
             geom_point(aes(colour=pvalue,size=Count)) +
             scale_colour_gradient(low="red", high="white") +
@@ -178,7 +193,7 @@ if(!is.null(opt$listAnnotation)) {
             theme(text=element_text(size=10), axis.text.x=element_text(angle=90))
         #ggsave(p, dpi=300, height=as.numeric(opt$maxClass)*1.5, width=length(unique(data_sig$Cluster))*2, filename=outFile, useDingbats=FALSE)
         #ggsave(p, dpi=300, height=as.numeric(opt$figHeight), width=as.numeric(opt$figWidth), filename=outFile, useDingbats=FALSE)
-        ggsave(p, dpi=300, height=20, width=10, filename=outFile, useDingbats=FALSE)
+        ggsave(p, dpi=300, height=10, width=8, filename=outFile, useDingbats=FALSE)
     }
 
     outFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.xls", opt$outDir, opt$annotation)
@@ -208,20 +223,20 @@ if(!is.null(opt$listAnnotation)) {
         ## compute go enrichment
         if(opt$annotation=="DAVID"){
             ## annotation options: GOTERM_BP_ALL, GOTERM_MF_ALL, GOTERM_CC_ALL, UP_TISSUE, UCSC_TFBS
-            results <- enrichDAVID(gene=gene$ENTREZID, idType="ENTREZ_GENE_ID", listType="Gene", annotation="GOTERM_BP_ALL", david.user="pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
+            results <- enrichDAVID(gene=gene$ENTREZID, idType="ENTREZ_GENE_ID", listType="Gene", annotation="GOTERM_BP_ALL", david.user="pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="KEGG_PATHWAY"){
-            results=enrichKEGG(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
+            results=enrichKEGG(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
             #results=enrichKEGG(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene), use_internal_data=TRUE)
         } else if(opt$annotation=="DISEASE_ONTOLOGY"){
-            results=enrichDO(gene$ENTREZID, pvalueCutoff=as.numeric(opt$pValue))
+            results=enrichDO(gene$ENTREZID, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="REACTOME_PATHWAY"){
-            results=enrichPathway(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue))
+            results=enrichPathway(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="GOTERM_BP_ALL"){
-            results=enrichGO(gene$ENTREZID, ont="BP", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue))
+            results=enrichGO(gene$ENTREZID, ont="BP", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="GOTERM_MF_ALL"){
-            results=enrichGO(gene$ENTREZID, ont="MF", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue))
+            results=enrichGO(gene$ENTREZID, ont="MF", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="GOTERM_CC_ALL"){
-            results=enrichGO(gene$ENTREZID, ont="CC", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue))
+            results=enrichGO(gene$ENTREZID, ont="CC", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         }
     } else {
         load(opt$sessionFile)
