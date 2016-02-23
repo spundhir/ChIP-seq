@@ -59,6 +59,16 @@ fi
 ## perform gene centric analysis
 intersectBed -a $GENE_FILE -b <(cut -f 1-3,5,18,24,30,35,44 $BED_FILE | grep -v "start") -wao | sortBed -i stdin | perl -ane '
     $id="$F[0]_$F[1]_$F[2]";
+    $mid=sprintf("%0.0f", ($F[16]+$F[17])/2);
+    if($F[5]=~/\+/ && $F[17]>0) {
+        $dist=$F[2]-$mid;
+    }
+    elsif($F[5]=~/\-/ && $F[17]>0) { 
+        $dist=$mid-$F[1];
+    }
+    else {
+        $dist="NA";
+    }
     if($i==0) {
         foreach(@F[0..14]) { $des.="$_\t"; $seen{$id}=1; }
         $des=~s/\t$//g;
@@ -69,10 +79,11 @@ intersectBed -a $GENE_FILE -b <(cut -f 1-3,5,18,24,30,35,44 $BED_FILE | grep -v 
         $cebpa.="$F[22]";
         if($F[23]=~/^\.$/ && $F[19]>0) { $F[23]="other"; }
         $cobound.="$F[23]";
+        $distance.="$dist";
     }
     elsif($i>0 && !defined($seen{$id})) {
-        print "$des\t$stage\t$h3k27ac\t$h3k4me1\t$pu1\t$cebpa\t$cobound\n";
-        $des=(); $h3k27ac=(); $h3k4me1=(); $stage=(); $pu1=(); $cebpa=(); $cobound=();
+        print "$des\t$stage\t$h3k27ac\t$h3k4me1\t$pu1\t$cebpa\t$cobound\t$distance\n";
+        $des=(); $h3k27ac=(); $h3k4me1=(); $stage=(); $pu1=(); $cebpa=(); $cobound=(); $distance=();
         foreach(@F[0..14]) { $des.="$_\t"; $seen{$id}=1; }
         $des=~s/\t$//g;
         $stage.="$F[18]";
@@ -82,6 +93,7 @@ intersectBed -a $GENE_FILE -b <(cut -f 1-3,5,18,24,30,35,44 $BED_FILE | grep -v 
         $cebpa.="$F[22]";
         if($F[23]=~/^\.$/ && $F[19]>0) { $F[23]="other"; }
         $cobound.="$F[23]";
+        $distance.="$dist";
     }
     else {
         $stage.=";$F[18]";
@@ -91,6 +103,7 @@ intersectBed -a $GENE_FILE -b <(cut -f 1-3,5,18,24,30,35,44 $BED_FILE | grep -v 
         $cebpa.=";$F[22]";
         if($F[23]=~/^\.$/ && $F[19]>0) { $F[23]="other"; }
         $cobound.=";$F[23]";
+        $distance.=";$dist";
     } $i++;' | perl -ane '
         $cobound{"other"}{'stage'}=".";
         $cobound{"pu1"}{'stage'}=".";
@@ -116,12 +129,17 @@ intersectBed -a $GENE_FILE -b <(cut -f 1-3,5,18,24,30,35,44 $BED_FILE | grep -v 
         $cobound{"pu1"}{'cebpa'}=0;
         $cobound{"cebpa"}{'cebpa'}=0;
         $cobound{"pu1,cebpa"}{'cebpa'}=0;
+        $cobound{"other"}{'distance'}=();
+        $cobound{"pu1"}{'distance'}=();
+        $cobound{"cebpa"}{'distance'}=();
+        $cobound{"pu1,cebpa"}{'distance'}=();
         @stage=split(/\;/,$F[15]);
         @h3k27ac=split(/\;/,$F[16]);
         @h3k4me1=split(/\;/,$F[17]);
         @pu1=split(/\;/,$F[18]);
         @cebpa=split(/\;/,$F[19]);
         @binding=split(/\;/,$F[20]);
+        @distance=split(/\;/,$F[21]);
         #print "$_\n";
         for($i=0; $i<scalar(@binding); $i++) {
             #if($h3k27ac[$i] > $cobound{$binding[$i]}{'h3k27ac'}) {
@@ -129,6 +147,7 @@ intersectBed -a $GENE_FILE -b <(cut -f 1-3,5,18,24,30,35,44 $BED_FILE | grep -v 
                 $cobound{$binding[$i]}{'h3k4me1'}+=$h3k4me1[$i];
                 $cobound{$binding[$i]}{'pu1'}+=$pu1[$i];
                 $cobound{$binding[$i]}{'cebpa'}+=$cebpa[$i];
+                $cobound{$binding[$i]}{'distance'}.="$distance[$i];";
             #}
             $cobound{$binding[$i]}{'count'}++;
             #print "Hello\t$binding[$i]\t$h3k27ac[$i]\t$h3k4me1[$i]\t$pu1[$i]\t$cebpa[$i]\n\n";
@@ -143,10 +162,15 @@ intersectBed -a $GENE_FILE -b <(cut -f 1-3,5,18,24,30,35,44 $BED_FILE | grep -v 
         #    }
         #    print "Hi\t$keys\t$cobound{$keys}{'h3k27ac'}\t$cobound{$keys}{'h3k4me1'}\t$cobound{$keys}{'pu1'}\t$cobound{$keys}{'cebpa'}\n";
         #}
-        printf("%d\t%d\t%d\t%d\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\n", $cobound{"other"}{'count'}, $cobound{"pu1"}{'count'}, $cobound{"cebpa"}{'count'}, $cobound{"pu1,cebpa"}{'count'}, $cobound{"other"}{'h3k27ac'}, $cobound{"pu1"}{'h3k27ac'}, $cobound{"cebpa"}{'h3k27ac'}, $cobound{"pu1,cebpa"}{'h3k27ac'}, $cobound{"other"}{'h3k4me1'}, $cobound{"pu1"}{'h3k4me1'}, $cobound{"cebpa"}{'h3k4me1'}, $cobound{"pu1,cebpa"}{'h3k4me1'}, $cobound{"other"}{'pu1'}, $cobound{"pu1"}{'pu1'}, $cobound{"cebpa"}{'pu1'}, $cobound{"pu1,cebpa"}{'pu1'}, $cobound{"other"}{'cebpa'}, $cobound{"pu1"}{'cebpa'}, $cobound{"cebpa"}{'cebpa'}, $cobound{"pu1,cebpa"}{'cebpa'});' | perl -ane '
+        if(!defined($cobound{"other"}{'distance'})) { $cobound{"other"}{'distance'}="NA"; } else { $cobound{"other"}{'distance'}=~s/\;$//g; }
+        if(!defined($cobound{"pu1"}{'distance'})) { $cobound{"pu1"}{'distance'}="NA"; } else { $cobound{"pu1"}{'distance'}=~s/\;$//g; }
+        if(!defined($cobound{"cebpa"}{'distance'})) { $cobound{"cebpa"}{'distance'}="NA"; } else { $cobound{"cebpa"}{'distance'}=~s/\;$//g; }
+        if(!defined($cobound{"pu1,cebpa"}{'distance'})) { $cobound{"pu1,cebpa"}{'distance'}="NA"; } else { $cobound{"pu1,cebpa"}{'distance'}=~s/\;$//g; }
+        printf("%d\t%d\t%d\t%d\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%0.5f\t%s\t%s\t%s\t%s\n", $cobound{"other"}{'count'}, $cobound{"pu1"}{'count'}, $cobound{"cebpa"}{'count'}, $cobound{"pu1,cebpa"}{'count'}, $cobound{"other"}{'h3k27ac'}, $cobound{"pu1"}{'h3k27ac'}, $cobound{"cebpa"}{'h3k27ac'}, $cobound{"pu1,cebpa"}{'h3k27ac'}, $cobound{"other"}{'h3k4me1'}, $cobound{"pu1"}{'h3k4me1'}, $cobound{"cebpa"}{'h3k4me1'}, $cobound{"pu1,cebpa"}{'h3k4me1'}, $cobound{"other"}{'pu1'}, $cobound{"pu1"}{'pu1'}, $cobound{"cebpa"}{'pu1'}, $cobound{"pu1,cebpa"}{'pu1'}, $cobound{"other"}{'cebpa'}, $cobound{"pu1"}{'cebpa'}, $cobound{"cebpa"}{'cebpa'}, $cobound{"pu1,cebpa"}{'cebpa'}, $cobound{"other"}{'distance'}, $cobound{"pu1"}{'distance'}, $cobound{"cebpa"}{'distance'}, $cobound{"pu1,cebpa"}{'distance'});' | perl -ane '
         $sum=$F[16]+$F[17]+$F[18]+$F[19];
         chomp($_);
         $class="none";
+        $distance="none";
         if($sum>0) {
             $max_index=1; $max=0; $i=1;
             foreach(@F[20..23]) {
@@ -157,12 +181,12 @@ intersectBed -a $GENE_FILE -b <(cut -f 1-3,5,18,24,30,35,44 $BED_FILE | grep -v 
                 $i++;
             }
             #print "Hello\t$max_index\n\n";
-            if($max_index==1) { $class="other"; }
-            elsif($max_index==2) { $class="pu1"; }
-            elsif($max_index==3) { $class="cebpa"; }
-            else { $class="pu1,cebpa"; }
+            if($max_index==1) { $class="other"; $distance=$F[36]; }
+            elsif($max_index==2) { $class="pu1"; $distance=$F[37]; }
+            elsif($max_index==3) { $class="cebpa"; $distance=$F[38]; }
+            else { $class="pu1,cebpa"; $distance=$F[39]; }
         }
-        print "$_\t$class\n";' > $BED_FILE.gene
+        print "$_\t$distance\t$class\n";' > $BED_FILE.gene
 
 ## remove temporary file
 if [ ! -z "$TMP" ]; then
