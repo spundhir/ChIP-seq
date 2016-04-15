@@ -75,7 +75,7 @@ else
     else
         MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
         SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
-        bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $CHRSIZE -s -l 0 -r $EXTEND | bedtools genomecov -bg -i stdin -g $CHRSIZE -split -scale $MAPPEDREADS > $ID.bedGraph
+        bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $CHRSIZE -s -l 0 -r $EXTEND | bedtools genomecov -bg -i stdin -g $CHRSIZE -split -scale $SCALE_FACTOR > $ID.bedGraph
     fi
 
     bedGraphToBigWig $ID.bedGraph $CHRSIZE $ID.bw

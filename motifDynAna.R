@@ -44,6 +44,8 @@ dat <- matrix(data$V8, nrow=no_rows)
 pat <- matrix(data$V4, nrow=no_rows)
 ## use log fold change
 mat <- matrix(data$V13, nrow=no_rows)
+## use q-value
+#mat <- matrix(data$V6, nrow=no_rows)
 data$V1 <- sprintf("%s_%s", data$V1, data$V11)
 colnames(mat) <- as.vector(unique(data$V1))
 row.names(mat) <- data[1:no_rows,2]
@@ -56,8 +58,8 @@ if(!is.null(opt$onlyDiffFreq)) {
     myCol <- (brewer.pal(9, "OrRd"))
 } else {
     myCol <- rev(brewer.pal(11, "RdBu"))
-    #sig_rows <- which(apply(mat, 1, function(x) max(x) > 0 & min(x) < 0 & max(x)-min(x) > as.numeric(opt$diffFreq)))
-    sig_rows <- which(apply(mat, 1, function(x) max(x) > as.numeric(opt$diffFreq) & min(x) < -1*as.numeric(opt$diffFreq) & max(x)-min(x) > 1))
+    sig_rows <- which(apply(mat, 1, function(x) max(x) > 0 & min(x) < 0 & max(x)-min(x) > as.numeric(opt$diffFreq)))
+    #sig_rows <- which(apply(mat, 1, function(x) max(x) > as.numeric(opt$diffFreq) & min(x) < -1*as.numeric(opt$diffFreq) & max(x)-min(x) > 1))
 }
 #sig_rows <- which(apply(dat, 1, function(x) max(x)>3))
 

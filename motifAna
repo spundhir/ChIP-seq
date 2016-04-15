@@ -3,7 +3,7 @@
 
 GENOME="mm9";
 MODE=1;
-TFBS="/home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe.motifs"
+TFBS="/home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jalma.motifs"
 LIST="1,2"
 PROCESSOR=1
 LENGTH="8,10,12" ## recommended 7,8,9,10,11,12,13,14 (Andersson et al. 2014)

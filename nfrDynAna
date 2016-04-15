@@ -6,6 +6,7 @@ GENOME="mm9"
 PROCESSOR=1
 MIN_N_CLASS=50
 GENE_ORDER="none"
+COLOR="red2"
 
 #### usage ####
 usage() {
@@ -44,13 +45,14 @@ usage() {
     echo " -a <string>         [gene order algorithm for heatmap (default: none)]"
     echo "                     [total, hc, max, prod, diff, km, none]"
     echo " -z                  [NFR_DYNAMICS.TXT file already present in the output directory]"
+    echo " -c <string>         [Color for heatmap (like red2, blue2, darkgreen yellow. default: red2)]"
 	echo " -h                  [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:k:l:vo:f:d:g:te:n:m:p:rx:y:a:zh ARG; do
+while getopts i:j:k:l:vo:f:d:g:te:n:m:p:rx:y:a:zc:h ARG; do
 	case "$ARG" in
 		i) NFR=$OPTARG;;
 		j) NFRID=$OPTARG;;
@@ -71,6 +73,7 @@ while getopts i:j:k:l:vo:f:d:g:te:n:m:p:rx:y:a:zh ARG; do
         y) MIN_N_CLASS=$OPTARG;;
         a) GENE_ORDER=$OPTARG;;
         z) INFILE_EXIST=1;;
+        c) COLOR=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -181,8 +184,8 @@ else
 fi
 
 ## UNCOMMENT TO COLLAPSE CLASSES INTO SMALLER CLASSES
-#for CLASS in $(less $OUTDIR/NFR_DYNAMICS.TXT | cut -f 5 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1 | perl -ane 'if($F[0]>500) { print "$F[1]\n"; }'); do perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT; done | perl -ane 'if($F[4]=~/^lsk/) { if($F[4]=~/granulocytes/) { $F[4]="lsk,pregm,gmp,granulocytes"; } else { $F[4]="lsk,pregm,gmp"; } } elsif($F[4]=~/^pregm/) { if($F[4]=~/granulocytes/) { $F[4]="pregm,gmp,granulocytes"; } else { $F[4]="pregm,gmp"; } } elsif($F[4]=~/^gmp/) { if($F[4]=~/granulocytes/) { $F[4]="gmp,granulocytes"; } else { $F[4]="gmp"; } } $line=(); foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/NFR_DYNAMICS.TXT.TMP
-#mv $OUTDIR/NFR_DYNAMICS.TXT.TMP $OUTDIR/NFR_DYNAMICS.TXT
+for CLASS in $(less $OUTDIR/NFR_DYNAMICS.TXT | cut -f 5 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1 | perl -ane 'if($F[0]>500) { print "$F[1]\n"; }'); do perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT; done | perl -ane 'if($F[4]=~/^lsk/) { if($F[4]=~/granulocytes/) { $F[4]="lsk,pregm,gmp,granulocytes"; } else { $F[4]="lsk,pregm,gmp"; } } elsif($F[4]=~/^pregm/) { if($F[4]=~/granulocytes/) { $F[4]="pregm,gmp,granulocytes"; } else { $F[4]="pregm,gmp"; } } elsif($F[4]=~/^gmp/) { if($F[4]=~/granulocytes/) { $F[4]="gmp,granulocytes"; } else { $F[4]="gmp"; } } $line=(); foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/NFR_DYNAMICS.TXT.TMP
+mv $OUTDIR/NFR_DYNAMICS.TXT.TMP $OUTDIR/NFR_DYNAMICS.TXT
 
 echo -n "Plot ChIP profile for each NFR dynamic class (`date`).. "
 SESSION_FILES=""
@@ -235,7 +238,7 @@ if [ ! -f "$OUTDIR/heatmap/heatmap.avgprof.RData" ]; then
         ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR/heatmap -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER
     fi
 fi
-nfrDynAna.R -i $OUTDIR/heatmap/heatmap -j heatmap -o NONE -m -a $GENE_ORDER
+nfrDynAna.R -i $OUTDIR/heatmap/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -c $COLOR
 
 ## plot nfr dynamics as line plot
 if [ ! -z "$TFPROFILE" ]; then
