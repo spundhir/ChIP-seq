@@ -24,6 +24,7 @@ usage() {
     echo " -g <string> [genome (default: mm9)]"
     echo "[OPTIONS: chip2geneExprCor]"
     echo " -x <int>    [number of samples for which to compute gene expression (default: 4)]"
+    echo " -c          [associate enhancers to closest gene instead to collapsed gene(s)]"
 	echo " -h          [help]"
     echo "[NOTE]"
     echo " In case of error: Could not open input BAM files, refer to:"
@@ -34,7 +35,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:j:r:n:g:x:h ARG; do
+while getopts i:o:j:r:n:g:x:ch ARG; do
     case "$ARG" in
     i) BED_FILE=$OPTARG;;
     o) OUTDIR=$OPTARG;;
@@ -43,6 +44,7 @@ while getopts i:o:j:r:n:g:x:h ARG; do
     n) MIN_N_CLASS=$OPTARG;;
     g) GENOME=$OPTARG;;
     x) SAMPLE_COUNT=$OPTARG;;
+    c) CLOSEST_GENE=1;;
     h) HELP=1;;
     esac
 done
@@ -132,7 +134,11 @@ fi
 
 ## compute proximal gene expression
 if [ ! -z "$BED_FILE_EXPR" ]; then
-    chip2geneExprCor -i $OUTDIR/$BED_FILE -j $BED_FILE_EXPR -k $SAMPLE_COUNT -n > $OUTDIR/$BED_FILE.expr
+    if [ ! -z "$CLOSEST_GENE" ]; then
+        chip2geneExprCor -i $OUTDIR/$BED_FILE -j $BED_FILE_EXPR -k $SAMPLE_COUNT -n -c > $OUTDIR/$BED_FILE.expr
+    else
+        chip2geneExprCor -i $OUTDIR/$BED_FILE -j $BED_FILE_EXPR -k $SAMPLE_COUNT -n > $OUTDIR/$BED_FILE.expr
+    fi
 fi
 
 ## compute number of proximal genes

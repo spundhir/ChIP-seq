@@ -7,6 +7,7 @@ PROCESSOR=1
 MIN_N_CLASS=50
 GENE_ORDER="none"
 COLOR="red2"
+TFBSFILE="/home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs"
 
 #### usage ####
 usage() {
@@ -35,6 +36,7 @@ usage() {
     echo " -e <string>         [input file containing gene expression values]"
     echo "                     [also compute the gene expression distribution for each NFR class]"
     echo "                     [example: /home/pundhir/project/genome_annotations/gencode_v19_hg19_gtf_tss_5000bp.expr]"
+    echo " -s <file>           [input file having PWM of TFBS motifs (default: TFBSFILE=/home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs)]"
     echo " -n <int>            [number of samples for which gene expression values will be plotted]"
     echo " -m <string>         [name of samples for which gene expression values will be plotted]"
     echo "                     [if multiple seperate them by a comma]"
@@ -52,7 +54,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:k:l:vo:f:d:g:te:n:m:p:rx:y:a:zc:h ARG; do
+while getopts i:j:k:l:vo:f:d:g:te:s:n:m:p:rx:y:a:zc:h ARG; do
 	case "$ARG" in
 		i) NFR=$OPTARG;;
 		j) NFRID=$OPTARG;;
@@ -65,6 +67,7 @@ while getopts i:j:k:l:vo:f:d:g:te:n:m:p:rx:y:a:zc:h ARG; do
         g) GENOME=$OPTARG;;
         t) TFPROFILE=1;;
         e) EXPRFILE=$OPTARG;;
+        s) TFBSFILE=$OPTARG;;
         n) SAMPLECOUNTS=$OPTARG;;
         m) SAMPLENAMES=$OPTARG;;
         r) EXPRREP_ABSENT=1;;
@@ -263,7 +266,7 @@ if [ -z "$TFPROFILE" ]; then
         PLOT_TITLE=$(echo $CLASS | sed 's/\,/_/g')
         if [ ! -d "$OUTDIR/motifs/$PLOT_TITLE" ]; then
             #perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | motifAna -i stdin -o $OUTDIR/motifs/$PLOT_TITLE -m 1 -g $GENOME -p $PROCESSOR -t 7,8,9,10,11,12,13,14 -u 0.75 -v 1.5 -w 50 -x 1e-15 -z 30
-            perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | motifAna -i stdin -o $OUTDIR/motifs/$PLOT_TITLE -m 1 -g $GENOME -p $PROCESSOR -t 7,8,9,10,11,12,13,14 -u 0.75 -v 1.5 -x 1e-15 -y 3 -n 100
+            perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | motifAna -i stdin -o $OUTDIR/motifs/$PLOT_TITLE -m 1 -g $GENOME -p $PROCESSOR -t 7,8,9,10,11,12,13,14 -u 0.75 -v 1.5 -x 1e-15 -y 3 -n 100 -s $TFBSFILE
         fi
         INPUT_MOTIF_DYN_ANA="$INPUT_MOTIF_DYN_ANA,$OUTDIR/motifs/$PLOT_TITLE" 
     done
@@ -272,6 +275,9 @@ if [ -z "$TFPROFILE" ]; then
     echo -n "Perform dynamics in the enrichment of motifs across NFR classes (`date`).. "
     INPUT_MOTIF_DYN_ANA=$(echo $INPUT_MOTIF_DYN_ANA | sed -E 's/^\,//')
     if [ ! -f "$OUTDIR/motif_dynamics.pdf" ]; then
+        echo
+        echo "COMMAND TO ANALYZE MOTIF DYNAMICS: motifDynAna -i $INPUT_MOTIF_DYN_ANA -o $OUTDIR -g $GENOME -p $PROCESSOR -c 50 -u 0.75 -v 1.5 -x 1.1 "
+        echo
         motifDynAna -i $INPUT_MOTIF_DYN_ANA -o $OUTDIR -g $GENOME -p $PROCESSOR -c 50 -u 0.75 -v 1.5 -x 1.1 
     fi
     echo "done"

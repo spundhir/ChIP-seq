@@ -190,10 +190,14 @@ if(!is.null(opt$listAnnotation)) {
         } else {
             data_sig$Description <-factor(data_sig$Description, levels=data_sig$Description)
         }
+        high <- as.vector(quantile(data_sig$pvalue)[3])
+        data_sig[which(data_sig$pvalue > high),]$pvalue <- high
         p <- ggplot(data_sig, aes(x = Cluster, y = Description)) +
             #geom_point(aes(colour=pvalue,size=Count)) +
             geom_point(aes(colour=pvalue,size=GeneDensity*100)) +
-            scale_colour_gradient(low="brown", high="yellow") +
+            #scale_colour_gradient(low="brown", high="yellow", name="p-value") +
+            scale_colour_gradient(low="#00441b", high="#ccece6", name="p-value") +
+                #breaks=c(1e-20, 1e-15, 1e-10, 1e-5, 0.01, 0.05)) +
             #scale_size(range=c(1,10)) +
             #scale_size(range=c((min(data_sig$GeneDensity)*100),(max(data_sig$GeneDensity*100))), breaks=waiver(), labels=waiver()) +
             scale_size_area(breaks=seq(0,100,by=5), max_size=15) +
@@ -201,7 +205,7 @@ if(!is.null(opt$listAnnotation)) {
             theme_bw(base_size=15)
         #ggsave(p, dpi=300, height=as.numeric(opt$maxClass)*1.5, width=length(unique(data_sig$Cluster))*2, filename=outFile, useDingbats=FALSE)
         #ggsave(p, dpi=300, height=as.numeric(opt$figHeight), width=as.numeric(opt$figWidth), filename=outFile, useDingbats=FALSE)
-        ggsave(p, dpi=300, height=10, width=8, filename=outFile, useDingbats=FALSE)
+        ggsave(p, dpi=300, height=10, width=9, filename=outFile, useDingbats=FALSE)
     }
 
     outFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.xls", opt$outDir, opt$annotation)

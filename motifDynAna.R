@@ -8,7 +8,8 @@ option_list <- list(
     make_option(c("-d", "--diffFreq"), default="0", help="minimum difference in enrichment between categories (defaut=%default)"),
 	make_option(c("-o", "--outPdfFile"), help="output pdf image file"),
     make_option(c("-f", "--onlyDiffFreq"), action="store_true", help="less stringent criteria. use only difference in frequency"),
-    make_option(c("-v", "--plotSim"), action="store_true", help="instead plot motifs similar in frequency")
+    make_option(c("-v", "--plotSim"), action="store_true", help="instead plot motifs similar in frequency"),
+    make_option(c("-r", "--rescale"), action="store_true", help="rescale color bar between min and max value")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -65,8 +66,25 @@ if(!is.null(opt$onlyDiffFreq)) {
 
 if(length(sig_rows)>2) {
     pdf(opt$outPdfFile, height=15)
-    heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1)
-    #heatmap.2(mat, trace="none", col=myCol, margins=c(15,20), cexCol=1, cexRow=1)
+    #breaks <- as.vector(summary(as.vector(mat[sig_rows,])))
+    #len=2
+    #breaks1 <- seq(breaks[1], breaks[2], length=len)
+    #breaks2 <- seq(breaks[2], breaks[3], length=len)
+    #breaks3 <- seq(breaks[3], breaks[4], length=len)
+    #breaks4 <- seq(breaks[4], breaks[5], length=len)
+    #breaks5 <- seq(breaks[5], breaks[6], length=len)
+    #breaks <- c(breaks1[1:length(breaks1)], breaks2[2:length(breaks2)],
+    #            breaks3[2:length(breaks3)], breaks4[2:length(breaks4)],
+    #            breaks5[2:length(breaks5)])
+    if(!is.null(opt$rescale)) {
+        breaks <- seq(min(mat[sig_rows,]), max(mat[sig_rows,]), by=0.25)
+        #myCol <- colorpanel(n=length(breaks)-1,low="blue",mid="white",high="red")
+        myCol <- rev(brewer.pal(length(breaks)-1, "RdBu"))
+        heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1, breaks=breaks)
+    } else {
+        heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1)
+        #heatmap.2(mat, trace="none", col=myCol, margins=c(15,20), cexCol=1, cexRow=1)
+    }
     dev.off()
 } else if(length(sig_rows)>=1) {
     cat("\nNumber of significant motifs are too low for a heatmap. Instead writing results to motif_dynamics.txt\n\n")

@@ -9,9 +9,9 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: bed2window -i <file | stdin>"
+	echo "Usage: bed2window -i <file>"
 	echo "Options:"
-	echo " -i <file>   [input file containing genomic coordinate in BED format]"
+	echo " -i <file>   [input file containing genomic coordinate in BED format (can be stdin)]"
     echo "[OPTIONS]"
     echo " -w <int>    [flanking window length (default: 200 bp)]"
     echo "             [200 bp up- and downstream to middle point]"
@@ -49,9 +49,9 @@ fi
 
 if [ ! -z "$TSS" ]; then
     if [ -f "$INPUTBEDFILE" ]; then
-        zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[5]=~/^\-$/) { $start=$F[2]; $end=$start+'$WIN'; } else { $end=$F[1]; $start=$end-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' 
+        zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/) { next; } if($F[5]=~/^\-$/) { $start=$F[2]; $end=$start+'$WIN'; } else { $end=$F[1]; $start=$end-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' 
     elif [ "$INPUTBEDFILE" == "stdin" ]; then 
-        while read LINE; do echo ${LINE}; done | grep -v "^\#" | perl -ane 'if($F[5]=~/^\-$/) { $start=$F[2]; $end=$start+'$WIN'; } else { $end=$F[1]; $start=$end-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
+        while read LINE; do echo ${LINE}; done | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/) { next; } if($F[5]=~/^\-$/) { $start=$F[2]; $end=$start+'$WIN'; } else { $end=$F[1]; $start=$end-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
     else
         usage
     fi

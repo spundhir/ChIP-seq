@@ -3,7 +3,12 @@
 
 GENOME="mm9";
 MODE=1;
-TFBS="/home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jalma.motifs"
+## v1
+#TFBS_FILE="/home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe.motifs"
+## v2
+TFBS_FILE="/home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs"
+## v3
+#TFBS_FILE="/home/pundhir/software/homer/data/knownTFs/vertebrates/hocomoco_mouse.motifs"
 LIST="1,2"
 PROCESSOR=1
 LENGTH="8,10,12" ## recommended 7,8,9,10,11,12,13,14 (Andersson et al. 2014)
@@ -29,7 +34,7 @@ usage() {
     echo " -m <int>    [running mode (default: 1)]"
     echo "             [mode 1: Determine all TFBS motifs enriched in the input regions]"
     echo "              -s <file>   [input file having PWM of TFBS motifs]"
-    echo "                          [default: /home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe.motifs]"
+    echo "                          [default: /home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs]"
     echo "              -t <string> [motif length (default=8,10,12)]"
     echo "              -u <float>  [similarity threshold used to remove similar motifs (default: 0.6)]"
     echo "              -v <float>  [remove motifs with information content less than # (default: not used)]"
@@ -56,7 +61,7 @@ while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:g:p:fh ARG; do
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         m) MODE=$OPTARG;;
-        s) TFBS=$OPTARG;;
+        s) TFBS_FILE=$OPTARG;;
         t) LENGTH=$OPTARG;;
         u) REDUCE_THRESHOLD=$OPTARG;;
         v) INFO=$OPTARG;;
@@ -142,9 +147,9 @@ if [ "$MODE" -eq 1 ]; then
     fi
 
     if [ -z "$BKG_FILE" ]; then
-        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS -mknown $TFBS -p $PROCESSOR -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -dumpFasta -S $S $ADDITIONAL_ARGUMENT &> $OUTDIR/findMotifs.log
+        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS_FILE -mknown $TFBS_FILE -p $PROCESSOR -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -dumpFasta -S $S $ADDITIONAL_ARGUMENT &> $OUTDIR/findMotifs.log
     else
-        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS -mknown $TFBS -p $PROCESSOR -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -dumpFasta -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE &> $OUTDIR/findMotifs.log
+        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS_FILE -mknown $TFBS_FILE -p $PROCESSOR -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -dumpFasta -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE &> $OUTDIR/findMotifs.log
     fi
     echo "done"
 

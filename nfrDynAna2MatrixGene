@@ -11,7 +11,7 @@ usage() {
 	echo Contact: pundhir@binf.ku.dk
 	echo "Usage: nfrDynAna2MatrixGene -i <file> -j <file> -o <dir> [OPTIONS]"
 	echo "Options:"
-	echo " -i <file>   [input genomic coordinates in BED format]"
+	echo " -i <file>   [input nfr coordinates in BED format]"
     echo "             [output from nfrDynAna script]"
 	echo " -j <file>   [input gene coordinates in BED format (can be stdin)]"
     echo "[OPTIONS]"
