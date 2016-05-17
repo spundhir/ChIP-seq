@@ -73,8 +73,9 @@ elif [ -z "$CLOSESTGENE" ]; then
     #echo "$COL_EXPR $COL_OUT $NCOL_EXPR $NSAMPLES"; exit
     intersectBed -a $INPUTCHIPFILE -b <(cat $INPUTEXPRFILE | perl -ane '$start='$NCOL_EXPR'-'$NSAMPLES'; $end='$NCOL_EXPR'-1; $sum=0; foreach(@F[$start..$end]) { $sum+=$_; } if($sum>=0) { print $_; }') -wao | sortBed -i stdin | mergeBed -i stdin -c $COL_EXPR -o $COL_OUT
 else
-    intersectBed -a $INPUTCHIPFILE -b $INPUTEXPRFILE -loj | sortBed -i stdin | mergeBed.pl -i - -c | cut -f 1-3,$COL_EXPR | perl -ane '$end=scalar(@F); $start=$end-'$NSAMPLES'; if($_=~/\s+\.\s+/) { for($i=$start; $i<$end; $i++) { $F[$i]=0; }  $line=(); foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; print "$line\n"; } else { print "$_"; }' 
-    #closestBed -a $INPUTCHIPFILE -b $INPUTEXPRFILE -t first | cut -f 1-3,$COL_EXPR
+    #echo "$COL_EXPR $COL_OUT $NCOL_EXPR $NSAMPLES"; exit
+    #intersectBed -a $INPUTCHIPFILE -b $INPUTEXPRFILE -loj | sortBed -i stdin | mergeBed.pl -i - -c | cut -f 1-3,$COL_EXPR | perl -ane '$end=scalar(@F); $start=$end-'$NSAMPLES'; if($_=~/\s+\.\s+/) { for($i=$start; $i<$end; $i++) { $F[$i]=0; }  $line=(); foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; print "$line\n"; } else { print "$_"; }' 
+    closestBed -a $INPUTCHIPFILE -b $INPUTEXPRFILE -t first | cut -f 1-3,$COL_EXPR
 fi
 
 if [ ! -z "$TMP" ]; then

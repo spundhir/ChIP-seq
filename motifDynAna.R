@@ -3,7 +3,7 @@ suppressPackageStartupMessages(library("optparse"))
 
 ## parse command line arguments
 option_list <- list(
-	make_option(c("-i", "--inFile"), help="input file created by nfrDynaAna script"),
+	make_option(c("-i", "--inFile"), help="input file containing motif enrichment dynamics"),
     make_option(c("-n", "--minFreq"), default="50", help="minimum frequency of NFRs in each nfr dynamic class (defaut=%default)"),
     make_option(c("-d", "--diffFreq"), default="0", help="minimum difference in enrichment between categories (defaut=%default)"),
 	make_option(c("-o", "--outPdfFile"), help="output pdf image file"),
@@ -78,8 +78,11 @@ if(length(sig_rows)>2) {
     #            breaks5[2:length(breaks5)])
     if(!is.null(opt$rescale)) {
         breaks <- seq(min(mat[sig_rows,]), max(mat[sig_rows,]), by=0.25)
-        #myCol <- colorpanel(n=length(breaks)-1,low="blue",mid="white",high="red")
-        myCol <- rev(brewer.pal(length(breaks)-1, "RdBu"))
+        if(length(breaks)<11) {
+            myCol <- rev(brewer.pal(length(breaks)-1, "RdBu"))
+        } else {
+            myCol <- colorpanel(n=length(breaks)-1,low="blue",mid="white",high="red")
+        }
         heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1, breaks=breaks)
     } else {
         heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1)

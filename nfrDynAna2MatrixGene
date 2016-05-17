@@ -57,7 +57,10 @@ if [ "$BED_FILE" == "stdin" ]; then
 fi
 
 ## perform gene centric analysis
-intersectBed -a $GENE_FILE -b <(cut -f 1-3,5,18,24,30,35,44 $BED_FILE | grep -v "start") -wao | sortBed -i stdin | perl -ane '
+<<"COMMENT"
+COMMENT
+#intersectBed -a $GENE_FILE -b <(cut -f 1-3,5,18,24,30,35,44 $BED_FILE | grep -v "start") -wao | sortBed -i stdin | 
+cat $GENE_FILE | perl -ane '@enhancer_info=`grep -w $F[3] '$BED_FILE' | cut -f 1-3,5,18,24,30,35,44`; if(scalar(@enhancer_info)>0) { for($i=0; $i<scalar(@enhancer_info); $i++) { chomp($_); chomp($enhancer_info[$i]); print "$_\t$enhancer_info[$i]\t1\n"; } } else { chomp($_); print "$_\t.\t-1\t-1\t.\t.\t.\t.\t.\t.\t0\n"; }' | perl -ane '
     $id="$F[0]_$F[1]_$F[2]";
     $mid=sprintf("%0.0f", ($F[16]+$F[17])/2);
     if($F[5]=~/\+/ && $F[17]>0) {
@@ -187,6 +190,33 @@ intersectBed -a $GENE_FILE -b <(cut -f 1-3,5,18,24,30,35,44 $BED_FILE | grep -v 
             else { $class="pu1,cebpa"; $distance=$F[39]; }
         }
         print "$_\t$distance\t$class\n";' > $BED_FILE.gene
+
+<<"COMMENT"
+intersectBed -a $GENE_FILE -b <(cut -f 1-3,16-35 $BED_FILE | grep -v start) -wao | sortBed -i stdin | cut -f 1-6,8-15,19-38 | perl -ane '
+    $id="$F[0]_$F[1]_$F[2]";
+    $line=();
+    for($i=0; $i<=13; $i++) { 
+        $line.="$F[$i]\t";
+    }
+    $line=~s/\t$//g;
+    $seen{$id}{'gene'}=$line;
+    for($i=14; $i<=33; $i++) {
+        if($F[$i]=~/^\.$/) { $F[$i]=0; }
+        $seen{$id}{$i}+=$F[$i];
+    }
+    END {
+        foreach $id(keys(%seen)) {
+            print "$seen{$id}{'gene'}\t";
+            $line=();
+            for($i=14; $i<=33; $i++) {
+                $line.="$seen{$id}{$i}\t";
+            }
+            $line=~s/\t$//g;
+            print "$line\n";
+        }
+    }
+' | sortBed -i stdin > $BED_FILE.gene_summary
+COMMENT
 
 ## remove temporary file
 if [ ! -z "$TMP" ]; then

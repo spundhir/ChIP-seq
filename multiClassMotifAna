@@ -1,0 +1,115 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9";
+PVALUE="0.05"
+TFBS_FILE="/home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs"
+PROCESSOR=1
+
+#### usage ####
+usage() {
+echo Program: "multiClassMotifAna (perform motif analysis on genomic regions from multiple classes)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: goAna -i <file> -o <dir> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file containing gene list(s) (can be stdin)]"
+    echo "             [format]"
+    echo "             => chr start end name score class"
+    echo " -o <dir>    [output directory]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome for which to perform the analysis (default: mm9)]"
+    echo " -p <float>  [p-value (default: 0.05)]"
+    echo " -s <file>   [input file having PWM of TFBS motifs]"
+    echo "             [default: /home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs]"
+    echo " -r <int>    [number fo processors to use (default: 1)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:o:g:p:s:r:h ARG; do
+	case "$ARG" in
+		i) BEDFILE=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        p) PVALUE=$OPTARG;;
+        s) TFBS_FILE=$OPTARG;;
+        r) PROCESSOR=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$BEDFILE" -o -z "$OUTDIR" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+<<"COMMENT1"
+COMMENT1
+echo -n "Create directory structure... "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+echo "done"
+
+echo -n "Populating files based on input genome, $GENOME (`date`).. "
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.simpleRepeat.gz"
+    GENOME_NAME="mouse"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg19.simpleRepeat.gz"
+    GENOME_NAME="human"
+else
+    echo "Presently the program only support analysis for mm9, hg19 or danRer7"
+    echo
+    usage
+fi
+echo "done"
+
+## determine, if the input genes are from a file or stdin
+echo -n "Create gene file depending on if the input is from file or STDIN (`date`).. "
+if [ -f "$BEDFILE" ]; then
+    zless $BEDFILE | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/BEDFILE_INTEREST.TXT
+elif [ "$BEDFILE" == "stdin" ]; then
+    while read LINE; do echo ${LINE}; done | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/BEDFILE_INTEREST.TXT
+else
+    usage
+fi
+
+echo "Initiate motif analysis (`date`).. "
+MOTIFDIR_ALL=""
+for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$/) { print "$F[5]\n"; }' | sort | uniq); do
+    ID=$(echo $CLASS | perl -ane 'if($_=~/^\.$/) { print "other"; } else { $_=~s/\,/\_/; print $_; }')
+    cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[5]=~/^'$CLASS'$/) { print $_; }' > $OUTDIR/enhancer_$ID.bed
+
+    MOTIFDIR="$OUTDIR/$ID"
+    if [ ! -d "$MOTIFDIR" ]; then
+        mkdir -p $MOTIFDIR
+    fi
+
+    motifAna -i $OUTDIR/enhancer_$ID.bed -o $MOTIFDIR -m 1 -t 7,8,9,10,11,12,13,14 -u 0.75 -v 1.5 -x 1e-15 -y 3 -n 100 -g $GENOME -p $PROCESSOR -s $TFBS_FILE &>$MOTIFDIR/$ID.log &
+
+    MOTIFDIR_ALL="$MOTIFDIR_ALL,$MOTIFDIR"
+done
+wait
+
+MOTIFDIR_ALL=$(echo $MOTIFDIR_ALL | perl -ane '$_=~s/^\,//g; print $_;')
+motifDynAna -i $MOTIFDIR_ALL -o $OUTDIR/motifDynAna -g $GENOME -p $PROCESSOR -c 50 -u 0.75 -v 1.5 -x 1.1 &>$OUTDIR/motifDynAna.log
+echo "done"

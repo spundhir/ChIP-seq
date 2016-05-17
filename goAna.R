@@ -87,7 +87,15 @@ if(!is.null(opt$listAnnotation)) {
         }
 
     } else {
+        figWidth=opt$figWidth
+        figHeight=opt$figHeight
+        maxClass=opt$maxClass
+        outDir=opt$outDir
         load(opt$sessionFile)
+        opt$figWidth=figWidth
+        opt$figHeight=figHeight
+        opt$maxClass=opt$maxClass
+        opt$outDir=outDir
     }
     #outFile <- sprintf("%s/go_analysis_compareCluster_%s.pdf", opt$outDir, opt$annotation)
     #pdf(outFile)
@@ -122,8 +130,8 @@ if(!is.null(opt$listAnnotation)) {
             theme(text=element_text(size=10), axis.text.x=element_text(angle=90)) +
             theme_bw(base_size=15)
         #ggsave(p, dpi=300, height=as.numeric(opt$maxClass)*1.5, width=length(unique(data_sig$Cluster))*1.5, filename=outFile, useDingbats=FALSE)
-        #ggsave(p, dpi=300, height=as.numeric(opt$figHeight), width=as.numeric(opt$figWidth), filename=outFile, useDingbats=FALSE)
-        ggsave(p, dpi=300, height=20, width=10, filename=outFile, useDingbats=FALSE)
+        ggsave(p, dpi=300, height=as.numeric(opt$figHeight), width=as.numeric(opt$figWidth), filename=outFile, useDingbats=FALSE)
+        #ggsave(p, dpi=300, height=20, width=10, filename=outFile, useDingbats=FALSE)
     }
 
     outFile <- sprintf("%s/go_analysis_compareCluster_%s.xls", opt$outDir, opt$annotation)
@@ -132,6 +140,7 @@ if(!is.null(opt$listAnnotation)) {
     #write.table(data, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
     write.table(as.data.frame(summary(results)), file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
 
+    rm(figWidth, figHeight, outDir)
     save.session(opt$sessionFile)
 } else if(!is.null(opt$formula)) {
     ## read input gene list file
@@ -167,7 +176,15 @@ if(!is.null(opt$listAnnotation)) {
             results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         }
     } else {
+        figWidth=opt$figWidth
+        figHeight=opt$figHeight
+        maxClass=opt$maxClass
+        outDir=opt$outDir
         load(opt$sessionFile)
+        opt$figWidth=figWidth
+        opt$figHeight=figHeight
+        opt$maxClass=opt$maxClass
+        opt$outDir=outDir
         #opt$maxClass=10
         #opt$outDir="go_analysis/pu1_pregm_wt_ko/all"
     }
@@ -204,8 +221,8 @@ if(!is.null(opt$listAnnotation)) {
             theme(text=element_text(size=10), axis.text.x=element_text(angle=90)) +
             theme_bw(base_size=15)
         #ggsave(p, dpi=300, height=as.numeric(opt$maxClass)*1.5, width=length(unique(data_sig$Cluster))*2, filename=outFile, useDingbats=FALSE)
-        #ggsave(p, dpi=300, height=as.numeric(opt$figHeight), width=as.numeric(opt$figWidth), filename=outFile, useDingbats=FALSE)
-        ggsave(p, dpi=300, height=10, width=9, filename=outFile, useDingbats=FALSE)
+        ggsave(p, dpi=300, height=as.numeric(opt$figHeight), width=as.numeric(opt$figWidth), filename=outFile, useDingbats=FALSE)
+        #ggsave(p, dpi=300, height=10, width=9, filename=outFile, useDingbats=FALSE)
     }
 
     outFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.xls", opt$outDir, opt$annotation)
@@ -214,6 +231,7 @@ if(!is.null(opt$listAnnotation)) {
     write.table(data, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
 
     #opt$sessionFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.Rsession", opt$outDir, opt$annotation)
+    rm(figWidth, figHeight, outDir)
     save.session(opt$sessionFile)
 } else {
     ## read input gene list file

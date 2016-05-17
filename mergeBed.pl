@@ -77,7 +77,7 @@ if(defined($closest)) {
         exit(-1);
     }
 
-    print "$col_start\t$col_end\t$col_strand\n"; exit;
+    #print "$col_start\t$col_end\t$col_strand\n"; exit;
     ## determine closest gene coordinate for each enhancer
     my $key=(); my $key_previous=();
     my $dist=(); my %enhancer=();

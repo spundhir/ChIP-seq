@@ -8,6 +8,9 @@ PVALUE="0.05"
 MAXCLASS=20
 MINGENE=10
 ALLOW_DUPLICATES=0
+FIGWIDTH=10
+FIGHEIGHT=20
+
 
 #### usage ####
 usage() {
@@ -44,13 +47,15 @@ echo Program: "goAna (perform gene ontology analysis on input gene list)"
     echo " -c          [compare gene lists]"
     echo " -f          [compare gene lists using formula (gene~class)]"
     echo " -u <int>    [Plot top -m classes even if some are common between classes (0: No, 1: yes (default: 0))]"
+    echo " -w <int>    [Width of output figure (default: 10)]"
+    echo " -t <int>    [Height of output figure (default: 20)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:d:a:p:m:n:cfu:h ARG; do
+while getopts i:o:g:d:a:p:m:n:cfu:w:t:h ARG; do
 	case "$ARG" in
 		i) GENEFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -63,6 +68,8 @@ while getopts i:o:g:d:a:p:m:n:cfu:h ARG; do
         c) COMPARE_CLUSTER=1;;
         f) COMPARE_CLUSTER_FORMULA=1;;
         u) ALLOW_DUPLICATES=$OPTARG;;
+        w) FIGWIDTH=$OPTARG;;
+        t) FIGHEIGHT=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -122,15 +129,15 @@ echo "done"
 echo "Initiate GO analysis (`date`).. "
 if [ ! -z "$COMPARE_CLUSTER" ]; then
     for ANNO in $(echo $ANNOTATION | sed 's/\,/ /g'); do
-        goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -n $MINGENE -c -s $OUTDIR/go_analysis_compareCluster.Rsession -u $ALLOW_DUPLICATES
+        goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -n $MINGENE -c -s $OUTDIR/go_analysis_compareCluster.Rsession -u $ALLOW_DUPLICATES -w $FIGWIDTH -t $FIGHEIGHT
     done
 elif [ ! -z "$COMPARE_CLUSTER_FORMULA" ]; then
     for ANNO in $(echo $ANNOTATION | sed 's/\,/ /g'); do
-        goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -m $MAXCLASS -n $MINGENE -f -s $OUTDIR/go_analysis_compareClusterCompare.Rsession -u $ALLOW_DUPLICATES
+        goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -m $MAXCLASS -n $MINGENE -f -s $OUTDIR/go_analysis_compareClusterCompare.Rsession -u $ALLOW_DUPLICATES -w $FIGWIDTH -t $FIGHEIGHT
     done
 else
     for ANNO in $(echo $ANNOTATION | sed 's/\,/ /g'); do
-        goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -m $MAXCLASS -n $MINGENE -s $OUTDIR/go_analysis_list.Rsession -u $ALLOW_DUPLICATES
+        goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -m $MAXCLASS -n $MINGENE -s $OUTDIR/go_analysis_list.Rsession -u $ALLOW_DUPLICATES -w $FIGWIDTH -t $FIGHEIGHT
     done
 fi
 echo "done"
