@@ -5,6 +5,7 @@ GENOME="mm9";
 PVALUE="0.05"
 TFBS_FILE="/home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs"
 PROCESSOR=1
+NMOTIFS=50
 
 #### usage ####
 usage() {
@@ -24,13 +25,14 @@ echo Program: "multiClassMotifAna (perform motif analysis on genomic regions fro
     echo " -s <file>   [input file having PWM of TFBS motifs]"
     echo "             [default: /home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs]"
     echo " -r <int>    [number fo processors to use (default: 1)]"
+    echo " -c <int>    [number of top motifs to analyze from each sample (default: 50)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:p:s:r:h ARG; do
+while getopts i:o:g:p:s:r:c:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -38,6 +40,7 @@ while getopts i:o:g:p:s:r:h ARG; do
         p) PVALUE=$OPTARG;;
         s) TFBS_FILE=$OPTARG;;
         r) PROCESSOR=$OPTARG;;
+        c) NMOTIFS=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -111,5 +114,5 @@ done
 wait
 
 MOTIFDIR_ALL=$(echo $MOTIFDIR_ALL | perl -ane '$_=~s/^\,//g; print $_;')
-motifDynAna -i $MOTIFDIR_ALL -o $OUTDIR/motifDynAna -g $GENOME -p $PROCESSOR -c 50 -u 0.75 -v 1.5 -x 1.1 &>$OUTDIR/motifDynAna.log
+motifDynAna -i $MOTIFDIR_ALL -o $OUTDIR/motifDynAna -g $GENOME -p $PROCESSOR -c $NMOTIFS -u 0.75 -v 1.5 -x 1.1 &>$OUTDIR/motifDynAna.log
 echo "done"

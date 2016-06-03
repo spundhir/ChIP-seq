@@ -8,6 +8,7 @@ option_list <- list(
     make_option(c("-d", "--diffFreq"), default="0", help="minimum difference in enrichment between categories (defaut=%default)"),
 	make_option(c("-o", "--outPdfFile"), help="output pdf image file"),
     make_option(c("-f", "--onlyDiffFreq"), action="store_true", help="less stringent criteria. use only difference in frequency"),
+    make_option(c("-t", "--plotRange"), action="store_true", help="even less stringent criteria. plot motifs within a range of differential enrichment"),
     make_option(c("-v", "--plotSim"), action="store_true", help="instead plot motifs similar in frequency"),
     make_option(c("-r", "--rescale"), action="store_true", help="rescale color bar between min and max value")
 )
@@ -51,12 +52,16 @@ data$V1 <- sprintf("%s_%s", data$V1, data$V11)
 colnames(mat) <- as.vector(unique(data$V1))
 row.names(mat) <- data[1:no_rows,2]
 if(!is.null(opt$onlyDiffFreq)) {
-    #myCol <- brewer.pal(9, "OrRd")
     myCol <- rev(brewer.pal(11, "RdBu"))
     sig_rows <- which(apply(mat, 1, function(x) max(x)-min(x)>as.numeric(opt$diffFreq)))
 } else if(!is.null(opt$plotSim)) {
-    sig_rows <- which(apply(mat, 1, function(x) max(x) > 0.1 & min(x) > 0.1 & max(x)-min(x) <= as.numeric(opt$diffFreq)))
-    myCol <- (brewer.pal(9, "OrRd"))
+    #sig_rows <- which(apply(mat, 1, function(x) max(x) > 0.1 & min(x) > 0.1 & max(x)-min(x) <= as.numeric(opt$diffFreq)))
+    sig_rows <- which(apply(mat, 1, function(x) max(x)-min(x) <= as.numeric(opt$diffFreq)))
+    #myCol <- (brewer.pal(9, "OrRd"))
+    myCol <- rev(brewer.pal(11, "RdBu"))
+} else if(!is.null(opt$plotRange)) {
+    myCol <- rev(brewer.pal(11, "RdBu"))
+    sig_rows <- which(apply(mat, 1, function(x) max(x) > 1.5 & max(x)-min(x) > 0.3 & max(x)-min(x) <= as.numeric(opt$diffFreq)))
 } else {
     myCol <- rev(brewer.pal(11, "RdBu"))
     sig_rows <- which(apply(mat, 1, function(x) max(x) > 0 & min(x) < 0 & max(x)-min(x) > as.numeric(opt$diffFreq)))
@@ -77,11 +82,12 @@ if(length(sig_rows)>2) {
     #            breaks3[2:length(breaks3)], breaks4[2:length(breaks4)],
     #            breaks5[2:length(breaks5)])
     if(!is.null(opt$rescale)) {
-        breaks <- seq(min(mat[sig_rows,]), max(mat[sig_rows,]), by=0.25)
-        if(length(breaks)<11) {
+        breaks <- seq(min(mat[sig_rows,]), max(mat[sig_rows,]), by=0.5)
+        if(length(breaks)<=12) {
             myCol <- rev(brewer.pal(length(breaks)-1, "RdBu"))
         } else {
-            myCol <- colorpanel(n=length(breaks)-1,low="blue",mid="white",high="red")
+            myCol <- colorpanel(n=length(breaks)-1,low="blue",mid="#f7f7f7",high="red")
+            #myCol <- colorpanel(n=length(breaks)-1,low="#2166ac",mid="#f7f7f7",high="#b2182b")
         }
         heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1, breaks=breaks)
     } else {

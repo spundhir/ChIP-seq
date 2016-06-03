@@ -49,13 +49,14 @@ echo Program: "goAna (perform gene ontology analysis on input gene list)"
     echo " -u <int>    [Plot top -m classes even if some are common between classes (0: No, 1: yes (default: 0))]"
     echo " -w <int>    [Width of output figure (default: 10)]"
     echo " -t <int>    [Height of output figure (default: 20)]"
+    echo " -b <file>   [input file containing background gene list]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:d:a:p:m:n:cfu:w:t:h ARG; do
+while getopts i:o:g:d:a:p:m:n:cfu:w:t:b:h ARG; do
 	case "$ARG" in
 		i) GENEFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -70,6 +71,7 @@ while getopts i:o:g:d:a:p:m:n:cfu:w:t:h ARG; do
         u) ALLOW_DUPLICATES=$OPTARG;;
         w) FIGWIDTH=$OPTARG;;
         t) FIGHEIGHT=$OPTARG;;
+        b) BKGFILE=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -129,15 +131,27 @@ echo "done"
 echo "Initiate GO analysis (`date`).. "
 if [ ! -z "$COMPARE_CLUSTER" ]; then
     for ANNO in $(echo $ANNOTATION | sed 's/\,/ /g'); do
-        goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -n $MINGENE -c -s $OUTDIR/go_analysis_compareCluster.Rsession -u $ALLOW_DUPLICATES -w $FIGWIDTH -t $FIGHEIGHT
+        if [ ! -z "$BKGFILE" ]; then
+            goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -n $MINGENE -c -s $OUTDIR/go_analysis_compareCluster.Rsession -u $ALLOW_DUPLICATES -w $FIGWIDTH -t $FIGHEIGHT -b $BKGFILE
+        else
+            goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -n $MINGENE -c -s $OUTDIR/go_analysis_compareCluster.Rsession -u $ALLOW_DUPLICATES -w $FIGWIDTH -t $FIGHEIGHT
+        fi
     done
 elif [ ! -z "$COMPARE_CLUSTER_FORMULA" ]; then
     for ANNO in $(echo $ANNOTATION | sed 's/\,/ /g'); do
-        goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -m $MAXCLASS -n $MINGENE -f -s $OUTDIR/go_analysis_compareClusterCompare.Rsession -u $ALLOW_DUPLICATES -w $FIGWIDTH -t $FIGHEIGHT
+        if [ ! -z "$BKGFILE" ]; then
+            goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -m $MAXCLASS -n $MINGENE -f -s $OUTDIR/go_analysis_compareClusterCompare.Rsession -u $ALLOW_DUPLICATES -w $FIGWIDTH -t $FIGHEIGHT -b $BKGFILE
+        else
+            goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -m $MAXCLASS -n $MINGENE -f -s $OUTDIR/go_analysis_compareClusterCompare.Rsession -u $ALLOW_DUPLICATES -w $FIGWIDTH -t $FIGHEIGHT
+        fi
     done
 else
     for ANNO in $(echo $ANNOTATION | sed 's/\,/ /g'); do
-        goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -m $MAXCLASS -n $MINGENE -s $OUTDIR/go_analysis_list.Rsession -u $ALLOW_DUPLICATES -w $FIGWIDTH -t $FIGHEIGHT
+        if [ ! -z "$BKGFILE" ]; then
+            goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -m $MAXCLASS -n $MINGENE -s $OUTDIR/go_analysis_list.Rsession -u $ALLOW_DUPLICATES -w $FIGWIDTH -t $FIGHEIGHT -b $BKGFILE
+        else
+            goAna.R -i $OUTDIR/GENES_INTEREST.TXT -o $OUTDIR -e $GENOME_NAME -d $GENE_ID_TYPE -a $ANNO -p $PVALUE -m $MAXCLASS -n $MINGENE -s $OUTDIR/go_analysis_list.Rsession -u $ALLOW_DUPLICATES -w $FIGWIDTH -t $FIGHEIGHT
+        fi
     done
 fi
 echo "done"

@@ -17,7 +17,8 @@ option_list <- list(
     make_option(c("-s", "--sessionFile"), default="go_analysis.Rsession", help="output session file. It will be used, if already exist"),
     make_option(c("-w", "--figWidth"), default="10", help="width of output figure"),
     make_option(c("-t", "--figHeight"), default="20", help="height of output figure"),
-    make_option(c("-u", "--allowDuplicates"), default=0, help="Plot top -m classes even if some are common between classes")
+    make_option(c("-u", "--allowDuplicates"), default=0, help="Plot top -m classes even if some are common between classes"),
+	make_option(c("-b", "--bkgFile"), help="input file containing background gene list")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -83,19 +84,23 @@ if(!is.null(opt$listAnnotation)) {
         } else if(opt$annotation=="REACTOME_PATHWAY") {
             results=compareCluster(geneList, fun="enrichPathway", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else {
-            results=compareCluster(geneList, fun="enrichGO", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(geneList, fun="enrichGO", ont="BP", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         }
 
     } else {
         figWidth=opt$figWidth
         figHeight=opt$figHeight
         maxClass=opt$maxClass
+        minGene=opt$minGene
         outDir=opt$outDir
+        allowDuplicates=opt$allowDuplicates
         load(opt$sessionFile)
         opt$figWidth=figWidth
         opt$figHeight=figHeight
-        opt$maxClass=opt$maxClass
+        opt$maxClass=maxClass
+        opt$minGene=minGene
         opt$outDir=outDir
+        opt$allowDuplicates <- allowDuplicates
     }
     #outFile <- sprintf("%s/go_analysis_compareCluster_%s.pdf", opt$outDir, opt$annotation)
     #pdf(outFile)
@@ -140,19 +145,30 @@ if(!is.null(opt$listAnnotation)) {
     #write.table(data, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
     write.table(as.data.frame(summary(results)), file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
 
-    rm(figWidth, figHeight, outDir)
+    rm(figWidth, figHeight, maxClass, minGene, outDir, allowDuplicates)
     save.session(opt$sessionFile)
 } else if(!is.null(opt$formula)) {
     ## read input gene list file
     geneList <- read.table(opt$inFile)
+
+    ## read background gene list file
+    if(!is.null(opt$bkgFile)) {
+        bkgList <- read.table(opt$bkgFile)
+    }
 
     opt$sessionFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.Rsession", opt$outDir, opt$annotation)
     if(!file.exists(opt$sessionFile)) {
         ## convert gene symbol to entrex gene id
         if(opt$genome=="mouse") {
             geneList_conv <- bitr(geneList$V1, fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Mm.eg.db")
+            if(!is.null(opt$bkgFile)) {
+                bkgList_conv <- bitr(bkgList$V1, fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Mm.eg.db")
+            }
         } else {
             geneList_conv <- bitr(geneList$V1, fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Hs.eg.db")
+            if(!is.null(opt$bkgFile)) {
+                bkgList_conv <- bitr(bkgList$V1, fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Hs.eg.db")
+            }
         }
 
         geneList_conv <- as.data.frame(geneList_conv)
@@ -161,6 +177,16 @@ if(!is.null(opt$listAnnotation)) {
 
         if(opt$geneIdType=="ENSEMBLTRANS") {
             geneList <- unique(geneList[,c(2,3)])
+        }
+
+        if(!is.null(opt$bkgFile)) {
+            bkgList_conv <- as.data.frame(bkgList_conv)
+            bkgList <- merge(bkgList, bkgList_conv, by.x="V1", by.y=opt$geneIdType)
+            bkgList <- bkgList[which(!is.na(bkgList$ENTREZID)),]
+
+            if(opt$geneIdType=="ENSEMBLTRANS") {
+                bkgList <- unique(bkgList[,c(2,3)])
+            }
         }
 
         ## compute go enrichment
@@ -173,18 +199,30 @@ if(!is.null(opt$listAnnotation)) {
         } else if(opt$annotation=="REACTOME_PATHWAY"){
             results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichPathway", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else {
-            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
+            if(!is.null(opt$bkgFile)) {
+                results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", ont="BP", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), universe=bkgList$ENTREZID)
+                ## groupGO is not useful due to the reason that it does not give p-values
+                #results=compareCluster(ENTREZID~V2, data=geneList, fun="groupGO", ont="BP", organism=opt$genome, universe=bkgList$ENTREZID, level=2)
+            } else {
+                results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", ont="BP", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
+                ## groupGO is not useful due to the reason that it does not give p-values
+                #results=compareCluster(ENTREZID~V2, data=geneList, fun="groupGO", ont="BP", organism=opt$genome, level=2)
+            }
         }
     } else {
         figWidth=opt$figWidth
         figHeight=opt$figHeight
         maxClass=opt$maxClass
+        minGene=opt$minGene
         outDir=opt$outDir
+        allowDuplicates=opt$allowDuplicates
         load(opt$sessionFile)
         opt$figWidth=figWidth
         opt$figHeight=figHeight
-        opt$maxClass=opt$maxClass
+        opt$maxClass=maxClass
+        opt$minGene=minGene
         opt$outDir=outDir
+        opt$allowDuplicates=allowDuplicates
         #opt$maxClass=10
         #opt$outDir="go_analysis/pu1_pregm_wt_ko/all"
     }
@@ -231,7 +269,7 @@ if(!is.null(opt$listAnnotation)) {
     write.table(data, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
 
     #opt$sessionFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.Rsession", opt$outDir, opt$annotation)
-    rm(figWidth, figHeight, outDir)
+    rm(figWidth, figHeight, maxClass, minGene, outDir, allowDuplicates)
     save.session(opt$sessionFile)
 } else {
     ## read input gene list file
