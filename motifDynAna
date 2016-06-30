@@ -5,7 +5,8 @@ GENOME="mm9"
 PROCESSOR=1
 NMOTIFS=50
 LENGTH="8,10,12" ## recommended 7,8,9,10,11,12,13,14 (Andersson et al. 2014)
-REDUCE_THRESHOLD="0.6" ## argument in compareMotifs.pl (-reduceThreshold)  ## recommended 0.75 (Andersson et al. 2014)#INFO="1.5" ## argument in compareMotifs.pl (-info)
+REDUCE_THRESHOLD="0.6" ## argument in compareMotifs.pl (-reduceThreshold)  ## recommended 0.75 (Andersson et al. 2014)
+#INFO="1.5" ## argument in compareMotifs.pl (-info)
 #MIN_T=50 ## argument in compareMotifs.pl (-minT)
 PVALUE="0.01" ## recommended 1e-15 (Andersson et al. 2014)
 MIN_P_T=0 ## recommended 3 (Andersson et al. 2014)
@@ -35,13 +36,14 @@ usage() {
     echo " -y <float>  [remove motifs with target percentage less than # (default: 0)]"
     echo " -z <float>  [remove motifs with background percentage greater than # (default: 100)]"
     echo " -n <int>    [number of motifs to optimize for each motif length (default: 25)]"
+    echo " -b <file>   [custom background file]"
     echo " -h          [help]"
     echo
     exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:h ARG; do
+while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:h ARG; do
 	case "$ARG" in
 		i) INDIR=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -56,6 +58,7 @@ while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:h ARG; do
         y) MIN_P_T=$OPTARG;;
         z) B=$OPTARG;;
         n) S=$OPTARG;;
+        b) BKG_FILE=$OPTARG;;
         h) HELP=1;;
 	esac
 done
@@ -142,17 +145,27 @@ for CLASS in DENOVO KNOWN; do
 
     for (( i=0; i<${#INDIRS[@]}; i++)); do
         ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
-        if [ ! -d "${INDIRS[$i]}/motifDynAna" ]; then
-            mkdir -p ${INDIRS[$i]}/motifDynAna
+        if [ ! -d "${INDIRS[$i]}/$CLASS'_motifDynAna'" ]; then
+            mkdir -p ${INDIRS[$i]}/$CLASS"_motifDynAna"
         fi
-        findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/motifDynAna -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT
+        if [ -z "$BKG_FILE" ]; then
+            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT
+        else
+            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE
+        fi
 
-        TARGET_TOTAL=$(grep "^>" ${INDIRS[$i]}/target.fa | wc -l)
-        BKG_TOTAL=$(grep "^>" ${INDIRS[$i]}/background.fa | wc -l)
+        if [ -z "$BKG_FILE" ]; then
+            TARGET_TOTAL=$(grep "^>" ${INDIRS[$i]}/target.fa | wc -l)
+            BKG_TOTAL=$(grep "^>" ${INDIRS[$i]}/background.fa | wc -l)
+        else
+            TARGET_TOTAL=$(cat ${INDIRS[$i]}/REGIONS_INTEREST.bed | wc -l)
+            BKG_TOTAL=$(cat $BKG_FILE | wc -l)
+        fi
+
         if [ -f "${INDIRS[$i]}/knownResults.html" ]; then
-            #grep -v Name ${INDIRS[$i]}/motifDynAna/knownResults.txt | perl -ane '$pval=sprintf("%0.20f", $F[2]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[6]=~s/\%//g; $F[8]=~s/\%//g; if($pval < $my_pval && $F[6]>='$MIN_P_T' && $F[8]<='$B') { chomp($_); $_=~s/\%//g; print "'$ID'\t$_\t'$TARGET_TOTAL'\t'$BKG_TOTAL'\n"; }'
+            #grep -v Name ${INDIRS[$i]}/$CLASS"_motifDynAna"/knownResults.txt | perl -ane '$pval=sprintf("%0.20f", $F[2]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[6]=~s/\%//g; $F[8]=~s/\%//g; if($pval < $my_pval && $F[6]>='$MIN_P_T' && $F[8]<='$B') { chomp($_); $_=~s/\%//g; print "'$ID'\t$_\t'$TARGET_TOTAL'\t'$BKG_TOTAL'\n"; }'
             ## we want to include all motifs irrespective of their p-values
-            grep -v Name ${INDIRS[$i]}/motifDynAna/knownResults.txt | perl -ane 'chomp($_); $_=~s/\%//g; print "'$ID'\t$_\t'$TARGET_TOTAL'\t'$BKG_TOTAL'\n";'
+            grep -v Name ${INDIRS[$i]}/$CLASS"_motifDynAna"/knownResults.txt | perl -ane 'chomp($_); $_=~s/\%//g; print "'$ID'\t$_\t'$TARGET_TOTAL'\t'$BKG_TOTAL'\n";'
         fi
     done | sort -k 1,1 -k 2,2 > $OUTDIR/"$CLASS"_MOTIF_ENRICHMENT_DYNAMICS.TXT
     echo "done"

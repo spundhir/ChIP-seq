@@ -10,7 +10,8 @@ option_list <- list(
     make_option(c("-f", "--onlyDiffFreq"), action="store_true", help="less stringent criteria. use only difference in frequency"),
     make_option(c("-t", "--plotRange"), action="store_true", help="even less stringent criteria. plot motifs within a range of differential enrichment"),
     make_option(c("-v", "--plotSim"), action="store_true", help="instead plot motifs similar in frequency"),
-    make_option(c("-r", "--rescale"), action="store_true", help="rescale color bar between min and max value")
+    make_option(c("-r", "--rescale"), action="store_true", help="rescale color bar between min and max value"),
+    make_option(c("-k", "--rescaleBreaks"), default="0.3", help="breaks for rescale color bar")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -40,6 +41,11 @@ data$V14 <- gsub("\\(.*", "", data$V14)
 data$V15 <- gsub("^.*BestGuess:", "", data$V2)
 data$V15 <- as.numeric(gsub("\\)", "", gsub("^.*\\(", "", data$V15)))
 data <- data[which(data$V11>=as.numeric(opt$minFreq)),]
+if(length(which( !is.na(data$V15), arr.ind=TRUE))>0) {
+    data <- data[which(data$V11>=as.numeric(opt$minFreq) & data$V15>=0.85),]
+} else {
+    data <- data[which(data$V11>=as.numeric(opt$minFreq)),]
+}
 no_rows=nrow(data)/length(unique(data$V1))
 tf_info <- as.data.frame(data[1:no_rows, c(14,15)])
 dat <- matrix(data$V8, nrow=no_rows)
@@ -56,7 +62,8 @@ if(!is.null(opt$onlyDiffFreq)) {
     sig_rows <- which(apply(mat, 1, function(x) max(x)-min(x)>as.numeric(opt$diffFreq)))
 } else if(!is.null(opt$plotSim)) {
     #sig_rows <- which(apply(mat, 1, function(x) max(x) > 0.1 & min(x) > 0.1 & max(x)-min(x) <= as.numeric(opt$diffFreq)))
-    sig_rows <- which(apply(mat, 1, function(x) max(x)-min(x) <= as.numeric(opt$diffFreq)))
+    #sig_rows <- which(apply(mat, 1, function(x) max(x)-min(x) <= as.numeric(opt$diffFreq)))
+    sig_rows <- row(mat)[,1]
     #myCol <- (brewer.pal(9, "OrRd"))
     myCol <- rev(brewer.pal(11, "RdBu"))
 } else if(!is.null(opt$plotRange)) {
@@ -70,7 +77,7 @@ if(!is.null(opt$onlyDiffFreq)) {
 #sig_rows <- which(apply(dat, 1, function(x) max(x)>3))
 
 if(length(sig_rows)>2) {
-    pdf(opt$outPdfFile, height=15)
+    pdf(opt$outPdfFile, height=20)
     #breaks <- as.vector(summary(as.vector(mat[sig_rows,])))
     #len=2
     #breaks1 <- seq(breaks[1], breaks[2], length=len)
@@ -82,11 +89,12 @@ if(length(sig_rows)>2) {
     #            breaks3[2:length(breaks3)], breaks4[2:length(breaks4)],
     #            breaks5[2:length(breaks5)])
     if(!is.null(opt$rescale)) {
-        breaks <- seq(min(mat[sig_rows,]), max(mat[sig_rows,]), by=0.5)
+        breaks <- seq(min(mat[sig_rows,]), max(mat[sig_rows,]), by=as.numeric(opt$rescaleBreaks))
         if(length(breaks)<=12) {
             myCol <- rev(brewer.pal(length(breaks)-1, "RdBu"))
         } else {
-            myCol <- colorpanel(n=length(breaks)-1,low="blue",mid="#f7f7f7",high="red")
+            myCol <- colorRampPalette(c("dodgerblue4","grey97", "sienna3"))(length(breaks)-1)
+            #myCol <- colorpanel(n=length(breaks)-1,low="blue",mid="#f7f7f7",high="red")
             #myCol <- colorpanel(n=length(breaks)-1,low="#2166ac",mid="#f7f7f7",high="#b2182b")
         }
         heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1, breaks=breaks)

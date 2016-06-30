@@ -18,7 +18,8 @@ option_list <- list(
     make_option(c("-w", "--figWidth"), default="10", help="width of output figure"),
     make_option(c("-t", "--figHeight"), default="20", help="height of output figure"),
     make_option(c("-u", "--allowDuplicates"), default=0, help="Plot top -m classes even if some are common between classes"),
-	make_option(c("-b", "--bkgFile"), help="input file containing background gene list")
+	make_option(c("-b", "--bkgFile"), help="input file containing background gene list"),
+	make_option(c("-r", "--ftrResFile"), help="input file containing manually filtered GO categories to plot")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -59,7 +60,11 @@ if(!is.null(opt$listAnnotation)) {
     gene <- read.table(opt$inFile, fill=TRUE, sep="\t")
 
     opt$sessionFile <- sprintf("%s/go_analysis_compareCluster_%s.Rsession", opt$outDir, opt$annotation)
-    if(!file.exists(opt$sessionFile)) {
+    if(!is.null(opt$ftrResFile)) {
+       ftr_results <- read.table(opt$ftrResFile, sep="\t")
+       data <- ftr_results[,c(1,2,3,4,5,6,7,8,10)]
+       colnames(data) <- c("Cluster", "ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "Count")
+    } else if(!file.exists(opt$sessionFile)) {
         ## convert gene symbol to entrex gene id
         gene[gene==""]  <- NA
         #geneList <- lapply(gene, function(x) { list <- queryMany(x[!is.na(x)], scopes=opt$geneIdType, fields="entrezgene", species=opt$genome)$entrezgene; list[which(!is.na(list))]; } )
@@ -86,7 +91,7 @@ if(!is.null(opt$listAnnotation)) {
         } else {
             results=compareCluster(geneList, fun="enrichGO", ont="BP", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         }
-
+        data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
     } else {
         figWidth=opt$figWidth
         figHeight=opt$figHeight
@@ -101,16 +106,19 @@ if(!is.null(opt$listAnnotation)) {
         opt$minGene=minGene
         opt$outDir=outDir
         opt$allowDuplicates <- allowDuplicates
+        data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
     }
     #outFile <- sprintf("%s/go_analysis_compareCluster_%s.pdf", opt$outDir, opt$annotation)
     #pdf(outFile)
     #plot(results, includeAll=TRUE, showCategory=NULL)
     #dev.off()
 
-    library(ggplot2)
-    data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
     if(nrow(data)>=1) {
-        outFile <- sprintf("%s/go_analysis_compareCluster_%s.pdf", opt$outDir, opt$annotation)
+        if(is.null(opt$ftrResFile)) {
+            outFile <- sprintf("%s/go_analysis_compareCluster_%s.pdf", opt$outDir, opt$annotation)
+        } else {
+            outFile <- sprintf("%s/go_analysis_compareCluster_filtered_%s.pdf", opt$outDir, opt$annotation)
+        }
         data$GeneDensity <- apply(data, 1, function(x) as.numeric(unlist(strsplit(x[4],"/"))[1])/as.numeric(unlist(strsplit(x[4],"/"))[2]))
         data$BgDensity <- apply(data, 1, function(x) as.numeric(unlist(strsplit(x[5],"/"))[1])/as.numeric(unlist(strsplit(x[5],"/"))[2]))
         data$fc <- log2(data$GeneDensity/data$BgDensity)
@@ -126,8 +134,8 @@ if(!is.null(opt$listAnnotation)) {
             data_sig$Description <-factor(data_sig$Description, levels=data_sig$Description)
         }
         p <- ggplot(data_sig, aes(x = Cluster, y = Description)) +
-            #geom_point(aes(colour=pvalue,size=Count)) +
-            geom_point(aes(colour=pvalue,size=GeneDensity*100)) +
+            geom_point(aes(colour=pvalue,size=Count)) +
+            #geom_point(aes(colour=pvalue,size=GeneDensity*100)) +
             scale_colour_gradient(low="brown", high="yellow") +
             scale_size(range=c(1,10))
             #scale_size(range=c((min(data_sig$GeneDensity)*100),(max(data_sig$GeneDensity*100))), breaks=waiver(), labels=waiver()) +
@@ -139,14 +147,16 @@ if(!is.null(opt$listAnnotation)) {
         #ggsave(p, dpi=300, height=20, width=10, filename=outFile, useDingbats=FALSE)
     }
 
-    outFile <- sprintf("%s/go_analysis_compareCluster_%s.xls", opt$outDir, opt$annotation)
-    #data <- as.data.frame(summary(results))
-    #data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[9], "/")), function(x) geneList[which(geneList$ENTREZID==x),]$V1)), collapse="/"))
-    #write.table(data, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
-    write.table(as.data.frame(summary(results)), file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
+    if(is.null(opt$ftrResFile)) {
+        outFile <- sprintf("%s/go_analysis_compareCluster_%s.xls", opt$outDir, opt$annotation)
+        #data <- as.data.frame(summary(results))
+        #data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[9], "/")), function(x) geneList[which(geneList$ENTREZID==x),]$V1)), collapse="/"))
+        #write.table(data, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
+        write.table(as.data.frame(summary(results)), file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
 
-    rm(figWidth, figHeight, maxClass, minGene, outDir, allowDuplicates)
-    save.session(opt$sessionFile)
+        rm(figWidth, figHeight, maxClass, minGene, outDir, allowDuplicates)
+        save.session(opt$sessionFile)
+    }
 } else if(!is.null(opt$formula)) {
     ## read input gene list file
     geneList <- read.table(opt$inFile)
@@ -157,7 +167,11 @@ if(!is.null(opt$listAnnotation)) {
     }
 
     opt$sessionFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.Rsession", opt$outDir, opt$annotation)
-    if(!file.exists(opt$sessionFile)) {
+    if(!is.null(opt$ftrResFile)) {
+       ftr_results <- read.table(opt$ftrResFile, sep="\t")
+       data <- ftr_results[,c(1,2,3,4,5,6,7,8,10)]
+       colnames(data) <- c("Cluster", "ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "Count")
+    } else if(!file.exists(opt$sessionFile)) {
         ## convert gene symbol to entrex gene id
         if(opt$genome=="mouse") {
             geneList_conv <- bitr(geneList$V1, fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Mm.eg.db")
@@ -209,6 +223,7 @@ if(!is.null(opt$listAnnotation)) {
                 #results=compareCluster(ENTREZID~V2, data=geneList, fun="groupGO", ont="BP", organism=opt$genome, level=2)
             }
         }
+        data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
     } else {
         figWidth=opt$figWidth
         figHeight=opt$figHeight
@@ -225,11 +240,16 @@ if(!is.null(opt$listAnnotation)) {
         opt$allowDuplicates=allowDuplicates
         #opt$maxClass=10
         #opt$outDir="go_analysis/pu1_pregm_wt_ko/all"
+        data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
     }
 
-    data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
     if(nrow(data)>1) {
-        outFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.pdf", opt$outDir, opt$annotation)
+        if(is.null(opt$ftrResFile)) {
+            outFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.pdf", opt$outDir, opt$annotation)
+        } else {
+            outFile <- sprintf("%s/go_analysis_compareClusterFormula_filtered_%s.pdf", opt$outDir, opt$annotation)
+        }
+
         library(ggplot2)
         data$GeneDensity <- apply(data, 1, function(x) as.numeric(unlist(strsplit(x[4],"/"))[1])/as.numeric(unlist(strsplit(x[4],"/"))[2]))
         data$BgDensity <- apply(data, 1, function(x) as.numeric(unlist(strsplit(x[5],"/"))[1])/as.numeric(unlist(strsplit(x[5],"/"))[2]))
@@ -245,17 +265,19 @@ if(!is.null(opt$listAnnotation)) {
         } else {
             data_sig$Description <-factor(data_sig$Description, levels=data_sig$Description)
         }
-        high <- as.vector(quantile(data_sig$pvalue)[3])
-        data_sig[which(data_sig$pvalue > high),]$pvalue <- high
+        #high <- as.vector(quantile(data_sig$pvalue)[3])
+        #data_sig[which(data_sig$pvalue > high),]$pvalue <- high
+        data_sig$pvalue <- -log10(data_sig$pvalue)
         p <- ggplot(data_sig, aes(x = Cluster, y = Description)) +
-            #geom_point(aes(colour=pvalue,size=Count)) +
-            geom_point(aes(colour=pvalue,size=GeneDensity*100)) +
-            #scale_colour_gradient(low="brown", high="yellow", name="p-value") +
-            scale_colour_gradient(low="#00441b", high="#ccece6", name="p-value") +
+            geom_point(aes(colour=pvalue,size=Count)) +
+            #geom_point(aes(colour=pvalue,size=GeneDensity*100)) +
+            #scale_colour_gradient(high="brown", low="yellow", name="p-value") +
+            #scale_colour_gradient(low="#00441b", high="#ccece6", name="p-value") +
+            scale_colour_gradient(high="#00441b", low="#99d8c9", name="-log10(p-value)") +
                 #breaks=c(1e-20, 1e-15, 1e-10, 1e-5, 0.01, 0.05)) +
             #scale_size(range=c(1,10)) +
             #scale_size(range=c((min(data_sig$GeneDensity)*100),(max(data_sig$GeneDensity*100))), breaks=waiver(), labels=waiver()) +
-            scale_size_area(breaks=seq(0,100,by=5), max_size=15) +
+            scale_size_area(breaks=seq(0,100,by=10), max_size=20) +
             theme(text=element_text(size=10), axis.text.x=element_text(angle=90)) +
             theme_bw(base_size=15)
         #ggsave(p, dpi=300, height=as.numeric(opt$maxClass)*1.5, width=length(unique(data_sig$Cluster))*2, filename=outFile, useDingbats=FALSE)
@@ -263,14 +285,16 @@ if(!is.null(opt$listAnnotation)) {
         #ggsave(p, dpi=300, height=10, width=9, filename=outFile, useDingbats=FALSE)
     }
 
-    outFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.xls", opt$outDir, opt$annotation)
-    data <- as.data.frame(summary(results))
-    data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[9], "/")), function(x) geneList[which(geneList$ENTREZID==x),]$V1)), collapse="/"))
-    write.table(data, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
+    if(is.null(opt$ftrResFile)) {
+        outFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.xls", opt$outDir, opt$annotation)
+        data <- as.data.frame(summary(results))
+        data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[9], "/")), function(x) geneList[which(geneList$ENTREZID==x),]$V1)), collapse="/"))
+        write.table(data, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
 
-    #opt$sessionFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.Rsession", opt$outDir, opt$annotation)
-    rm(figWidth, figHeight, maxClass, minGene, outDir, allowDuplicates)
-    save.session(opt$sessionFile)
+        #opt$sessionFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.Rsession", opt$outDir, opt$annotation)
+        rm(figWidth, figHeight, maxClass, minGene, outDir, allowDuplicates)
+        save.session(opt$sessionFile)
+    }
 } else {
     ## read input gene list file
     gene <- read.table(opt$inFile)

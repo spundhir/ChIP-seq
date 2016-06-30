@@ -512,6 +512,8 @@ plotheat <- function(reg.list, uniq.reg, enrichList, v.low.cutoff, go.algo,
     } else {
         if(hm.color != "default") {
             enrich.palette <- colorRampPalette(c('snow', hm.color))
+            #enrich.palette <- colorRampPalette(c('midnightblue', hm.color))
+            #enrich.palette <- colorRampPalette(c('midnightblue', 'yellow3', hm.color), bias=color.distr, interpolate='spline')
         } else {
             enrich.palette <- colorRampPalette(c('snow', 'red2'))    
         }
@@ -780,7 +782,11 @@ if(!is.null(opt$heatMap)) {
     }
 
     ## plot the dynamics
-    pdf(opt$outPdfFile, height=length(sessionFile)*2)
+    if(length(sessionFile)>1) {
+        pdf(opt$outPdfFile, height=length(sessionFile)*2)
+    } else {
+        pdf(opt$outPdfFile, width=ncol(regcovMat)*2)
+    }
     for(row in 1:length(sessionFile)) {
         load(sprintf("%s.avgprof.RData", sessionFile[row]))
 
@@ -821,25 +827,31 @@ if(!is.null(opt$heatMap)) {
             }
         } else {
             if(row==1) {
-                par(mfrow=c(length(sessionFile), ncol(regcovMat)))
+                if(length(sessionFile)>1) {
+                    par(mfrow=c(length(sessionFile), ncol(regcovMat)))
+                } else {
+                    par(mar=c(0.5,0.5,0.5,0.5))
+                    par(mfrow=c(length(sessionFile), ncol(regcovMat)))
+                    #par(mfrow=c(12, 3))
+                }
             }
             for(col in 1:ncol(regcovMat)) {
                 box_color <- "black"
                 if(!is.null(opt$tfProfile)) {
-                    if(length(col_order) <= 4) {
-                        color[col_order] <- c("#e7298a", "#1b9e77", "#e6ab02", "#7570b3")
+                    if(length(col) <= 4) {
+                        color[col] <- c("#e7298a", "#1b9e77", "#e6ab02", "#7570b3")
                     } else {
-                        color[col_order] <- NA
+                        color[col] <- NA
                     }
                 } else {
-                    color[col_order] <- "#762a83"
+                    color[col] <- "#762a83"
                 }
 
                 #gsub("_[^#]+_", "_", title[col], perl=T)
                 if(!is.null(opt$logScale)) {
-                    plotmat(log(regcovMat[,col]), title[col], color[col], bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, as.matrix(confiMat[,col]), mw, ymin, ymax, regionCounts[,col_order], box_color, prof.misc)
+                    plotmat(log(regcovMat[,col]), title[col], color[col], bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, as.matrix(confiMat[,col]), mw, ymin, ymax, NA, box_color, prof.misc)
                 } else {
-                    plotmat(regcovMat[,col], title[col], color[col], bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, as.matrix(confiMat[,col]), mw, ymin, ymax, regionCounts[,col_order], box_color, prof.misc)
+                    plotmat(regcovMat[,col], title[col], color[col], bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, as.matrix(confiMat[,col]), mw, ymin, ymax, NA, box_color, prof.misc)
                 }
             }
         }
