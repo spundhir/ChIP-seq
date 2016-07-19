@@ -8,6 +8,7 @@ MIN_N_CLASS=50
 GENE_ORDER="none"
 COLOR="red2"
 CD="0.6"
+SC="global"
 WIN=1000
 
 #### usage ####
@@ -35,11 +36,16 @@ usage() {
     echo " -y <int>            [minimum number of elements within each nfr dynamic class to plot (default: 50)]"
     echo " -a <string>         [gene order algorithm for heatmap (default: none)]"
     echo "                     [total, hc, max, prod, diff, km, none, h3k27ac, cobinding, expr, tf_fc, tf_expr, me1_fc]"
-    echo " -c <string>         [Color for heatmap (like red2, blue2, darkgreen yellow. default: red2)]"
-    echo " -t <float>          [Color distribution for heatmap (positive number; default: 0.6)]"
+    echo " -c <string>         [color for heatmap (like red2, blue2, darkgreen yellow. default: red2)]"
+    echo " -t <float>          [color distribution for heatmap (positive number; default: 0.6)]"
     echo "                     [    Hint: lower values give more widely spaced colors at the negative end]"
     echo "                     [    In other words, they shift the neutral color to positive values]"
     echo "                     [    If set to 1, the neutral color represents 0 (i.e. no bias)]"
+    echo " -s <string>         [color scale for heatmap (min,max) (default: global)]"
+    echo "                     [local: base on each individual heatmap]"
+    echo "                     [region: base on all heatmaps belong to the same region]"
+    echo "                     [global: base on all heatmaps together]"
+    echo "                     [min_val,max_val: custom scale using a pair of numerics]"
     echo " -w <int>            [flanking region size (default: 1000)]"
     echo " -x                  [ignore class, meaning do not make separate plot for each class]" 
 	echo " -h                  [help]"
@@ -48,7 +54,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:k:l:vo:f:d:g:p:y:a:c:t:w:xh ARG; do
+while getopts i:k:l:vo:f:d:g:p:y:a:c:t:s:w:xh ARG; do
 	case "$ARG" in
 		i) NFR=$OPTARG;;
         k) CHIPDIR=$OPTARG;;
@@ -63,6 +69,7 @@ while getopts i:k:l:vo:f:d:g:p:y:a:c:t:w:xh ARG; do
         a) GENE_ORDER=$OPTARG;;
         c) COLOR=$OPTARG;;
         t) CD=$OPTARG;;
+        s) SC=$OPTARG;;
         w) WIN=$OPTARG;;
         x) IGNORE_CLASS=1;;
 		h) HELP=1;;
@@ -224,13 +231,13 @@ HEATMAP_FILES=$(echo $HEATMAP_FILES | sed -E 's/^\,//g')
 #echo "nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -c $COLOR -d $CD";
 #if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
     if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
-        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -l $WIN
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -s $SC -l $WIN
     elif [ ! -z "$CHIP_INCL_FILTER" ]; then
-        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -l $WIN
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -s $SC -l $WIN
     elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
-        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -l $WIN
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -s $SC -l $WIN
     else
-        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -l $WIN
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -s $SC -l $WIN
     fi
 #fi
 
