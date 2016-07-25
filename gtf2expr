@@ -9,9 +9,9 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: gtf2expr -i <file | stdin> -j <file(s)>"
+	echo "Usage: gtf2expr -i <file> -j <file(s)>"
 	echo "Options:"
-	echo " -i <file>   [input file containing genomic coordinate in GTF format]"
+	echo " -i <file>   [input file containing genomic coordinate in GTF format (can be stdin)]"
     echo " -j <file>   [input mapped reads in SAM/BAM format]"
     echo "             [if multiple seperate by a comma]"
     echo "[OPTIONS]"
@@ -56,6 +56,15 @@ else
     echo "Presently the program only support analysis for mm9 or hg19"
     echo
     usage
+fi
+
+## create temporary GTF file if input is from stdin
+if [ "$INPUTGTFFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo "${LINE}"
+    done | perl -an -F'/\t+/' -e '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; chomp($line); print "$line\n";' > $TMP
+    INPUTGTFFILE=$TMP
 fi
 
 ## parse input bam files in an array
@@ -140,7 +149,11 @@ else
     grep -vE '^[#|GeneId]+' $TMP_FILE | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", ($_*1000000)/$mappedReads[$i]); $i++; } print "\n";'
 fi | perl -ane '$chr=$F[1]; $chr=~s/\;.*//g; @t=sort { $a <=> $b } split(/\;/, $F[2]); $start=$t[0]; @t=reverse sort { $a <=> $b } split(/\;/, $F[3]); $end=$t[0]; $strand=$F[4]; $strand=~s/\;.*//g; print "$chr\t$start\t$end\t$F[0]\t1\t$strand\t$F[5]\t"; foreach(@F[6..scalar(@F)-1]) { print "$_\t"; } print "\n";' | sortBed -i stdin
 
-#rm $TMP_FILE
-#rm $TMP_FILE.summary
+rm $TMP_FILE
+rm $TMP_FILE.summary
+
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
 
 exit
