@@ -22,6 +22,7 @@ usage() {
 	echo " -i <file>           [file containing NFR with statistics from nfrDynAna2Matrix script (can be stdin)]"
     echo "                     [stdin, only if -l is not stdin]"
     echo "                     [chr start end name class (...)]"
+    echo "                     [(...) additional columns can be TPM values by which to sort coordinates using -a param]"
     echo " -k <dir>            [input directory containing BAM files for various histone marks]"
     echo "[OPTIONS]"
     echo " -l <file>           [file containing TF coordinate. Analyze NFRs which overlap the TF coordinate (can be stdin)]"
@@ -35,7 +36,7 @@ usage() {
     echo " -p <int>            [number of processor to use (default: 1)]"
     echo " -y <int>            [minimum number of elements within each nfr dynamic class to plot (default: 50)]"
     echo " -a <string>         [gene order algorithm for heatmap (default: none)]"
-    echo "                     [total, hc, max, prod, diff, km, none, h3k27ac, cobinding, expr, tf_fc, tf_expr, me1_fc]"
+    echo "                     [total, hc, max, prod, diff, km, none, h3k27ac, cobinding, expr, tf_fc, tf_expr, sum"
     echo " -c <string>         [color for heatmap (like red2, blue2, darkgreen yellow. default: red2)]"
     echo " -t <float>          [color distribution for heatmap (positive number; default: 0.6)]"
     echo "                     [    Hint: lower values give more widely spaced colors at the negative end]"
@@ -180,7 +181,7 @@ if [ ! -z "$IGNORE_CLASS" ]; then
         cat $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$fc_pu1=log(($F[29]+0.01)/($F[28]+0.01))/log(2); $fc_cebpa=log(($F[34]+0.01)/($F[33]+0.01))/log(2); chomp($_); print "$_\t$fc_pu1\t$fc_cebpa\n";' | sort -k 46rg,46 -k 45g,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLES.bed
     elif [ "$GENE_ORDER" == "tf_expr" ]; then
         cat $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$mean_pu1=sprintf("%0.2f", ($F[27]+$F[28]+$F[29])/3); $mean_cebpa=sprintf("%0.2f", ($F[32]+$F[33]+$F[34])/3); chomp($_); print "$_\t$mean_pu1\t$mean_cebpa\n";' | sort -k 46rg,46 -k 45g,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLES.bed
-    elif [ "$GENE_ORDER" == "me1_fc" ]; then
+    elif [ "$GENE_ORDER" == "sum" ]; then
         cat $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$fc_me1=log(($F[26]+0.01)/($F[22]+0.01))/log(2); chomp($_); print "$_\t$fc_me1\n";' | sort -k 44r,44 -k 45g,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLES.bed
     else
         cat $OUTDIR/NFR_DYNAMICS.TXT | cut -f 1-9 > $OUTDIR/$PLOT_TITLES.bed
@@ -207,7 +208,7 @@ else
             perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$fc_pu1=log(($F[29]+0.01)/($F[28]+0.01))/log(2); $fc_cebpa=log(($F[34]+0.01)/($F[33]+0.01))/log(2); chomp($_); print "$_\t$fc_pu1\t$fc_cebpa\n";' | sort -k 46rg,46 -k 45g,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
         elif [ "$GENE_ORDER" == "tf_expr" ]; then
             perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$mean_pu1=sprintf("%0.2f", ($F[27]+$F[28]+$F[29])/3); $mean_cebpa=sprintf("%0.2f", ($F[32]+$F[33]+$F[34])/3); chomp($_); print "$_\t$mean_pu1\t$mean_cebpa\n";' | sort -k 46rg,46 -k 45g,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
-        elif [ "$GENE_ORDER" == "me1_fc" ]; then
+        elif [ "$GENE_ORDER" == "sum" ]; then
             perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$fc_me1=log(($F[26]+0.01)/($F[22]+0.01))/log(2); chomp($_); print "$_\t$fc_me1\n";' | sort -k 44r,44 -k 45g,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
         else
             perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
@@ -215,7 +216,7 @@ else
     done
 fi
 
-if [ "$GENE_ORDER" == "h3k27ac" -o "$GENE_ORDER" == "cobinding" -o "$GENE_ORDER" == "expr" -o "$GENE_ORDER" == "tf_fc" -o "$GENE_ORDER" == "tf_expr" -o "$GENE_ORDER" == "me1_fc" ]; then
+if [ "$GENE_ORDER" == "h3k27ac" -o "$GENE_ORDER" == "cobinding" -o "$GENE_ORDER" == "expr" -o "$GENE_ORDER" == "tf_fc" -o "$GENE_ORDER" == "tf_expr" -o "$GENE_ORDER" == "sum" ]; then
     GENE_ORDER="none"
 fi
 echo "done"

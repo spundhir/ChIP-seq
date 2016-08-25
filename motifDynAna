@@ -19,7 +19,7 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: motifDynAna -i <dir> -o <file> [OPTIONS]"
+	echo "Usage: motifDynAna -i <dir> -o <dir> [OPTIONS]"
 	echo "Options:"
     echo " -i <dir>    [directory containing result from prior run of motifAna script]"
     echo "             [if multiple, seperate them by a comma]"

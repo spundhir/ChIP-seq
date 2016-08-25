@@ -1,0 +1,64 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+MIN_N_CLASS=500
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "filterBedByClassFreq (filter input BED file based on frequency of classes)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: filterBedByClassFreq -i <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input genomic coordinates in BED format (can be stdin)]"
+    echo "             [chr start end stages_count stages (..)]"
+    echo "[OPTIONS]"
+    echo " -n <int>    [minimum number of elements within class (default: 500)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:n:h ARG; do
+    case "$ARG" in
+    i) BED_FILE=$OPTARG;;
+    n) MIN_N_CLASS=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$BED_FILE" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+else
+    echo "Presently the program only support analysis for mm9 or hg19"
+    echo
+    usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$BED_FILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    BED_FILE=$TMP
+fi
+
+## filter input BED file based on minimum number of elements within each nfr dynamic class
+for CLASS in $(cat $BED_FILE | cut -f 5 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1 | perl -ane 'if($F[0]>'$MIN_N_CLASS') { print "$F[1]\n"; }'); do perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $BED_FILE; done | sort -k 1,1 -k 2n,2 -k 3n,3
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi

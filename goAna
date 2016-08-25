@@ -107,11 +107,13 @@ echo -n "Populating files based on input genome, $GENOME (`date`).. "
 if [ "$GENOME" == "mm9" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
     REPEAT_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.simpleRepeat.gz"
-    GENOME_NAME="mouse"
+    GENOME_NAME="mmu"
+    GENOME_DB="org.Mm.eg.db"
 elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
     REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg19.simpleRepeat.gz"
-    GENOME_NAME="human"
+    GENOME_NAME="hsa"
+    GENOME_DB="org.Hsa.eg.db"
 else
     echo "Presently the program only support analysis for mm9, hg19 or danRer7"
     echo

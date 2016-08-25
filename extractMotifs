@@ -1,0 +1,104 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9";
+
+usage() {
+	echo Program: "extractMotifs (extract motifs of interest from a motif file)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: extractMotifs -i <file> -j <string> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file containing motifs (or stdin)]"
+	echo " -j <string> [name of motifs needs to be extracted]"
+    echo "             [if multiple, separate them by a comma]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome for which to perform the analysis (default: mm9)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:g:h ARG; do
+	case "$ARG" in
+		i) MOTIFFILE=$OPTARG;;
+        j) MOTIF=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$MOTIFFILE" -o -z "$MOTIF" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.simpleRepeat.gz"
+    GENOME_MOTIF="mm9r"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg19.simpleRepeat.gz"
+    GENOME_MOTIF="hg19r"
+elif [ "$GENOME" == "danRer7" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.simpleRepeat.gz"
+    GENOME_MOTIF="danRer7r"
+else
+    echo "Presently the program only support analysis for mm9, hg19 or danRer7"
+    echo
+    usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$MOTIFFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    MOTIFFILE=$TMP
+fi
+
+oIFS=$IFS
+IFS=","
+MOTIFS=($MOTIF)
+IFS=$oIFS
+
+for (( i=0; i<${#MOTIFS[@]}; i++ )); do
+    MOTIFS[$i]=$(echo ${MOTIFS[$i]} | perl -ane 's/\//\\\//g; print $_;')
+    zless $MOTIFFILE | perl -ane '
+        if($_=~/'${MOTIFS[$i]}'.*/i) {
+            @t=split(/\s+/,$_);
+            $t[1]=~s/^.*\(/'${MOTIFS[$i]}'(/g;
+            $line=();
+            foreach(@t) { $line.="$_\t"; }
+            $line=~s/\t$//g;
+            print "$line\n"; $start=1;
+        }
+        elsif($_=~/^\>/) { $start=0; }
+        elsif($start) { print $_; }
+    '
+done
+
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
+
+#wait
+#wait_for_jobs_to_finish "Wait for jobs to finish... "
+#echo "done"
+

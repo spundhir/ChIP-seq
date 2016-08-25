@@ -1,0 +1,57 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+MIN_N_CLASS=500
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "tabEdit (edit or gather information about a tab delimited file)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: tabEdit -i <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input tab delimited file (can be stdin)]"
+    echo " -r          [remove empty columns]"
+    echo " -c          [count number of columns]"
+    echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:rch ARG; do
+    case "$ARG" in
+    i) INFILE=$OPTARG;;
+    r) REMOVE=1;;
+    c) COUNT=1;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$INFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    INFILE=$TMP
+fi
+
+## remove empty columns
+if [ ! -z "$REMOVE" ]; then
+    tr -s '\t' < $INFILE
+else
+    zless $INFILE | perl -ane 'print scalar(@F)."\n";' | sort | uniq -c
+fi
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi

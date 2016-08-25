@@ -14,16 +14,18 @@ usage() {
     echo " -i <files>  [input BED files seperated by a comma]"
     echo "[OPTIONS]"
     echo " -j <string> [names to describe each input files seperated by a comma]"
+    echo " -f <string> [filter input BED files for this input string parameter]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:h ARG; do
+while getopts i:j:f:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         j) NAME=$OPTARG;;
+        f) FILTER=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -69,9 +71,14 @@ fi
 COMMAND_BED=""
 COMMAND_NAME=""
 for (( i=0; i<$BEDFILES_COUNT; i++ )); do
-    TMP_NAME[i]=$RANDOM
-    bedtools sort -i ${BEDFILES[$i]} > /tmp/${TMP_NAME[$i]}.txt
-    COMMAND_BED="$COMMAND_BED /tmp/${TMP_NAME[$i]}.txt"
+    TMP_NAME[i]=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    #TMP_NAME[i]=$RANDOM
+    if [ ! -z "$FILTER" ]; then
+        zless ${BEDFILES[$i]} | perl -ane 'for($i=0; $i<scalar(@F); $i++) { if($F[$i]=~/^'$FILTER'$/) { print $_; last; } }' |  bedtools sort -i - > ${TMP_NAME[$i]}.bed
+    else
+        bedtools sort -i ${BEDFILES[$i]} > ${TMP_NAME[$i]}.bed
+    fi
+    COMMAND_BED="$COMMAND_BED ${TMP_NAME[$i]}.bed"
     if [ ! -z "$NAME" ]; then
         COMMAND_NAME="$COMMAND_NAME ${NAMES[$i]}"
     fi
@@ -84,9 +91,15 @@ if [ ! -z "$NAME" ]; then
 else
     bedtools multiinter -i $COMMAND_BED | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; $last_counter=$F[3]; } } elsif($last_coor!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'
     #bedtools multiinter -i $COMMAND_BED | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; $last_counter=$F[3]; } } elsif($last_counter!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'
-fi
+fi | while read line; do 
+    if [ ! -z "$FILTER" ]; then 
+        echo $line$'\t'$FILTER; 
+    else
+        echo "$line";
+    fi
+done
 
 ## remove temporary files
 for (( i=0; i<$BEDFILES_COUNT; i++ )); do
-    rm /tmp/${TMP_NAME[$i]}.txt
+    rm ${TMP_NAME[$i]}.bed
 done

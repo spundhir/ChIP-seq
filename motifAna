@@ -47,6 +47,9 @@ usage() {
     echo "             [mode 2: analyze the enrichment of specific TFBS motifs in the input regions]"
     echo "              -l <file>   [motif file for which enrichment will be analyzed]"
     echo "                          [if multiple, separate them by a comma]"
+    echo "              -j <string> [name of motifs that are of interest]"
+    echo "                          [if multiple separate them by a comma]"
+    echo "                          [If not provided analysis will be done using all motifs]"
     echo "              -f          [output file as histogram (default: annotation)]"
     echo " -g <string> [genome for which to perform the analysis (default: mm9)]"
     echo " -p <int>    [number of processors to use (default: 1)]"
@@ -56,7 +59,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:g:p:fh ARG; do
+while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:g:p:j:fh ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -74,6 +77,7 @@ while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:g:p:fh ARG; do
         l) LIST=$OPTARG;;
         g) GENOME=$OPTARG;;
         p) PROCESSOR=$OPTARG;;
+        j) MOTIF_NAME=$OPTARG;;
         f) FORMAT_HIST=1;;
 		h) HELP=1;;
 	esac
@@ -179,16 +183,40 @@ elif [ ! -z "$LIST" ]; then
     for (( i=0; i<${#FILE[@]}; i++ )); do
         PWM="$PWM ${FILE[$i]}"
     done
-    echo -n "Analyze the enrichment of specific TFBS motifs in the input regions... "
-    if [ ! -z "$FORMAT_HIST" ]; then
-        ## parameter histNorm added on Nov 12, 2015 for Janus project 
-        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size 1000 -hist 10 -histNorm 5 > $OUTDIR/REGIONS_INTEREST.hist
-    else
-        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM > $OUTDIR/REGIONS_INTEREST.anno
+
+    if [ ! -z "$MOTIF_NAME" ];
+    then
+        echo -n "Create motif file depending upon input motifs of interest.. "
+        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        zless $PWM | extractMotifs -i stdin -j $MOTIF_NAME > $TMP
+        echo "done"
+        PWM=$TMP
+    fi
+
+    echo -n "Analyze the enrichment of specific TFBS motifs in the input regions.. "
+    ## parameter histNorm added on Nov 12, 2015 for Janus project 
+    annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size 1000 -hist 10 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
+
+    if [ -z "$FORMAT_HIST" ]; then
+        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -find $PWM > $OUTDIR/REGIONS_INTEREST.find
+        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -annStats $OUTDIR/REGIONS_INTEREST.annoStats > $OUTDIR/REGIONS_INTEREST.anno
+
+        TOTAL=$(cat $OUTDIR/REGIONS_INTEREST.bed | wc -l)
+        MAPPED=$(grep -v Offset $OUTDIR/REGIONS_INTEREST.find | wc -l)
+        PER=$(perl -e '$per=('$MAPPED'*100)/'$TOTAL'; printf("%0.2f", $per);')
+        echo
+        echo
+        echo "$MAPPED out of $TOTAL ($PER) input sequences contain the input motifs" >> $OUTDIR/REGIONS_INTEREST.annoStats
+        echo "$MAPPED out of $TOTAL ($PER) input sequences contain the input motifs"
+
     fi
     echo "done"
 else
     usage
+fi
+
+if [ ! -z "$TMP" ]; then
+    rm $TMP
 fi
 
 #wait

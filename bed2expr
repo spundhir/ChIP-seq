@@ -18,7 +18,8 @@ usage() {
     echo "[OPTIONS]"
     echo " -s <float>  [normalize expression by input size factor]"
     echo "             [if multiple, seperate them by a comma]"
-    echo " -m          [normalize expression by counts per million mapped reads]"
+    echo " -m          [normalize expression by counts per million mapped reads (RPM)]"
+    echo " -k          [normalize expression by counts per kilo base per million mapped reads (RPKM)]"
     echo " -d          [remove duplicate reads]"
     echo " -e <int>    [extend 3' end of reads by input number of bases (useful for ChIP-seq data)]"
     echo " -v <int>    [instead of giving expression for each replicate, output only the mean (deafult: 0)]"
@@ -35,12 +36,13 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:s:mde:g:v:rh ARG; do
+while getopts i:j:s:mkde:g:v:rh ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         j) INPUTBAMFILES=$OPTARG;;
         s) INPUTSIZEFACTORS=$OPTARG;; 
         m) CPM=1;;
+        k) CPKM=1;;
         d) REMOVE_DUPLICATE=1;;
         e) INPUTEXTENDS=$OPTARG;;
         g) GENOME=$OPTARG;;
@@ -74,7 +76,7 @@ BAMFILES_COUNT=${#BAMFILES[@]}
 IFS=$oIFS
 
 ## initialize size factors, if both size factors and total reads not provided
-if [ -z "$INPUTSIZEFACTORS" -a -z "$CPM" ]; then
+if [ -z "$INPUTSIZEFACTORS" -a -z "$CPM" -a -z "$CPKM" ]; then
     INPUTSIZEFACTORS=""
     for(( i=0; i<$BAMFILES_COUNT; i++ )); do
         INPUTSIZEFACTORS="$INPUTSIZEFACTORS,1"
@@ -136,6 +138,34 @@ if [ ! -z "$INPUTSIZEFACTORS" ]; then
             bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10
         fi
     fi | perl -ane '@sizeFactors=split(/\,/, "'$INPUTSIZEFACTORS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", $_/$sizeFactors[$i]); $i++; } print "\n";'
+elif [ ! -z "$CPKM" ]; then
+    MAPPEDREADS=""
+    for(( i=0; i<$BAMFILES_COUNT; i++ )); do
+        ## create index of input BAM file, if does not exist
+        if [ ! -f "${BAMFILES[$i]}.bai" ]; then
+            samtools index ${BAMFILES[$i]}
+        fi
+
+        COUNT=$(samtools idxstats ${BAMFILES[$i]} | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }');
+        MAPPEDREADS="$MAPPEDREADS,$COUNT"
+    done
+    MAPPEDREADS=$(echo $MAPPEDREADS | perl -ane '$_=~s/^\,//g; print $_;')
+
+    #echo $MAPPEDREADS
+    if [ -z "$REMOVE_DUPLICATE" ]; then
+        if [ ! -z "$SAME_STRAND" ]; then
+            bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D -s
+        else
+            #echo "bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D"; exit;
+            bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D
+        fi
+    else
+        if [ ! -z "$SAME_STRAND" ]; then
+            bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -s
+        else
+            bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10
+        fi
+    fi | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); $length=(($F[2]-$F[1])+1)/1000; foreach(@F[$field_count..scalar(@F)-1]) { $line.=sprintf("%0.5f\t", ($_*1000000)/($mappedReads[$i]*$length)); $i++; } $line=~s/\t$//g; print "$line\n";'
 else
     MAPPEDREADS=""
     for(( i=0; i<$BAMFILES_COUNT; i++ )); do
@@ -163,10 +193,11 @@ else
         else
             bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10
         fi
-    fi | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", ($_*1000000)/$mappedReads[$i]); $i++; } print "\n";'
-fi | perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; for($i=$field_count; $i<scalar(@F); $i+=2) { if(!defined($F[$i+1])) { $F[$i+1]=$F[$i]; } printf("%0.5f\t", ($F[$i]+$F[$i+1])/2); } print "\n"; } else { print $_; }'
+    fi | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.=sprintf("%0.5f\t", ($_*1000000)/$mappedReads[$i]); $i++; } $line=~s/\t$//g; print "$line\n";'
+fi | perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); for($i=$field_count; $i<scalar(@F); $i+=2) { if(!defined($F[$i+1])) { $F[$i+1]=$F[$i]; } $line.=sprintf("%0.5f\t", ($F[$i]+$F[$i+1])/2); } $line=~s/\t$//g; print "$line\n"; } else { print $_; }'
 
 if [ ! -z "$TMP" ]; then
     rm $TMP
 fi
+
 exit

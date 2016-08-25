@@ -62,7 +62,9 @@ fi
 NCOL_CHIP=$(cat $INPUTCHIPFILE | head -n 1 | perl -ane 'print scalar(@F);')
 NCOL_EXPR=$(cat $INPUTEXPRFILE | head -n 1 | perl -ane 'print scalar(@F);')
 
-COL_EXPR=$(perl -e '$col="5,13,"; $end='$NCOL_CHIP'+'$NCOL_EXPR'; $start=$end-'$NSAMPLES'; for($i=$start+1; $i<=$end; $i++) { $col.="$i,"; } $col=~s/\,$//g; print $col;')
+## old code used in CEBPA project
+#COL_EXPR=$(perl -e '$col="5,13,"; $end='$NCOL_CHIP'+'$NCOL_EXPR'; $start=$end-'$NSAMPLES'; for($i=$start+1; $i<=$end; $i++) { $col.="$i,"; } $col=~s/\,$//g; print $col;')
+COL_EXPR=$(perl -e '$col=sprintf("%s,%d,", 5,'$NCOL_CHIP'+4); $end='$NCOL_CHIP'+'$NCOL_EXPR'; $start=$end-'$NSAMPLES'; for($i=$start+1; $i<=$end; $i++) { $col.="$i,"; } $col=~s/\,$//g; print $col;')
 
 COL_OUT=$(perl -e '$col="distinct,distinct,"; $end='$NCOL_CHIP'+'$NCOL_EXPR'; $start=$end-'$NSAMPLES'; for($i=$start; $i<$end; $i++) { $col.="sum,"; } $col=~s/\,$//g; print $col;')
 

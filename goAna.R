@@ -49,9 +49,17 @@ suppressPackageStartupMessages(library(ggplot2))
 #cat(sprintf("A: %s", opt$compareCluster));
 #cat(sprintf("B: %s", opt$formula));
 #q();
+if(opt$genome=="mmu") {
+    genomeDb <- "org.Mm.eg.db"
+    genomeReactome <- "mouse"
+} else {
+    genomeDb <- "org.Hs.eg.db"
+    genomeReactome <- "human"
+}
+
 if(!is.null(opt$listAnnotation)) {
     david<-DAVIDWebService$new("pundhir@binf.ku.dk")
-    idType("org.Hs.eg.db")
+    idType(genomeDb)
     getIdTypes(david)
     #getAllAnnotationCategoryNames(david)
     ## ?DAVIDWebService (for more details)
@@ -67,12 +75,8 @@ if(!is.null(opt$listAnnotation)) {
     } else if(!file.exists(opt$sessionFile)) {
         ## convert gene symbol to entrex gene id
         gene[gene==""]  <- NA
-        #geneList <- lapply(gene, function(x) { list <- queryMany(x[!is.na(x)], scopes=opt$geneIdType, fields="entrezgene", species=opt$genome)$entrezgene; list[which(!is.na(list))]; } )
-        if(opt$genome=="mouse") {
-            geneList <- lapply(gene, function(x) { list <- bitr(x[!is.na(x)], fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Mm.eg.db")$ENTREZID; list[which(!is.na(list))]; } )
-        } else {
-            geneList <- lapply(gene, function(x) { list <- bitr(x[!is.na(x)], fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Hs.eg.db")$ENTREZID; list[which(!is.na(list))]; } )
-        }
+        #geneList <- lapply(gene, function(x) { list <- queryMany(x[!is.na(x)], scopes=opt$geneIdType, fields="entrezgene", OrgDb=genomeDb)$entrezgene; list[which(!is.na(list))]; } )
+        geneList <- lapply(gene, function(x) { list <- bitr(x[!is.na(x)], fromType=opt$geneIdType, toType="ENTREZID", OrgDb=genomeDb)$ENTREZID; list[which(!is.na(list))]; } )
 
         if(opt$geneIdType=="ENSEMBLTRANS") {
             geneList <- unique(geneList[,c(2,3)])
@@ -87,11 +91,12 @@ if(!is.null(opt$listAnnotation)) {
         } else if(opt$annotation=="DISEASE_ONTOLOGY") {
             results=compareCluster(geneList, fun="enrichDO", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="REACTOME_PATHWAY") {
-            results=compareCluster(geneList, fun="enrichPathway", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(geneList, fun="enrichPathway", organism=genomeReactome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else {
-            results=compareCluster(geneList, fun="enrichGO", ont="BP", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(geneList, fun="enrichGO", ont="BP", OrgDb=genomeDb, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         }
-        data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
+        #data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
+        data <- results@compareClusterResult[,c(1,3,4,5,6,7,8,9,10,11)]
     } else {
         figWidth=opt$figWidth
         figHeight=opt$figHeight
@@ -106,7 +111,8 @@ if(!is.null(opt$listAnnotation)) {
         opt$minGene=minGene
         opt$outDir=outDir
         opt$allowDuplicates <- allowDuplicates
-        data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
+        #data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
+        data <- results@compareClusterResult[,c(1,3,4,5,6,7,8,9,10,11)]
     }
     #outFile <- sprintf("%s/go_analysis_compareCluster_%s.pdf", opt$outDir, opt$annotation)
     #pdf(outFile)
@@ -149,10 +155,10 @@ if(!is.null(opt$listAnnotation)) {
 
     if(is.null(opt$ftrResFile)) {
         outFile <- sprintf("%s/go_analysis_compareCluster_%s.xls", opt$outDir, opt$annotation)
-        #data <- as.data.frame(summary(results))
+        #data <- as.data.frame(results@compareClusterResult)
         #data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[9], "/")), function(x) geneList[which(geneList$ENTREZID==x),]$V1)), collapse="/"))
         #write.table(data, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
-        write.table(as.data.frame(summary(results)), file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
+        write.table(as.data.frame(results@compareClusterResult), file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
 
         rm(figWidth, figHeight, maxClass, minGene, outDir, allowDuplicates)
         save.session(opt$sessionFile)
@@ -173,16 +179,9 @@ if(!is.null(opt$listAnnotation)) {
        colnames(data) <- c("Cluster", "ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "Count")
     } else if(!file.exists(opt$sessionFile)) {
         ## convert gene symbol to entrex gene id
-        if(opt$genome=="mouse") {
-            geneList_conv <- bitr(geneList$V1, fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Mm.eg.db")
-            if(!is.null(opt$bkgFile)) {
-                bkgList_conv <- bitr(bkgList$V1, fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Mm.eg.db")
-            }
-        } else {
-            geneList_conv <- bitr(geneList$V1, fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Hs.eg.db")
-            if(!is.null(opt$bkgFile)) {
-                bkgList_conv <- bitr(bkgList$V1, fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Hs.eg.db")
-            }
+        geneList_conv <- bitr(geneList$V1, fromType=opt$geneIdType, toType="ENTREZID", OrgDb=genomeDb)
+        if(!is.null(opt$bkgFile)) {
+            bkgList_conv <- bitr(bkgList$V1, fromType=opt$geneIdType, toType="ENTREZID", OrgDb=genomeDb)
         }
 
         geneList_conv <- as.data.frame(geneList_conv)
@@ -207,23 +206,24 @@ if(!is.null(opt$listAnnotation)) {
         if(opt$annotation=="DAVID"){
             results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichDAVID", idType="ENTREZ_GENE_ID", listType="Gene", annotation="GOTERM_BP_ALL", david.user = "pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="KEGG_PATHWAY"){
-            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichKEGG", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
+            results=compareCluster(ENTREZID~V2, organism=opt$genome, data=geneList, fun="enrichKEGG", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="DISEASE_ONTOLOGY"){
             results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichDO", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="REACTOME_PATHWAY"){
-            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichPathway", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
+            results=compareCluster(ENTREZID~V2, organism=genomeReactome, data=geneList, fun="enrichPathway", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else {
             if(!is.null(opt$bkgFile)) {
-                results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", ont="BP", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), universe=bkgList$ENTREZID)
+                results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", ont="BP", OrgDb=genomeDb, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), universe=bkgList$ENTREZID)
                 ## groupGO is not useful due to the reason that it does not give p-values
-                #results=compareCluster(ENTREZID~V2, data=geneList, fun="groupGO", ont="BP", organism=opt$genome, universe=bkgList$ENTREZID, level=2)
+                #results=compareCluster(ENTREZID~V2, data=geneList, fun="groupGO", ont="BP", OrgDb=genomeDb, universe=bkgList$ENTREZID, level=2)
             } else {
-                results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", ont="BP", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
+                results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", ont="BP", OrgDb=genomeDb, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
                 ## groupGO is not useful due to the reason that it does not give p-values
-                #results=compareCluster(ENTREZID~V2, data=geneList, fun="groupGO", ont="BP", organism=opt$genome, level=2)
+                #results=compareCluster(ENTREZID~V2, data=geneList, fun="groupGO", ont="BP", OrgDb=genomeDb, level=2)
             }
         }
-        data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
+        #data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
+        data <- results@compareClusterResult[,c(1,3,4,5,6,7,8,9,10,11)]
     } else {
         figWidth=opt$figWidth
         figHeight=opt$figHeight
@@ -240,7 +240,8 @@ if(!is.null(opt$listAnnotation)) {
         opt$allowDuplicates=allowDuplicates
         #opt$maxClass=10
         #opt$outDir="go_analysis/pu1_pregm_wt_ko/all"
-        data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
+        #data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
+        data <- results@compareClusterResult[,c(1,3,4,5,6,7,8,9,10,11)]
     }
 
     if(nrow(data)>1) {
@@ -287,7 +288,7 @@ if(!is.null(opt$listAnnotation)) {
 
     if(is.null(opt$ftrResFile)) {
         outFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.xls", opt$outDir, opt$annotation)
-        data <- as.data.frame(summary(results))
+        data <- as.data.frame(results@compareClusterResult)
         data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[9], "/")), function(x) geneList[which(geneList$ENTREZID==x),]$V1)), collapse="/"))
         write.table(data, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
 
@@ -302,11 +303,7 @@ if(!is.null(opt$listAnnotation)) {
     opt$sessionFile <- sprintf("%s/go_analysis_list_%s.Rsession", opt$outDir, opt$annotation)
     if(!file.exists(opt$sessionFile)) {
         ## convert gene symbol to entrez gene id
-        if(opt$genome=="mouse") {
-            gene_conv <- bitr(gene$V1, fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Mm.eg.db")
-        } else {
-            gene_conv <- bitr(gene$V1, fromType=opt$geneIdType, toType="ENTREZID", annoDb="org.Hs.eg.db")
-        }
+        gene_conv <- bitr(gene$V1, fromType=opt$geneIdType, toType="ENTREZID", OrgDb=genomeDb)
         gene_conv <- as.data.frame(gene_conv)
         gene <- merge(gene, gene_conv, by.x="V1", by.y=opt$geneIdType)
         gene <- gene[which(!is.na(gene$ENTREZID)),]
@@ -318,17 +315,17 @@ if(!is.null(opt$listAnnotation)) {
             results <- enrichDAVID(gene=gene$ENTREZID, idType="ENTREZ_GENE_ID", listType="Gene", annotation="GOTERM_BP_ALL", david.user="pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="KEGG_PATHWAY"){
             results=enrichKEGG(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
-            #results=enrichKEGG(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene), use_internal_data=TRUE)
+            #results=enrichKEGG(gene$ENTREZID, OrgDb=opt$genome, pvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene), use_internal_data=TRUE)
         } else if(opt$annotation=="DISEASE_ONTOLOGY"){
             results=enrichDO(gene$ENTREZID, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="REACTOME_PATHWAY"){
-            results=enrichPathway(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
+            results=enrichPathway(gene$ENTREZID, organism=genomeReactome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="GOTERM_BP_ALL"){
-            results=enrichGO(gene$ENTREZID, ont="BP", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
+            results=enrichGO(gene$ENTREZID, ont="BP", OrgDb=genomeDb, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="GOTERM_MF_ALL"){
-            results=enrichGO(gene$ENTREZID, ont="MF", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
+            results=enrichGO(gene$ENTREZID, ont="MF", OrgDb=genomeDb, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="GOTERM_CC_ALL"){
-            results=enrichGO(gene$ENTREZID, ont="CC", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
+            results=enrichGO(gene$ENTREZID, ont="CC", OrgDb=genomeDb, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         }
     } else {
         load(opt$sessionFile)
@@ -336,7 +333,7 @@ if(!is.null(opt$listAnnotation)) {
 
     save.session(opt$sessionFile)
     ## compute gene enrichment network for up- and down-regulated genes
-    if(is.numeric(gene$V2) & nrow(summary(results))>=1) {
+    if(is.numeric(gene$V2) & nrow(results@compareClusterResult)>=1) {
         geneList <- structure(gene$V2, names=gene$ENTREZID)
         pdf(sprintf("%s/go_analysis_list_cnetplot_%s.pdf", opt$outDir, opt$annotation), width=20, height=20)
         cnetplot(results, categorySize="pvalue", foldChange=geneList, showCategory = 3)
@@ -344,7 +341,7 @@ if(!is.null(opt$listAnnotation)) {
     }
 
     outFile <- sprintf("%s/go_analysis_list_%s.xls", opt$outDir, opt$annotation)
-    data <- as.data.frame(summary(results))
+    data <- as.data.frame(results@compareClusterResult)
     if(nrow(data)>=1) {
         data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[8], "/")), function(x) gene[which(gene$ENTREZID==x),]$V1)), collapse="/"))
     }

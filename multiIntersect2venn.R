@@ -31,7 +31,7 @@ if(opt$inFile=="stdin") {
     data <- read.table(opt$inFile)
 }
 if(is.null(opt$list)) {
-    vec <- as.vector(unique(data[!grepl(",", data$V5),]$V5))
+    vec <- as.vector(unique(data[!grepl("[,_]+", data$V5),]$V5))
     data$id <- sprintf("%d_%d", data$V2, data$V3)
 } else {
     colnames(data) <- c("id", "V5")
