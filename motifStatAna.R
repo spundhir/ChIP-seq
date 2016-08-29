@@ -96,7 +96,7 @@ p2 <- ggplot(df, aes(class, percentage, fill=factor(Motif))) +
         geom_bar(stat="identity") +
         geom_text(aes(label = sprintf("%0.0f", percentage), y = percentage), size = 3) +
         theme_bw() + scale_fill_brewer(palette = "Set3", type = "qualitative") +
-        theme(legend.position="none") +
+        #theme(legend.position="none") +
         theme(text=element_text(size=15), axis.text.x=element_text(angle = 0, vjust=1))
 
 ## plot frequency of motifs at each peak 
