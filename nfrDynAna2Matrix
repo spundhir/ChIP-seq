@@ -134,6 +134,7 @@ fi
 NCOL=$(head $OUTDIR/$BED_FILE -n 1 | perl -ane '$ncol=scalar(@F)+1; print "$ncol";')
 if [ ! -z "$BAM_FILE_TPM" ]; then
     bed2window -i $OUTDIR/$BED_FILE -w 500 | bed2expr -i stdin -j $BAM_FILE_TPM -m -d -g $GENOME | rep2mean -i stdin -s $NCOL -n $REPLICATES > $OUTDIR/$BED_FILE.tpm
+    #cat $OUTDIR/$BED_FILE | bed2expr -i stdin -j $BAM_FILE_TPM -d -g $GENOME | rep2mean -i stdin -s $NCOL -n $REPLICATES > $OUTDIR/$BED_FILE.tpm
 else
     touch $OUTDIR/$BED_FILE.tpm
 fi

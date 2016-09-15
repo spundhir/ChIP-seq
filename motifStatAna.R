@@ -36,7 +36,9 @@ dir.create(opt$outDir)
 
 ## parse input directory information
 inDirs <- as.vector(unlist(strsplit(opt$inDirs, ",")))
-inDirsDes <- gsub(".*/", "", gsub("/$","", inDirs))
+t <- as.data.frame(table(as.vector(unlist(strsplit(opt$inDirs, "[/,]")))))
+inDirsDes <- as.vector(t[which(t$Freq==1),]$Var1)
+#inDirsDes <- gsub(".*/", "", gsub("/$","", inDirs))
 
 ## plot histograms of motif location with respect to peaks
 all <- NULL
@@ -59,6 +61,8 @@ for(i in 2:(ncol(all)-1)) {
     theme(text=element_text(size=15), axis.text.x=element_text(angle = 0, vjust=1)))
 }
 dev.off()
+
+#save.session("test.session")
 
 ## plot match score to PWM of motifs  
 all <- NULL
@@ -95,7 +99,8 @@ df$percentage <- (df$Freq/df$total)*100
 p2 <- ggplot(df, aes(class, percentage, fill=factor(Motif))) +
         geom_bar(stat="identity") +
         geom_text(aes(label = sprintf("%0.0f", percentage), y = percentage), size = 3) +
-        theme_bw() + scale_fill_brewer(palette = "Set3", type = "qualitative") +
+        theme_bw() + 
+        #scale_fill_brewer(palette = "Set3", type = "qualitative") +
         #theme(legend.position="none") +
         theme(text=element_text(size=15), axis.text.x=element_text(angle = 0, vjust=1))
 

@@ -76,14 +76,18 @@ if [ ! -z "$PHYLOP" ]; then
 
     ## compute phylop conservation scores for input BED file
     for i in `seq 1 22` X Y M;
+    #for i in 15;
     do
         phyloPFn="$SCOREDIR/chr${i}.phyloP46way.wigFix.bed"
         #echo "$phyloPFn"
         if [ $(ls $phyloPFn | wc -l) -eq 1 ]; then
             echo "mapping signal for chromosome chr${i}...";
-            bedmap --echo --echo-map-score --delim '\t' $OUTDIR/INPUTFILE_PER_BASE.BED ${phyloPFn} > $OUTDIR/regions_with_perBase_phyloP.${i}.bed
+            bedmap --echo --echo-map-score --chrom chr${i} --delim '\t' $OUTDIR/INPUTFILE_PER_BASE.BED ${phyloPFn} > $OUTDIR/regions_with_perBase_phyloP.${i}.bed &
         fi
     done
+
+    #cat $OUTDIR/*.bed | perl -ane 'if($F[5]!~/^$/) { $F[3]=~s/\-.*//g; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' | mergeBed -i stdin -d 1 -c 4,5,6 -o distinct,distinct,median > $OUTDIR/ALL.CONSERVATION
+    cat $OUTDIR/*.bed | perl -ane 'if($F[5]!~/^$/) { $F[3]=~s/\-.*//g; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' | perl -ane 'if(!defined($info{$F[3]}) && $id!~/^$/) { print "$info{$id}{'0'}\t$info{$id}{'1'}\t$info{$id}{'2'}\t$info{$id}{'3'}\t$info{$id}{'4'}\t$info{$id}{'5'}\t$info{$id}{count}\n"; %info=(); $info{$F[3]}{'0'}=$F[0]; $info{$F[3]}{'1'}=$F[1]; $info{$F[3]}{'2'}=$F[2]; $info{$F[3]}{'3'}=$F[3]; $info{$F[3]}{'4'}=$F[4]; $info{$F[3]}{'5'}=$F[5]; $info{$F[3]}{count}=1; } elsif(defined($info{$F[3]})) { $id=$F[3]; $info{$id}{'2'}=$F[2]; $info{$id}{'5'}+=$F[5]; $info{$id}{count}++; } else { $info{$F[3]}{'0'}=$F[0]; $info{$F[3]}{'1'}=$F[1]; $info{$F[3]}{'2'}=$F[2]; $info{$F[3]}{'3'}=$F[3]; $info{$F[3]}{'4'}=$F[4]; $info{$F[3]}{'5'}=$F[5]; $info{$F[3]}{count}=1; }' > $OUTDIR/ALL.CONSERVATION 
 else
     ## compute phastcons conservation scores for input BED file
     for i in `seq 1 22` X Y M;
@@ -102,7 +106,7 @@ else
     echo -e "make final output file.. "
     NCOL=$(cat $OUTDIR/regions_with_avg_phastcons.*.bed | head -n 1 | perl -ane 'print scalar(@F);')
 
-    join -j 4 -o 1.1 1.2 1.3 1.4 1.5 2.$NCOL <(sort -k 4,4 $INPUTBEDFILE) <(cat $OUTDIR/regions_with_avg_phastcons.*.bed | sort -k 4,4) | perl -ane '$des=(); foreach(@F) { chomp($_); $des.="$_\t"; } $des=~s/\t$//g; print "$des\n";' > $OUTDIR/ALL.PHASTCONS
+    join -j 4 -o 1.1 1.2 1.3 1.4 1.5 2.$NCOL <(sort -k 4,4 $INPUTBEDFILE) <(cat $OUTDIR/regions_with_avg_phastcons.*.bed | sort -k 4,4) | perl -ane '$des=(); foreach(@F) { chomp($_); $des.="$_\t"; } $des=~s/\t$//g; print "$des\n";' > $OUTDIR/ALL.CONSERVATION
 fi
 
 ## remove temporary file, if exists

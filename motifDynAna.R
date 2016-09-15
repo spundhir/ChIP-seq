@@ -42,7 +42,7 @@ data$V15 <- gsub("^.*BestGuess:", "", data$V2)
 data$V15 <- as.numeric(gsub("\\)", "", gsub("^.*\\(", "", data$V15)))
 data <- data[which(data$V11>=as.numeric(opt$minFreq)),]
 if(length(which( !is.na(data$V15), arr.ind=TRUE))>0) {
-    data <- data[which(data$V11>=as.numeric(opt$minFreq) & data$V15>=0.85),]
+    data <- data[which(data$V11>=as.numeric(opt$minFreq) & data$V15>=0.80),]
 } else {
     data <- data[which(data$V11>=as.numeric(opt$minFreq)),]
 }
@@ -57,6 +57,8 @@ mat <- matrix(data$V13, nrow=no_rows)
 data$V1 <- sprintf("%s_%s", data$V1, data$V11)
 colnames(mat) <- as.vector(unique(data$V1))
 row.names(mat) <- data[1:no_rows,2]
+colnames(dat) <- as.vector(unique(data$V1))
+row.names(dat) <- data[1:no_rows,2]
 if(!is.null(opt$onlyDiffFreq)) {
     myCol <- rev(brewer.pal(11, "RdBu"))
     sig_rows <- which(apply(mat, 1, function(x) max(x)-min(x)>as.numeric(opt$diffFreq)))
@@ -103,13 +105,25 @@ if(length(sig_rows)>2) {
         #heatmap.2(mat, trace="none", col=myCol, margins=c(15,20), cexCol=1, cexRow=1)
     }
     dev.off()
+
+    txtFile=sprintf("%s.txt", opt$outPdfFile)
+    mat_df <- as.data.frame(mat)
+    mat_df$diff <- apply(mat_df, 1, function(x) max(x)-min(x))
+    dat_df <- as.data.frame(dat)
+    dat_df$class <- 0
+    dat_df[which(apply(dat_df, 1, function(x) max(x)>5)==T),]$class <- 1
+    dat_df[which(apply(dat_df, 1, function(x) max(x)>10)==T),]$class <- 2
+    dat_df[which(apply(dat_df, 1, function(x) max(x)>20)==T),]$class <- 3
+    mat_df <- merge(mat_df, dat_df, by=0) 
+    write.table(mat_df[order(-mat_df[,5]),], txtFile, quote=F, append=F, sep="\t", col.names=T, row.names=T)
 } else if(length(sig_rows)>=1) {
-    cat("\nNumber of significant motifs are too low for a heatmap. Instead writing results to motif_dynamics.txt\n\n")
+    txtFile=sprintf("%s.txt", opt$outPdfFile)
+    cat("\nNumber of significant motifs are too low for a heatmap. Instead writing results to txtFile\n\n")
     if(length(sig_rows)==1) {
         write(rownames(mat)[sig_rows], file="motif_dynamics.txt", sep="\t")
-        write.table(mat[sig_rows,], "motif_dynamics.txt", quote=F, append=TRUE, sep="\t")
+        write.table(mat[sig_rows,], txtFile, quote=F, append=TRUE, sep="\t")
     } else {
-        write.table(mat[sig_rows,], "motif_dynamics.txt", quote=F, append=FALSE, sep="\t")
+        write.table(mat[sig_rows,], txtFile, quote=F, append=FALSE, sep="\t")
     }
 } else {
     cat("\nNo significant motif is found\n")

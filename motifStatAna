@@ -90,6 +90,7 @@ IFS=$oIFS
 <<"COMMENT"
 COMMENT
 
+STATDIR=""
 for (( i=0; i<${#INDIRS[@]}; i++ )); do
     echo -n "Create output directory.. "
     if [ ! -d "${INDIRS[$i]}/stat" ]; then
@@ -103,9 +104,11 @@ for (( i=0; i<${#INDIRS[@]}; i++ )); do
     else
         motifAna -i ${INDIRS[$i]}/REGIONS_INTEREST.bed -o ${INDIRS[$i]}/stat -m 2 -l $MOTIF_FILE
     fi
+    STATDIR="$STATDIR,${INDIRS[$i]}/stat"
     echo "done"
 done
+STATDIR=$(echo $STATDIR | perl -ane '$_=~s/^\,//g; print $_;')
 
 echo -n "Plot motif statistics.. "
-motifStatAna.R -i $INDIR -o $OUTDIR 
+motifStatAna.R -i $STATDIR -o $OUTDIR
 echo "done"

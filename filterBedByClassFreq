@@ -3,6 +3,7 @@
 
 MIN_N_CLASS=500
 GENOME="mm9"
+CLASS_COL=5
 
 #### usage ####
 usage() {
@@ -13,19 +14,21 @@ usage() {
 	echo "Usage: filterBedByClassFreq -i <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input genomic coordinates in BED format (can be stdin)]"
-    echo "             [chr start end stages_count stages (..)]"
+    echo "             [chr start end stages_count class (..)]"
     echo "[OPTIONS]"
     echo " -n <int>    [minimum number of elements within class (default: 500)]"
+    echo " -k <int>    [column number that contains stage information (default: 5)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:n:h ARG; do
+while getopts i:n:k:h ARG; do
     case "$ARG" in
     i) BED_FILE=$OPTARG;;
     n) MIN_N_CLASS=$OPTARG;;
+    k) CLASS_COL=$OPTARG;;
     h) HELP=1;;
     esac
 done
@@ -56,7 +59,7 @@ if [ "$BED_FILE" == "stdin" ]; then
 fi
 
 ## filter input BED file based on minimum number of elements within each nfr dynamic class
-for CLASS in $(cat $BED_FILE | cut -f 5 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1 | perl -ane 'if($F[0]>'$MIN_N_CLASS') { print "$F[1]\n"; }'); do perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $BED_FILE; done | sort -k 1,1 -k 2n,2 -k 3n,3
+for CLASS in $(cat $BED_FILE | cut -f $CLASS_COL | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1 | perl -ane 'if($F[0]>'$MIN_N_CLASS') { print "$F[1]\n"; }'); do perl -ane 'if($F['$((CLASS_COL-1))']=~/^'$CLASS'$/) { print $_; }' $BED_FILE; done | sort -k 1,1 -k 2n,2 -k 3n,3
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then

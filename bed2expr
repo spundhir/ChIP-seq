@@ -194,7 +194,7 @@ else
             bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10
         fi
     fi | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.=sprintf("%0.5f\t", ($_*1000000)/$mappedReads[$i]); $i++; } $line=~s/\t$//g; print "$line\n";'
-fi | perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); for($i=$field_count; $i<scalar(@F); $i+=2) { if(!defined($F[$i+1])) { $F[$i+1]=$F[$i]; } $line.=sprintf("%0.5f\t", ($F[$i]+$F[$i+1])/2); } $line=~s/\t$//g; print "$line\n"; } else { print $_; }'
+fi | perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); for($i=$field_count; $i<scalar(@F); $i+=2) { if(!defined($F[$i+1])) { $F[$i+1]=$F[$i]; } $line.=sprintf("%0.5f\t", ($F[$i]+$F[$i+1])/2); } $line=~s/\t$//g; $line=~s/\s+$//g;print "$line\n"; } else { $_=~s/\s+$//g; print "$_\n"; }'
 
 if [ ! -z "$TMP" ]; then
     rm $TMP

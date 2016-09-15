@@ -89,7 +89,7 @@ else
 
         if [ ! -z "$ENTITY_COL" ]; then
             #echo "intersectBed -a $FEATURES_INT -b $FEATURES_REF -wao | sort -k 1,1 -k 2n,2 -k 3n,3 -k $FIELD | perl -ane '\$key=\"\$F[0]_\$F[1]_\$F[2]\"; if(!defined(\$seen{\$key})) { print \$_; \$seen{\$key}=1;}' | cut -f $ENTITY_COL | sort | uniq -c | sed -E 's/^\s+//g' | grep -w $entity | cut -f 1 -d \" \""; exit;
-            overlap=`~/software/bedtools2-2.19.1/bin/intersectBed -a $FEATURES_INT -b $FEATURES_REF -wao | sort -k 1,1 -k 2n,2 -k 3n,3 -k $FIELD | perl -ane '$key="$F[0]_$F[1]_$F[2]"; if(!defined($seen{$key})) { print $_; $seen{$key}=1;}' | cut -f $ENTITY_COL | sort | uniq -c | sed -E 's/^\s+//g' | grep -w $entity | cut -f 1 -d " "`;
+            overlap=`~/software/bedtools2-2.19.1/bin/intersectBed -a $FEATURES_INT -b $FEATURES_REF -wao | sort -k 1,1 -k 2n,2 -k 3n,3 -k $FIELD | perl -ane '$key="$F[0]_$F[1]_$F[2]"; if(!defined($seen{$key})) { print $_; $seen{$key}=1;}' | cut -f $ENTITY_COL | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[1]=~/^'$entity'$/) { print $_; }' | cut -f 1 -d " "`;
             if [ -z "$overlap" ]; then
                 overlap=0
             fi

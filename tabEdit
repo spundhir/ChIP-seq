@@ -40,13 +40,14 @@ if [ "$INFILE" == "stdin" ]; then
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     while read LINE; do
         echo ${LINE}
-    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";' > $TMP
     INFILE=$TMP
 fi
 
 ## remove empty columns
 if [ ! -z "$REMOVE" ]; then
-    tr -s '\t' < $INFILE
+    #tr -s '\t' < $INFILE
+    perl -ane '$_=~s/\s+$//g; print "$_\n";' < $INFILE
 else
     zless $INFILE | perl -ane 'print scalar(@F)."\n";' | sort | uniq -c
 fi
