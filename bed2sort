@@ -7,7 +7,7 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: bed2sort -i <file> -j <file(s)>"
+	echo "Usage: bed2sort -i <file>"
 	echo "Options:"
 	echo " -i <file>   [input file containing genomic coordinate in BED format (can be stdin)]"
 	echo " -h          [help]"

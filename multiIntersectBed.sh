@@ -85,6 +85,8 @@ for (( i=0; i<$BEDFILES_COUNT; i++ )); do
 done
 wait
 
+#echo "bedtools multiinter -i $COMMAND_BED -names $COMMAND_NAME"; exit
+
 if [ ! -z "$NAME" ]; then
     bedtools multiinter -i $COMMAND_BED -names $COMMAND_NAME | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; $last_counter=$F[3]; } } elsif($last_coor!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'
     #bedtools multiinter -i $COMMAND_BED -names $COMMAND_NAME | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; $last_counter=$F[3]; } } elsif($last_counter!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'

@@ -21,13 +21,14 @@ usage() {
     echo " -k          [keep bedGraph file also]"
     echo " -e <int>    [extend 3' end of reads by input number of bases (useful for ChIP-seq data)]"
     echo " -s          [scale the coverage to TPM]"
+    echo " -b          [also output the BED file]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:c:ke:sh ARG; do
+while getopts i:o:c:ke:sbh ARG; do
 	case "$ARG" in
 		i) BAMFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -35,6 +36,7 @@ while getopts i:o:c:ke:sh ARG; do
         k) KEEP=1;;
         e) EXTEND=$OPTARG;;
         s) SCALE=$OPTARG;;
+        b) BED=1;;
 		h) HELP=1;;
 	esac
 done
@@ -44,6 +46,8 @@ if [ ! -f "$BAMFILE" -o "$HELP" ]; then
 	usage
 fi
 
+<<"COMMENT"
+COMMENT
 ## retrieve file name
 if [ ! -z "$OUTDIR" ]; then
     if [ ! -d "$OUTDIR" ]; then
@@ -83,6 +87,11 @@ else
     if [ -z "$KEEP" ]; then
         rm $ID.bedGraph 
     fi
+fi
+
+if [ ! -z "$BED" ]; then
+    ID=`echo $BAMFILE | perl -ane '$_=~s/\.bam*//g; print $_;'`;
+    bedtools bamtobed -i $BAMFILE > $ID.bed
 fi
 
 #bigWigCmd = "./src/bamToBed -i " + name + "/mapped.bam " + "| ./src/slopBed -i stdin -g src/" + chromFile + " -s -l -0 -r " + str(args.fragment_length[0]-readLength) + " | ./src/genomeCoverageBed -bg -i stdin -g src/" + chromFile + "| ./src/wigToBigWig stdin src/" + chromFile + " " + name + "/mapped.bw"

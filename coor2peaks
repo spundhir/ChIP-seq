@@ -1,0 +1,126 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+PVALUE=0.05
+DISTRIBUTION="pois"
+MINCLUSTERHEIGHT=2
+MINBLOCKHEIGHT=2
+DISTANCE=70
+SCALE="0.6"
+BLOCKHEIGHT="abs"
+DISTANCE_PEAKS=20
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "coor2peaks (determine peak positions for input genomic region)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: coor2peaks -i <coor> -b <file(s)> [OPTIONS]"
+	echo "Options:"
+	echo " -c <coor>     [input coordinate in 'chr:start-end' format]"
+    echo " -b <file(s)>  [input bam file(s)]"
+    echo "               [if multiple, separate them by a comma]"
+    echo "[OPTIONS]"
+    echo " -p <float>    [pvalue for read enrichment (default: 0.05)]"
+    echo " -d <string>   [distribution to use for data fit (pois or nbinom) (default: pois)]"
+    echo " -c <int>      [minimum number of read in the block group (default: 2)]"
+    echo " -e <int>      [minimum number of read in the block (default: 2)]"
+    echo " -x <int>      [maximum distance between the blocks (default: 70)]"
+    echo " -s <float>    [scale to define blocks (default: 0.6)]"
+    echo " -g <int>      [block height (abs or rel) (default: abs)]"
+    echo " -w <int>      [minimum distance between the blocks (peaks) (default: 20)]"
+    echo " -y <string>   [genome (default: mm9)]"
+    echo " -z <float>    [size factor to normalize read count]"
+    echo "               [if multiple, separate them by a comma]"
+    echo " -q <int>      [extend 3' end of reads by input number of bases (useful for ChIP-seq data)]"
+    echo " -h            [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts c:b:p:d:c:e:x:s:g:w:y:z:q:h ARG; do
+	case "$ARG" in
+		c) COOR=$OPTARG;;
+        b) BAMFILE=$OPTARG;;
+        p) PVALUE=$OPTARG;;
+        d) DISTRIBUTION=$OPTARG;;
+        c) MINCLUSTERHEIGHT=$OPTARG;;
+        e) MINBLOCKHEIGHT=$OPTARG;;
+        x) DISTANCE=$OPTARG;;
+        s) SCALE=$OPTARG;;
+        g) BLOCKHEIGHT=$OPTARG;;
+        w) DISTANCE_PEAKS=$OPTARG;;
+        y) GENOME=$OPTARG;;
+        z) SIZEFACTOR=$OPTARG;;
+        q) EXTEND=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$COOR" -o -z "$BAMFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## parse input bam files in an array
+oIFS=$IFS
+IFS=","
+BAMFILES=($BAMFILE)
+BAMFILES_COUNT=${#BAMFILES[@]}
+IFS=$oIFS
+
+## initialize size factors, if both size factors are not provided
+if [ -z "$SIZEFACTOR" ]; then
+    SIZEFACTOR=""
+    for(( i=0; i<$BAMFILES_COUNT; i++ )); do
+        SIZEFACTOR="$SIZEFACTOR,1"
+    done
+    SIZEFACTOR=`echo $SIZEFACTOR | perl -ane '$_=~s/^\,//g; print $_;'`;
+fi
+
+## initialize extend parameter, if not provided
+if [ -z "$EXTEND" ]; then
+    EXTEND=""
+    for(( i=0; i<$BAMFILES_COUNT; i++ )); do
+        EXTEND="$EXTEND,0"
+    done
+    EXTEND=`echo $EXTEND | perl -ane '$_=~s/^\,//g; print $_;'`;
+fi
+
+## create index of input BAM file, if does not exist
+for(( i=0; i<$BAMFILES_COUNT; i++ )); do
+    if [ ! -f "${BAMFILES[$i]}.bai" ]; then
+        samtools index ${BAMFILES[$i]}
+    fi
+done
+
+## abort, if malformed BED entry is observed
+if [ "$(echo ${COOR} | perl -ane '@t=split(/[\:\-]+/,$_); if($_=~/#/ || $t[1]!~/^[0-9]+$/ || $t[2]!~/^[0-9]+$/) { print 0; } else { print 1; }')" -eq 0 ]; then
+    echo "malformed BED entry $COOR"
+    echo
+    exit
+fi
+
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+REGIONFILE=$(echo $COOR | perl -ane '$_=~s/[\:\-]+/-/g; print $_;')
+
+## extract reads corresponding to genomic coordinate
+coor2reads -c $COOR -b $BAMFILE -s $SIZEFACTOR -e $EXTEND -g $GENOME -d | perl -ane '$F[5]=~s/\-$/+/g; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n";' > $REGIONFILE.$TMP
+
+## determine significant peaks, if total number of input reads are >=10
+COUNT=$(cat $REGIONFILE.$TMP | wc -l)
+if [ "$COUNT" -ge 10 ]; then
+    #echo "reads2peaks -i $REGIONFILE.$TMP -o optimizeThreshold$TMP -p $PVALUE -d $DISTRIBUTION -x $DISTANCE -w $DISTANCE_PEAKS -a"; exit
+    reads2peaks -i $REGIONFILE.$TMP -o optimizeThreshold$TMP -p $PVALUE -d $DISTRIBUTION -x $DISTANCE -w $DISTANCE_PEAKS -a | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t'$COOR'\t$F[4]\t$F[5]\t$F[6]\n"' | sort -k 1,1 -k 2n,2 -k 3n,3
+else
+    echo $COOR | perl -ane '@t=split(/[\:\-]+/, $_); print "$t[0]\t-1\t-1\t'$COOR'\tNA\tNA\tNA\n";'
+fi
+
+## remove temporary files
+rm $REGIONFILE.$TMP
+rm -r optimizeThreshold$TMP
+
+exit

@@ -34,38 +34,65 @@ if(identical(opt$inFile, "stdin")==T) {
     data <- read.table(opt$inFile)
 }
 
+## create output directory, if does not exist
+dir.create(file.path(opt$outDir), showWarnings = FALSE)
+
 ## extract input distribution names
 distr=as.vector(unlist(strsplit(opt$distr, ",")))
 
-## fit each input distribution to the input numeric values
-model <- lapply(distr, function(x) { fitdist(as.integer(data[,1]), x, method="mme") })
+if(nrow(data)>=10) { 
+    ## analyze each model fit
+    outPdf <- sprintf("%s/plots.pdf", opt$outDir)
+    pdf(outPdf)
+    
+    ## check as to which distribution is the best
+    descdist(as.integer(data[,1]))
 
-## analyze each model fit
-outPdf <- sprintf("%s/plots.pdf", opt$outDir)
-pdf(outPdf)
-for (i in 1:length(model)) {
-    if(distr[i]=="pois") {
-        param <- as.vector(coef(model[[i]]))
-        plot(model[[i]])
-        data$pois <- laply(as.integer(data[,1]), function(x) { ppois(x, lambda = param[1], lower.tail = F) })
+    ## fit each input distribution to the input numeric values
+    model <- lapply(distr, function(x) { fitdist(as.integer(data[,1]), x, method="mme") })
+
+    for (i in 1:length(model)) {
+        if(distr[i]=="pois") {
+            param <- as.vector(coef(model[[i]]))
+            plot(model[[i]])
+            data$pois <- laply(as.integer(data[,1]), function(x) { ppois(x, lambda = param[1], lower.tail = F) })
+
+            ## write AIC value
+            outFile <- sprintf("%s/AIC", opt$outDir)
+            write(sprintf("POIS: %s", model[[i]]$aic), outFile, append=T)
+        }
+        else if(distr[i]=="nbinom") {
+            param <- as.vector(coef(model[[i]]))
+            plot(model[[i]])
+            data$pnorm <- laply(as.integer(data[,1]), function(x) { pnbinom(x, size = param[1], mu=param[2], lower.tail = F) })
+
+            ## write AIC value
+            outFile <- sprintf("%s/AIC", opt$outDir)
+            write(sprintf("NBINOM: %s", model[[i]]$aic), outFile, append=T)
+        }
+        else if(distr[i]=="geom") {
+            param <- as.vector(coef(model[[i]]))
+            plot(model[[i]])
+            data$geom <- laply(as.integer(data[,1]), function(x) { pgeom(x, param[1], lower.tail = F) })
+
+            ## write AIC value
+            outFile <- sprintf("%s/AIC", opt$outDir)
+            write(sprintf("GEOM: %s", model[[i]]$aic), outFile, append=T)
+        }
     }
-    else if(distr[i]=="nbinom") {
-        param <- as.vector(coef(model[[i]]))
-        plot(model[[i]])
-        data$pnorm <- laply(as.integer(data[,1]), function(x) { pnbinom(x, size = param[1], mu=param[2], lower.tail = F) })
-    }
-    else if(distr[i]=="geom") {
-        param <- as.vector(coef(model[[i]]))
-        plot(model[[i]])
-        data$geom <- laply(as.integer(data[,1]), function(x) { pgeom(x, param[1], lower.tail = F) })
-    }
+
+    #gofstat(model[[i]], fitnames=distr)
+    cdfcomp(model, legendtext=distr)
+    qqcomp(model, legendtext=distr)
+    dev.off()
+
+    ## HOW TO EVALUATE WHICH MODEL IS BETTER
+    # one having lower AIC value (model[[i]]$aic
+    # more details: http://stats.stackexchange.com/questions/132652/how-to-determine-which-distribution-fits-my-data-best
+} else {
+    data$pois <- 1
 }
-
-cdfcomp(model, legendtext=distr)
-#gofstat(model, fitnames=distr)
-qqcomp(model, legendtext=distr)
-dev.off()
-
+ 
 ## write output file containing pvalue information
 outTable <- sprintf("%s/table", opt$outDir)
 write.table(data[order(-data[,1]),], outTable, sep="\t", row.names = F, col.names = F, quote = F)

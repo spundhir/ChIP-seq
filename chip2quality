@@ -1,0 +1,87 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+## initialize variables with default values
+PROGDIR="/home/pundhir/software/idrCode"
+IDR_THRESHOLD="0.01"
+PROCESSOR=1
+
+#### usage ####
+usage() {
+	echo Program: "chip2quality (perform quality control on ChIP-seq data)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+    echo "Usage: chip2quality -i <file> -o <dir> [OPTIONS]"
+	echo "Options:"
+    echo " -i <file>   [mapped ChIP files in BAM format]"
+    echo "             [if multiple separate them by a comma]"
+    echo " -o <dir>    [output directory]"
+    echo "[OPTIONS]"
+    echo " -p <int>    [number of processors (default: 1)]"
+    echo " -t <float>  [IDR threshold (default: 0.01)]"
+    echo " -d <dir>    [path to dependent R scripts (default: /home/pundhir/software/idrCode)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:o:p:t:d:h ARG; do
+	case "$ARG" in
+        i) BAMFILE=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+        t) IDR_THRESHOLD=$OPTARG;;
+        d) PROGDIR=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories and not given/exist
+if [ ! "$BAMFILE" -o ! "$OUTDIR" -o "$HELP" ]; then
+    usage
+fi
+
+## create appropriate directory structure
+echo
+echo -n "Create output directory structure.. "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+echo "done"
+
+###############################################
+## determine number of input ChIP samples
+IFS=","
+BAMFILES=($BAMFILE)
+BAMFILES_COUNT=${#BAMFILES[@]}
+IFS=" "
+
+##########################################################################
+############ CALL PEAKS ON INDIVIDUAL REPLICATES
+##########################################################################
+
+<<"COMMENT1"
+COMMENT1
+
+## compute enrichment and quality measure for input ChIP-seq data
+echo -n "Compute enrichment and quality measure for input ChIP-seq data.. "
+if [ -e "$PROGDIR/phantompeakqualtools/run_spp.R" ]; then
+    for (( i=0; i<$BAMFILES_COUNT; i++ )); do
+        #Rscript $PROGDIR/phantompeakqualtools/run_spp.R -c=$INDIR/$CHIP_ID"Rep"$i.bam -fdr=$IDR_THRESHOLD -savp -odir=$OUTDIR/quality -out=$OUTDIR/quality/quality.txt -tmpdir=$OUTDIR/quality &> $OUTDIR/logs/quality.log
+        samtools view -b -F 1548 -q 30 ${BAMFILES[$i]} | bamToBed -i stdin | awk 'BEGIN{S="\t";OFS="\t"}{$4="N";print $0}' | gzip -c > $OUTDIR/${BAMFILES[$i]}.tagAlign.gz
+        Rscript $PROGDIR/phantompeakqualtools/run_spp.R -c=$OUTDIR/${BAMFILES[$i]}.tagAlign.gz -fdr=$IDR_THRESHOLD -savp -odir=$OUTDIR -out=$OUTDIR/quality.txt &> $OUTDIR/${BAMFILES[$i]}.quality.log
+        rm $OUTDIR/${BAMFILES[$i]}.tagAlign.gz 
+    done
+fi
+echo "done"
+
+## perform reproducibility analysis, if more than two BAM files are provided
+echo -n "Perform reproducibility analysis.. "
+if [ "$BAMFILES_COUNT" -ge 2 ]; then
+    bam2reproducibility -i $BAMFILE -o $OUTDIR -c -p $PROCESSOR
+fi
+echo "done"
+
+exit

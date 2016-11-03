@@ -1,0 +1,122 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "homer2seq (retieve nucleotide sequence corresponding to motif identified by homer2)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: homer2seq -i <file> -j <file>"
+	echo "Options:"
+	echo " -i <file>   [homer2 output file made using findMotifsGenome.pl -find (.find)]"
+    echo "             [can be stdin]"
+    echo " -j <file>   [genomic coordinates of target regions in BED format]"
+    echo " -l <int>    [region size parameter to findMotifsGenome.pl]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:l:g:h ARG; do
+	case "$ARG" in
+        i) HOMERFILE=$OPTARG;;
+        j) BEDFILE=$OPTARG;;
+        l) REGIONSIZE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$HOMERFILE" -o ! -f "$BEDFILE" -o -z "$REGIONSIZE" -o "$HELP" ]; then
+	usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$HOMERFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    HOMERFILE=$TMP
+fi
+
+## populating files based on input genome
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+    GENOME_SEQ_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.fa"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+    GENOME_SEQ_FILE="/home/pundhir/project/genome_annotations/human.hg19.fa"
+else
+    echo "Presently the program only support analysis for mm9 or hg19"
+    echo
+    usage
+fi
+
+## retrieve nucleotide sequences corresponding to BED coordinates
+if [ -f "$GENOME_SEQ_FILE" ]; then
+    WIN=$(echo $REGIONSIZE | perl -ane 'printf("%0.0f", $_/2);')
+    #bed2window -i $BEDFILE -w $WIN | fastaFromBed -fi $GENOME_SEQ_FILE -bed - -name > $BEDFILE.FASTA
+    bed2window -i $BEDFILE -w $WIN | perl -ane '$F[1]=$F[1]-1; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | fastaFromBed -fi $GENOME_SEQ_FILE -bed - -name | perl -ane 'if($_=~/^>/) { $_=~s/\:\:.*//g; } print "$_";' > $BEDFILE.FASTA
+else
+    echo
+    echo "Error: $GENOME_SEQ_FILE do not exist!!"
+    echo
+    usage
+fi
+
+## create index file of FASTA
+samtools faidx $BEDFILE.FASTA
+
+## start analysis
+while IFS=$'\t' read -r -a ARR; do
+    ## continue, if no strand information is available
+    if [ "${ARR[4]}" != "+" -a "${ARR[4]}" != "-" ]; then 
+        continue;
+    fi;
+
+    ## continue, if abs(offset) is greater than region size
+    OFFSET=${ARR[1]}
+    if [ "${OFFSET#-}" -gt $REGIONSIZE ]; then
+        continue
+    fi
+    
+    ## determine motif length
+    MOTIF_LEN=$(echo ${ARR[2]} | perl -an -F'//' -e 'print scalar(@F)-1;')
+
+    ## extract nucleotide sequence
+    if [ "${ARR[4]}" == "+" ]; then
+        SEQ=$(samtools faidx $BEDFILE".FASTA" ${ARR[0]} | grep -v "^>" | perl -ane 'chomp($_); print "$_";')
+    else
+        SEQ=$(samtools faidx $BEDFILE".FASTA" ${ARR[0]} | grep -v "^>" | perl -ane 'chomp($_); print "$_";' | rev | tr ATGC TACG)
+    fi
+
+    ## extract motif sequence
+    #if [ "${ARR[1]}" -lt 0 ]; then
+    #    START=$(echo $REGIONSIZE | perl -ane 'printf("%0.0f", ($_/2)+('${ARR[1]}'+1));')
+    #    END=$(echo $START | perl -ane 'print $_+('$MOTIF_LEN'-1);')
+    #else
+    #    END=$(echo $REGIONSIZE | perl -ane 'printf("%0.0f", ($_/2)+('${ARR[1]}'));')
+    #    START=$(echo $END | perl -ane 'print $_-('$MOTIF_LEN'-1);')
+    #fi
+    START=$(echo $REGIONSIZE | perl -ane 'printf("%0.0f", (($_/2)-abs('${ARR[1]}')));')
+    END=$(echo $START | perl -ane 'print $_+('$MOTIF_LEN'-1);')
+
+    #echo "${ARR[1]} $MOTIF_LEN $REGIONSIZE ${ARR[2]}"
+    #echo "${ARR[0]} $START $END"
+    echo -n "${ARR[@]}"
+    #samtools faidx $BEDFILE.FASTA ${ARR[0]}:$START-$END | perl -ane 'chomp($_); print "\t$_"; END { print "\n"; }'
+    echo $SEQ | perl -an -F'//' -e 'print "\t"; foreach(@F['$START'..'$END']) { print "$_"; } print "\n";'
+done < $HOMERFILE 
+
+## remove temporary file
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi

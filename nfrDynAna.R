@@ -16,7 +16,8 @@ option_list <- list(
     make_option(c("-a", "--go"), help="gene order algorithm for heatmap (total, hc, max, prod, diff, km, none)"),
     make_option(c("-b", "--sc"), help="color scale for heatmap (min,max; local; region; global)"),
     make_option(c("-c", "--co"), help="Color for heatmap (like red2, blue2, darkgreen yellow)"),
-    make_option(c("-d", "--cd"), help="Color distribution for heatmap (between 0 and 1)")
+    make_option(c("-d", "--cd"), help="Color distribution for heatmap (between 0 and 1)"),
+    make_option(c("-s", "--sf"), help="size factors to normalize the TPM read counts (RLE normalization) (one per sample, separated by a comma)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -36,6 +37,7 @@ if(is.null(opt$sessionFile) | is.null(opt$sessionFileDes) | is.null(opt$outPdfFi
 suppressPackageStartupMessages(library(caTools))
 suppressPackageStartupMessages(library(session))
 suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(RColorBrewer))
 
 #### plotlib.r ####
 # This contains the library for plotting related functions.
@@ -511,10 +513,27 @@ plotheat <- function(reg.list, uniq.reg, enrichList, v.low.cutoff, go.algo,
         }
     } else {
         if(hm.color != "default") {
-            #enrich.palette <- colorRampPalette(c('snow', hm.color))
-            #enrich.palette <- colorRampPalette(c('midnightblue', hm.color))
-            #enrich.palette <- colorRampPalette(c('midnightblue', 'yellow3', hm.color), bias=color.distr, interpolate='spline')
-            enrich.palette <- colorRampPalette(c('snow', hm.color, hm.color), bias=color.distr, interpolate='spline')
+            if(hm.color=="blue") {
+                #enrich.palette <- colorRampPalette(c('snow', 'blue3', hm.color), bias=color.distr, interpolate='spline')
+                enrich.palette <- colorRampPalette(c('#ffffff', '#253494', "#081d58"), bias=color.distr, interpolate='spline')
+            } else if(hm.color=="coral") {
+                enrich.palette <- colorRampPalette(c('#ffffff', '#a63603', "#7f2704"), bias=color.distr, interpolate='spline')
+            } else if(hm.color=="green") {
+                enrich.palette <- colorRampPalette(c('#ffffff', '#006837', "#004529"), bias=color.distr, interpolate='spline')
+            } else if(hm.color=="black") {
+                enrich.palette <- colorRampPalette(c('#ffffff', '#252525', "#000000"), bias=color.distr, interpolate='spline')
+            } else if(hm.color=="yellow") {
+                enrich.palette <- colorRampPalette(c('#ffffff', 'yellow3', "yellow4"), bias=color.distr, interpolate='spline')
+            } else if(hm.color=="yellow_dark") {
+                enrich.palette <- colorRampPalette(c('midnightblue', 'yellow3', "yellow4"), bias=color.distr, interpolate='spline')
+            } else if(hm.color=="white_dark") {
+                enrich.palette <- colorRampPalette(c('midnightblue', 'white', "white"), bias=color.distr, interpolate='spline')
+            } else if(hm.color=="red_dark") {
+                enrich.palette <- colorRampPalette(c('midnightblue', 'red3', "red4"), bias=color.distr, interpolate='spline')
+            } else {
+                #enrich.palette <- colorRampPalette(c('snow', hm.color))
+                enrich.palette <- colorRampPalette(c('snow', hm.color, hm.color), bias=color.distr, interpolate='spline')
+            }
         } else {
             enrich.palette <- colorRampPalette(c('snow', 'red2'))    
         }
@@ -728,7 +747,15 @@ if(!is.null(opt$heatMap)) {
     ## replot normalized heatmap
     for(row in 1:length(sessionFile)) {
         load(sprintf("%s.heatmap.RData", sessionFile[row]))
-        enrichListNorm <- lapply(enrichList, function(x) ((x-min)/(max-min)))
+        if(!is.null(opt$sf)) {
+            #enrichListNorm <- lapply(enrichList, function(x) ((x-min)/(max-min)))
+            sf <- as.numeric(as.vector(unlist(strsplit(opt$sf, ","))))
+            sf <- rep(sf, length(enrichList)/length(sf))
+            enrichListNorm <- enrichList
+            for(i in 1:length(enrichListNorm)) {
+                enrichListNorm[[i]] <- enrichListNorm[[i]]/sf[i]
+            }
+        }
         out.hm <- paste(oname, '.pdf', sep='')
         font.size=20
         if(!is.null(opt$go)) { go.algo <- opt$go; } 
@@ -741,10 +768,17 @@ if(!is.null(opt$heatMap)) {
 
         v.low.cutoff <- low.count.ratio * v.low.cutoff
         #gsub("_[^#]+_", "_", ctg.tbl$title, perl=T)
-        go.list <- plotheat(reg.list, uniq.reg, enrichList, v.low.cutoff, go.algo, 
-                            go.paras, ctg.tbl$title, bam.pair, xticks, flood.frac, 
-                            do.plot=T, hm.color=hm.color, color.distr=color.distr, 
-                            color.scale=color.scale)
+        if(!is.null(opt$sf)) {
+            go.list <- plotheat(reg.list, uniq.reg, enrichListNorm, v.low.cutoff, go.algo, 
+                                go.paras, ctg.tbl$title, bam.pair, xticks, flood.frac, 
+                                do.plot=T, hm.color=hm.color, color.distr=color.distr, 
+                                color.scale=color.scale)
+        } else {
+            go.list <- plotheat(reg.list, uniq.reg, enrichList, v.low.cutoff, go.algo, 
+                                go.paras, ctg.tbl$title, bam.pair, xticks, flood.frac, 
+                                do.plot=T, hm.color=hm.color, color.distr=color.distr, 
+                                color.scale=color.scale)
+        }
         out.dev <- dev.off()
     }
 } else {

@@ -1,0 +1,77 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+OUTDIR="optimizeThreshold"
+PVALUE=0.05
+DISTRIBUTION="pois"
+MINCLUSTERHEIGHT=2
+MINBLOCKHEIGHT=2
+DISTANCE=70
+SCALE="0.6"
+BLOCKHEIGHT="abs"
+
+#### usage ####
+usage() {
+	echo Program: "bed2blockGroups (determine block groups for input BED file)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2blockGroups -i <file> -o <dir>"
+	echo "Options:"
+	echo " -i <file>   [input file containing genomic coordinates in BED format (can be stdin)]"
+    echo "[OPTIONS]"
+    echo " -o <dir>    [output directory (default: optimizeThreshold)]"
+    echo " -p <float>  [pvalue for read enrichment (default: 0.05)]"
+    echo " -d <string> [distribution to use for data fit (pois or nbinom) (default: pois)]"
+    echo " -c <int>    [minimum number of read in the block group (default: 2)]"
+    echo " -e <int>    [minimum number of read in the block (default: 2)]"
+    echo " -x <int>    [maximum distance between the blocks (default: 70)]"
+    echo " -s <float>  [scale to define blocks (default: 0.6)]"
+    echo " -g <int>    [block height (abs or rel) (default: abs)]"
+    echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:o:p:d:c:e:x:s:g:h ARG; do
+	case "$ARG" in
+		i) INPUTBEDFILE=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        p) PVALUE=$OPTARG;;
+        d) DISTRIBUTION=$OPTARG;;
+        c) MINCLUSTERHEIGHT=$OPTARG;;
+        e) MINBLOCKHEIGHT=$OPTARG;;
+        x) DISTANCE=$OPTARG;;
+        s) SCALE=$OPTARG;;
+        g) BLOCKHEIGHT=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INPUTBEDFILE" -o -z "$OUTDIR" -o "$HELP" ]; then
+	usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$INPUTBEDFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    INPUTBEDFILE=$TMP
+fi
+
+## create output directory, if it does not exist
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+
+## define block groups
+blockbuster.x -minClusterHeight $MINCLUSTERHEIGHT -minBlockHeight $MINBLOCKHEIGHT -distance $DISTANCE -scale $SCALE -blockHeight $BLOCKHEIGHT -print 1 $INPUTBEDFILE | perl -ane 'if($_=~/^>/) { $id="$F[1]:$F[2]-$F[3]"; } else { print "$F[5]\t$F[1]\t$F[2]\t$F[3]\t$id\n"; }' | fitDistr.R -i stdin -o $OUTDIR -d $DISTRIBUTION 2>&1 >/dev/null
+
+## filter out significant block groups
+cat $OUTDIR/table | perl -ane '$sig="N"; if($F[5]<0.05) { $sig="Y"; } print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t+\t$sig\n";' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct | perl -ane 'if($F[6]=~/Y/) { print $_; }'
+
+exit

@@ -14,17 +14,16 @@ RR=30
 RZ=0
 KNC=5
 REORDER_NGSPLOT="lsk,pregm,gmp,granulocytes"
-GENOMIC_REGIONS="bed"
 
 #### usage ####
 usage() {
-	echo Program: "ngsPlot (plot histone profiles for a set of genomic regions)"
+	echo Program: "ngsPlotGene (plot histone profiles for a set of genes)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
 	echo "Usage: ngsPlot -i <file | stdin> -j <dir> [OPTIONS]"
 	echo "Options:"
-	echo " -i <file>   [input file(s) having regions of interest in BED format or gene id's, one per line ]"
+	echo " -i <file>   [input file(s) having gene symbols (one per line)]"
     echo "             [if multiple seperate them by a comma]"
 	echo " -j <dir>    [input directory containing BAM files for various histone marks]"
     echo "             [if multiple seperate them by a comma]"
@@ -43,7 +42,7 @@ usage() {
     echo " -r <string> [specify color for heatmap (default: red2)]"
     echo "             [for bam-pair, use color-pair(neg_color:pos_color)]"
     echo " -m          [merge replicates of input BAM files]"
-    echo " -w          [ngsPlot description file already exists]"
+    echo " -e          [ngsPlot description file already exists]"
     echo " -x <int>    [forbid image output if set to 1 (default: 0)]"
     echo " -y <string> [y-axis limit (min,max)]"
     echo " -s <string> [color scale for heatmap (min,max) (default: global)]"
@@ -62,14 +61,13 @@ usage() {
     echo "             [set 1 to remove them]"
     echo " -n          [scale signal profile between 0 and 1]"
     echo " -v <string> [reorder NGSPLOT.TXT based on input keywords (default: lsk,pregm,gmp,granulocytes)]"
-    echo " -e <string> [genomic regions (bed or genebody; default: bed)]" 
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:o:f:d:g:t:u:c:r:mwx:y:s:l:z:a:b:q:k:nv:e:h ARG; do
+while getopts i:j:o:f:d:g:t:u:c:r:mex:y:s:l:z:a:b:q:k:nv:h ARG; do
 	case "$ARG" in
 		i) REGION=$OPTARG;;
 		j) BAMDIR=$OPTARG;;
@@ -82,7 +80,7 @@ while getopts i:j:o:f:d:g:t:u:c:r:mwx:y:s:l:z:a:b:q:k:nv:e:h ARG; do
         c) COLOR=$OPTARG;;
         r) CO=$OPTARG;;
         m) MERGE=1;;
-        w) EXIST=1;;
+        e) EXIST=1;;
         x) FORBIDIMG=$OPTARG;;
         y) YLIM=$OPTARG;;
         s) SC=$OPTARG;;
@@ -94,7 +92,6 @@ while getopts i:j:o:f:d:g:t:u:c:r:mwx:y:s:l:z:a:b:q:k:nv:e:h ARG; do
         k) RZ=$OPTARG;;
         n) SCALE=1;;
         v) REORDER_NGSPLOT=$OPTARG;;
-        e) GENOMIC_REGIONS=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -154,26 +151,13 @@ if [ -z "$EXIST" ]; then
         ## determine, if the input peaks are from a file or stdin
         echo -n "Create peak file depending on if the input is from file or STDIN... " >&2
         if [ -f "${REGIONS[$j]}" ]; then
-            if [ "$GENOMIC_REGIONS" == "bed" ]; then
-                zless ${REGIONS[$j]} | perl -ane '$mid=sprintf("%0.0f", ($F[1]+$F[2])/2); $mid=$mid+'$SHIFT'; $start=$mid; $end=$mid+1; $line="$F[0]\t$start\t$end"; foreach(@F[3..3]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
-            else
-                zless ${REGIONS[$j]} | perl -ane 'chomp($F[0]); print "$F[0]\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
-            fi
+            #zless ${REGIONS[$j]} | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
+            zless ${REGIONS[$j]} | perl -ane 'chomp($F[0]); print "$F[0]\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
         elif [ "${REGIONS[$j]}" == "stdin" ]; then
-            if [ "$GENOMIC_REGIONS" == "bed" ]; then
-                while read LINE; do echo ${LINE}; done | perl -ane '$mid=sprintf("%0.0f", ($F[1]+$F[2])/2); $mid=$mid+'$SHIFT'; $start=$mid; $end=$mid+1; $line="$F[0]\t$start\t$end"; foreach(@F[3..3]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
-            else
-                while read LINE; do echo ${LINE}; done | perl -ane 'chomp($_); print "$F[0]\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
-            fi
+            #while read LINE; do echo ${LINE}; done | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
+            while read LINE; do echo ${LINE}; done | perl -ane 'chomp($_); print "$F[0]\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
         else
             usage
-        fi
-        ## sort input bed file by width, if required
-        if [ $GO == "width" ]; then
-            TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-            bed2sort -i $OUTDIR/REGIONS_INTEREST$j.bed > $TMP
-            mv $TMP $OUTDIR/REGIONS_INTEREST$j.bed
-            GO="none"
         fi
         echo "done" >&2
 
@@ -255,9 +239,9 @@ fi
 echo -n "plot signal profile.. "
 if [ ! -z "$PLOTTITLE" ]; then
     FORBIDIMG=1
-    ngs.plot.r -G $GENOME -R $GENOMIC_REGIONS -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/$PLOTTITLE -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG -KNC $KNC
+    ngs.plot.r -G $GENOME -R genebody -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/$PLOTTITLE -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG -KNC $KNC
 else
-    ngs.plot.r -G $GENOME -R $GENOMIC_REGIONS -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/combined -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG -KNC $KNC
+    ngs.plot.r -G $GENOME -R genebody -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/combined -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG -KNC $KNC
 fi
 echo "done"
 

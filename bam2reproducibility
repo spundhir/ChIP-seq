@@ -1,0 +1,83 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+PROCESSOR=1
+
+#### usage ####
+usage() {
+	echo Program: "bam2reproducibility (compute reproducibility between replicates)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+    echo "Usage: bam2reproducibility -i <files> -o <dir> [OPTIONS]"
+	echo "Options:"
+    echo " -i <file>   [input BAM files (atleast two)]"
+    echo "             [if multiple separate them by a comma]"
+    echo " -o <dir>    [output directory]"
+    echo "[OPTIONS]"
+    echo " -c          [input BAM files are for ChIP-seq]"
+    echo " -p <int>    [number of processors (default: 1)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:o:cp:h ARG; do
+	case "$ARG" in
+        i) BAMFILE=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        c) CHIPSEQ=1;;
+        p) PROCESSOR=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories and not given/exist
+if [ ! "$BAMFILE" -o ! "$OUTDIR" -o "$HELP" ]; then
+    usage
+fi
+
+## create appropriate directory structure
+echo
+echo -n "Create output directory structure.. "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+echo "done"
+
+###############################################
+echo -n "Check, if atleast two input BAM files are provided.. "
+IFS=","
+BAMFILES=($BAMFILE)
+BAMFILES_COUNT=${#BAMFILES[@]}
+IFS=" "
+if [ "$BAMFILES_COUNT" -lt 2 ]; then
+    echo
+    echo "Atleast two input BAM files are required"
+    echo
+    usage
+fi
+echo "done"
+
+echo -n "Index input BAM files, if it does not exist.. "
+for (( i=0; i<$BAMFILES_COUNT; i++ )); do
+    if [ ! -e "${BAMFILES[$i]}.bai" ]; then
+        samtools index ${BAMFILES[$i]}
+    fi
+done
+echo "done"
+
+###############################################
+echo -n "Start analysis.. "
+BAMFILES=$(echo $BAMFILE | sed 's/\,/ /g')
+if [ ! -z "$CHIPSEQ" ]; then
+    multiBamSummary bins --bamfiles $BAMFILES -out $OUTDIR/covMat --ignoreDuplicates -p $PROCESSOR
+else
+    multiBamSummary bins --bamfiles $BAMFILES -out $OUTDIR/covMat -p $PROCESSOR
+fi
+
+plotCorrelation -in $OUTDIR/covMat.npz -o $OUTDIR/reproducibility_heatmap.pdf -c spearman -p heatmap --plotNumbers
+echo "done"
+
+exit

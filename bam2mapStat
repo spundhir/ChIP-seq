@@ -1,0 +1,60 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+#### usage ####
+usage() {
+	echo Program: "bam2mapStat.sh (determine number of reads, mapped and uniquely mapped reads from a BAM file)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bam2mapStat -i <file>"
+	echo "Options:"
+	echo " -i <file>   [BAM file]"
+	echo "[optional]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:h ARG; do
+	case "$ARG" in
+		i) BAMFILE=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$BAMFILE" -o "$HELP" ]; then
+	usage
+fi
+
+<<"COMMENT"
+COMMENT
+## total number of reads
+TOTAL=$(samtools flagstat $BAMFILE | head -n 1 | cut -f 1 -d " ");
+
+## total number of mapped reads
+MAPPED=$(samtools flagstat $BAMFILE | head -n 5 | tail -n 1 | cut -f 1 -d " ");
+## flagstat outputs number of alignments, which may not be equal to total number of reads (see here https://www.biostars.org/p/138116/)
+#samtools view -F 0x904 -c file.sorted.bam
+#samtools view -F 0x4 foo.sorted.bam | cut -f 1 | sort | uniq | wc -l
+
+MAPPING_FREQUENCY=1
+
+## total number of uniquely mapped reads
+if grep -qP "NH:i:[1-$MAPPING_FREQUENCY]{0,1}\s+" $BAMFILE; then
+	#UNIQ=`samtools view -S $BAMFILE | grep -w NH:i:1 | perl -an -F'/\|+/' -e 'if(defined($F[1])) { $sum+=$F[1]; } else { $sum++; } END { print "$sum\n"; }'`;
+	UNIQ=`samtools view -S $BAMFILE | grep -P "NH:i:[1-$MAPPING_FREQUENCY]{0,1}\s+" | cut -f 1 | sort | uniq | perl -an -F'/\|+/' -e 'if(defined($F[1])) { $sum+=$F[1]; } else { $sum++; } END { print "$sum\n"; }'`;
+else
+	#UNIQ=`samtools view -S $BAMFILE | cut -f 1 | sort | uniq -u | wc -l`;
+	UNIQ=`samtools view -S $BAMFILE | cut -f 1 | sort | uniq -c | sed 's/^\s*//g' | perl -ane 'if($F[0]>=1 && $F[0]<='$MAPPING_FREQUENCY') { ($id,$freq)=split(/\|/,$F[1]); if(defined($freq)) { $sum+=$freq; } else { $sum+=1; } } END { print "$sum\n"; }'`;
+fi
+
+MAPPED_PERCENTAGE=$(perl -e '$per='$MAPPED'*100/'$TOTAL'; printf("%0.2f", $per);')
+UNIQ_PERCENTAGE=$(perl -e '$per='$UNIQ'*100/'$TOTAL'; printf("%0.2f", $per);')
+
+## print result
+echo -e "$BAMFILE\t$TOTAL\t$MAPPED ($MAPPED_PERCENTAGE)\t$UNIQ ($UNIQ_PERCENTAGE)"
+
+exit

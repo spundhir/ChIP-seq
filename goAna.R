@@ -213,13 +213,13 @@ if(!is.null(opt$listAnnotation)) {
             results=compareCluster(ENTREZID~V2, organism=genomeReactome, data=geneList, fun="enrichPathway", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else {
             if(!is.null(opt$bkgFile)) {
-                results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", ont="BP", OrgDb=genomeDb, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), universe=bkgList$ENTREZID)
+                results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", ont="BP", OrgDb=genomeDb, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), universe=bkgList$ENTREZID, minGSSize=as.numeric(opt$minGene))
                 ## groupGO is not useful due to the reason that it does not give p-values
-                #results=compareCluster(ENTREZID~V2, data=geneList, fun="groupGO", ont="BP", OrgDb=genomeDb, universe=bkgList$ENTREZID, level=2)
+                results_levels=compareCluster(ENTREZID~V2, data=geneList, fun="groupGO", ont="BP", OrgDb=genomeDb, universe=bkgList$ENTREZID, level=3)
             } else {
-                results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", ont="BP", OrgDb=genomeDb, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
+                results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", ont="BP", OrgDb=genomeDb, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
                 ## groupGO is not useful due to the reason that it does not give p-values
-                #results=compareCluster(ENTREZID~V2, data=geneList, fun="groupGO", ont="BP", OrgDb=genomeDb, level=2)
+                results_levels=compareCluster(ENTREZID~V2, data=geneList, fun="groupGO", ont="BP", OrgDb=genomeDb, level=3)
             }
         }
         #data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
@@ -289,8 +289,15 @@ if(!is.null(opt$listAnnotation)) {
     if(is.null(opt$ftrResFile)) {
         outFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.xls", opt$outDir, opt$annotation)
         data <- as.data.frame(results@compareClusterResult)
-        data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[9], "/")), function(x) geneList[which(geneList$ENTREZID==x),]$V1)), collapse="/"))
+        data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[10], "/")), function(x) geneList[which(geneList$ENTREZID==x),]$V1)), collapse="/"))
         write.table(data, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
+
+        if(exists("results_levels")==T) {
+            outFile <- sprintf("%s/go_analysis_compareClusterFormula_%s_levels.xls", opt$outDir, opt$annotation)
+            data_levels <- as.data.frame(results_levels@compareClusterResult)
+            data_levels$geneIDf <- apply(data_levels, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[7], "/")), function(x) geneList[which(geneList$ENTREZID==x),]$V1)), collapse="/"))
+            write.table(data_levels, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
+        }
 
         #opt$sessionFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.Rsession", opt$outDir, opt$annotation)
         rm(figWidth, figHeight, maxClass, minGene, outDir, allowDuplicates)
@@ -333,7 +340,7 @@ if(!is.null(opt$listAnnotation)) {
 
     save.session(opt$sessionFile)
     ## compute gene enrichment network for up- and down-regulated genes
-    if(is.numeric(gene$V2) & nrow(results@compareClusterResult)>=1) {
+    if(is.numeric(gene$V2) & summary(results)>=1) {
         geneList <- structure(gene$V2, names=gene$ENTREZID)
         pdf(sprintf("%s/go_analysis_list_cnetplot_%s.pdf", opt$outDir, opt$annotation), width=20, height=20)
         cnetplot(results, categorySize="pvalue", foldChange=geneList, showCategory = 3)
@@ -341,7 +348,7 @@ if(!is.null(opt$listAnnotation)) {
     }
 
     outFile <- sprintf("%s/go_analysis_list_%s.xls", opt$outDir, opt$annotation)
-    data <- as.data.frame(results@compareClusterResult)
+    data <- as.data.frame(summary(results))
     if(nrow(data)>=1) {
         data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[8], "/")), function(x) gene[which(gene$ENTREZID==x),]$V1)), collapse="/"))
     }
