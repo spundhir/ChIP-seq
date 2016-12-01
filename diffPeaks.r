@@ -17,6 +17,9 @@ if(is.null(opt$datasetFile) | is.null(opt$outDir)) {
 	cat("Version: 1.0\n")
 	cat("Contact: pundhir@binf.ku.dk\n");
 	print_help(parser)
+    cat("Format (description description file):\n");
+    cat("SampleId,Tissue,Factor,Condition,Replicate,bamReads,Peaks\n");
+    cat("suv39h1_control_Rep1,gmp,suv39h1,control,1,BOPNEQSSC1.bam,BOPNEQSSC1_peaks.broadPeak\n\n")
 	q()
 }
 
@@ -26,6 +29,10 @@ suppressPackageStartupMessages(library(session))
 
 ## load dataset description file, exit if not found
 if(!file.exists(opt$datasetFile)) { cat("Cannot locate dataset description file\n"); q('no'); }
+
+## create output directory, if does not exist
+dir.create(file.path(opt$outDir), showWarnings = FALSE)
+
 dataset <- dba(sampleSheet=opt$datasetFile, peakCaller="macs", scoreCol=8)
 
 ## calculate differentially bound regions (peaks)

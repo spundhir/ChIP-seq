@@ -23,6 +23,7 @@ usage() {
     echo " -r <int>    [number of replicates. used to compute mean (default: 2)]"
     echo " -n <int>    [minimum number of elements within each nfr dynamic class (default: 500)]"
     echo " -g <string> [genome (default: mm9)]"
+    echo " -w          [compute raw read counts instead (default: TPM)]"
     echo "[OPTIONS: chip2geneExprCor]"
     echo " -x <int>    [number of samples for which to compute gene expression (default: 4)]"
     echo " -c          [associate enhancers to closest gene instead to collapsed gene(s)]"
@@ -36,7 +37,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:j:r:n:g:x:ch ARG; do
+while getopts i:o:j:r:n:g:wx:ch ARG; do
     case "$ARG" in
     i) BED_FILE=$OPTARG;;
     o) OUTDIR=$OPTARG;;
@@ -44,6 +45,7 @@ while getopts i:o:j:r:n:g:x:ch ARG; do
     r) REPLICATES=$OPTARG;;
     n) MIN_N_CLASS=$OPTARG;;
     g) GENOME=$OPTARG;;
+    w) RAW_COUNT=1;;
     x) SAMPLE_COUNT=$OPTARG;;
     c) CLOSEST_GENE=1;;
     h) HELP=1;;
@@ -120,8 +122,17 @@ BED_FILE_COBOUND=$(cat $CONFIG_FILE | perl -ane '
 )
 #echo $BED_FILE_COBOUND
 
+BED_FILE_TSS=$(cat $CONFIG_FILE | perl -ane '
+    if($_=~/^tss/) {
+        $file.="$F[1],";
+    } END {
+        $file=~s/\,$//g;
+        print "$file\n";
+    }'
+)
+#echo $BED_FILE_TSS
+
 <<"COMMENT"
-COMMENT
 ## compute nfr dip
 NCOL=$(head $OUTDIR/$BED_FILE -n 1 | perl -ane '$ncol=scalar(@F)+1; print "$ncol";')
 if [ ! -z "$BAM_FILE_NFRDIP" ]; then
@@ -133,8 +144,12 @@ fi
 ## compute TPM for TF binding
 NCOL=$(head $OUTDIR/$BED_FILE -n 1 | perl -ane '$ncol=scalar(@F)+1; print "$ncol";')
 if [ ! -z "$BAM_FILE_TPM" ]; then
-    bed2window -i $OUTDIR/$BED_FILE -w 500 | bed2expr -i stdin -j $BAM_FILE_TPM -m -d -g $GENOME | rep2mean -i stdin -s $NCOL -n $REPLICATES > $OUTDIR/$BED_FILE.tpm
-    #cat $OUTDIR/$BED_FILE | bed2expr -i stdin -j $BAM_FILE_TPM -d -g $GENOME | rep2mean -i stdin -s $NCOL -n $REPLICATES > $OUTDIR/$BED_FILE.tpm
+    if [ -z "$RAW_COUNT" ]; then
+        bed2window -i $OUTDIR/$BED_FILE -w 500 | bed2expr -i stdin -j $BAM_FILE_TPM -m -d -g $GENOME | rep2mean -i stdin -s $NCOL -n $REPLICATES > $OUTDIR/$BED_FILE.tpm
+        #cat $OUTDIR/$BED_FILE | bed2expr -i stdin -j $BAM_FILE_TPM -d -g $GENOME | rep2mean -i stdin -s $NCOL -n $REPLICATES > $OUTDIR/$BED_FILE.tpm
+    else
+        bed2window -i $OUTDIR/$BED_FILE -w 500 | bed2expr -i stdin -j $BAM_FILE_TPM -d -g $GENOME | rep2mean -i stdin -s $NCOL -n $REPLICATES > $OUTDIR/$BED_FILE.tpm
+    fi
 else
     touch $OUTDIR/$BED_FILE.tpm
 fi
@@ -157,14 +172,18 @@ if [ ! -z "$BED_FILE_EXPR" ]; then
 else
     touch $OUTDIR/$BED_FILE.count
 fi
+COMMENT
 
 ## compute distance to proximal gene
-if [ ! -z "$BED_FILE_EXPR" ]; then
-    closestBed -a $OUTDIR/$BED_FILE -b $BED_FILE_EXPR -t first -d | perl -ane 'print $F[scalar(@F)-1]."\n";' > $OUTDIR/$BED_FILE.dist
+if [ ! -z "$BED_FILE_TSS" ]; then
+        closestBed -a $OUTDIR/$BED_FILE -b $BED_FILE_TSS -t first -d | perl -ane 'print $F[scalar(@F)-1]."\n";' > $OUTDIR/$BED_FILE.dist
 else
-    touch $OUTDIR/$BED_FILE.dist
+    if [ ! -z "$BED_FILE_EXPR" ]; then
+        closestBed -a $OUTDIR/$BED_FILE -b $BED_FILE_EXPR -t first -d | perl -ane 'print $F[scalar(@F)-1]."\n";' > $OUTDIR/$BED_FILE.dist
+    else
+        touch $OUTDIR/$BED_FILE.dist
+    fi
 fi
-
 
 ## compute fraction of nfr (co)-bound by TFs
 NCOL=$(head $OUTDIR/$BED_FILE -n 1 | perl -ane '$ncol=scalar(@F)+1; print "$ncol";')

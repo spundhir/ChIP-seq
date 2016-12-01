@@ -3,11 +3,13 @@
 
 GENOME="mm9"
 AVG=0
-SCOREDIR="/home/pundhir/project/genome_annotations/phastCons46way/vertebrate"
 
 #### usage ####
 usage() {
 	echo Program: "bed2conservation (compute phastcons or phyloP conservation score corresponding to input BED file)"
+    echo "         [MORE INFO: https://www.biostars.org/p/16724/]"
+    echo "         [MORE INFO: https://www.biostars.org/p/129981/]"
+    echo "         [MORE INFO: https://www.biostars.org/p/86847/]"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
@@ -16,11 +18,6 @@ usage() {
 	echo " -i <file>   [input file containing genomic coordinate in BED format (can be stdin)]"
     echo "             [format: chr start end unique_id class]"
     echo "             [NOTE: fourth column (name) should be unique]"
-    echo " -o <dir>    [output directory]"
-    echo " -s <dir>    [directory containing conservation score files]"
-    echo "             [default: /home/pundhir/project/genome_annotations/phastCons46way/vertebrate]"
-    echo "             [MORE INFO: https://www.biostars.org/p/129981/]"
-    echo "             [MORE INFO: https://www.biostars.org/p/86847/]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
     echo " -y          [compute phyloP scores instead]"
@@ -30,11 +27,9 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:s:g:yh ARG; do
+while getopts i:g:yh ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
-        o) OUTDIR=$OPTARG;;
-        s) SCOREDIR=$OPTARG;;
         g) GENOME=$OPTARG;;
         y) PHYLOP=1;;
 		h) HELP=1;;
@@ -42,20 +37,17 @@ while getopts i:o:s:g:yh ARG; do
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ -z "$INPUTBEDFILE" -o -z "$OUTDIR" -o ! -d "$SCOREDIR" -o "$HELP" ]; then
+if [ -z "$INPUTBEDFILE" -o "$HELP" ]; then
 	usage
-fi
-
-## create output directory, if it does not exist
-if [ ! -d "$OUTDIR" ]; then
-    mkdir -p $OUTDIR
 fi
 
 ## populating files based on input genome
 if [ "$GENOME" == "mm9" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+    PHASTCONS_DIR="/home/pundhir/project/genome_annotations/phastCons/mm9/phastCons30way/vertebrate"
 elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+    PHASTCONS_DIR="/home/pundhir/project/genome_annotations/phastCons/hg19/phastCons46way/vertebrate"
 else
     echo "Presently the program only support analysis for mm9 or hg19"
     echo
@@ -67,56 +59,94 @@ if [ "$INPUTBEDFILE" == "stdin" ]; then
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     while read LINE; do
         echo ${LINE}
-    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' | sort -k 1,1 -k 2n,2 -k 3n,3 > $TMP
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
     INPUTBEDFILE=$TMP
 fi
 
-if [ ! -z "$PHYLOP" ]; then
-    awk '{ regionChromosome = $1; regionStart = $2; regionStop = $3; regionID = $4; ID = $5; baseIdx = 0; for (baseStart = regionStart; baseStart < regionStop; baseStart++) { baseStop = baseStart + 1; print regionChromosome"\t"baseStart"\t"baseStop"\t"regionID"-"baseIdx"\t"ID; baseIdx++; } }' $INPUTBEDFILE > $OUTDIR/INPUTFILE_PER_BASE.BED
-
-    ## compute phylop conservation scores for input BED file
-    for i in `seq 1 22` X Y M;
-    #for i in 15;
-    do
-        phyloPFn="$SCOREDIR/chr${i}.phyloP46way.wigFix.bed"
-        #echo "$phyloPFn"
-        if [ $(ls $phyloPFn | wc -l) -eq 1 ]; then
-            echo "mapping signal for chromosome chr${i}...";
-            bedmap --echo --echo-map-score --chrom chr${i} --delim '\t' $OUTDIR/INPUTFILE_PER_BASE.BED ${phyloPFn} > $OUTDIR/regions_with_perBase_phyloP.${i}.bed &
+if [ "$GENOME" == "mm9" ]; then
+    while IFS=$'\t' read -r -a ARR; do
+        if [ -f "$PHASTCONS_DIR/${ARR[0]}.data.bw" ]; then 
+            #echo "bigWigSummary -type=mean $PHASTCONS_DIR/${ARR[0]}.data.bw ${ARR[0]} ${ARR[1]} ${ARR[2]} 1"; exit
+            MEAN_SCORE=$(bigWigSummary -type=mean $PHASTCONS_DIR/${ARR[0]}.data.bw ${ARR[0]} ${ARR[1]} ${ARR[2]} 1 2>/dev/null)
+            if [ "$?" -ne 0 ]; then
+                MEAN_SCORE="NA"
+            fi
+            MAX_SCORE=$(bigWigSummary -type=max $PHASTCONS_DIR/${ARR[0]}.data.bw ${ARR[0]} ${ARR[1]} ${ARR[2]} 1 2>/dev/null)
+            if [ "$?" -ne 0 ]; then
+                MAX_SCORE="NA"
+            fi
+        else
+            MEAN_SCORE="NA"
+            MAX_SCORE="NA"
         fi
-    done
-
-    #cat $OUTDIR/*.bed | perl -ane 'if($F[5]!~/^$/) { $F[3]=~s/\-.*//g; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' | mergeBed -i stdin -d 1 -c 4,5,6 -o distinct,distinct,median > $OUTDIR/ALL.CONSERVATION
-    cat $OUTDIR/*.bed | perl -ane 'if($F[5]!~/^$/) { $F[3]=~s/\-.*//g; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' | perl -ane 'if(!defined($info{$F[3]}) && $id!~/^$/) { print "$info{$id}{'0'}\t$info{$id}{'1'}\t$info{$id}{'2'}\t$info{$id}{'3'}\t$info{$id}{'4'}\t$info{$id}{'5'}\t$info{$id}{count}\n"; %info=(); $info{$F[3]}{'0'}=$F[0]; $info{$F[3]}{'1'}=$F[1]; $info{$F[3]}{'2'}=$F[2]; $info{$F[3]}{'3'}=$F[3]; $info{$F[3]}{'4'}=$F[4]; $info{$F[3]}{'5'}=$F[5]; $info{$F[3]}{count}=1; } elsif(defined($info{$F[3]})) { $id=$F[3]; $info{$id}{'2'}=$F[2]; $info{$id}{'5'}+=$F[5]; $info{$id}{count}++; } else { $info{$F[3]}{'0'}=$F[0]; $info{$F[3]}{'1'}=$F[1]; $info{$F[3]}{'2'}=$F[2]; $info{$F[3]}{'3'}=$F[3]; $info{$F[3]}{'4'}=$F[4]; $info{$F[3]}{'5'}=$F[5]; $info{$F[3]}{count}=1; }' > $OUTDIR/ALL.CONSERVATION 
-else
-<<"COMMENT"
-COMMENT
-    ## compute phastcons conservation scores for input BED file
-    for i in `seq 1 22` X Y M;
-    do
-        phastConFn="$SCOREDIR/chr${i}.phastCons*.wigFix.starch";
-        #echo "$phastConFn"
-        if [ $(ls $phastConFn | wc -l) -eq 1 ]; then
-            echo "mapping signal for chromosome chr${i}...";
-            bedmap --echo --sum --echo-map-score --chrom chr${i} --delim '\t' $INPUTBEDFILE ${phastConFn} > $OUTDIR/regions_with_avg_phastcons.${i}.bed &
+        echo -e "${ARR[@]}\t$MEAN_SCORE\t$MAX_SCORE"
+    done < $INPUTBEDFILE | perl -an -F'/\s+/' -e 'if($F[0]=~/^chr/i) { print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n"; }'
+else 
+    while IFS=$'\t' read -r -a ARR; do
+        if [ -f "$PHASTCONS_DIR/${ARR[0]}.phastCons46way.wigFix.bw" ]; then 
+            #echo "bigWigSummary -type=mean $PHASTCONS_DIR/${ARR[0]}.phastCons46way.wigFix.bw ${ARR[0]} ${ARR[1]} ${ARR[2]} 1"; exit
+            MEAN_SCORE=$(bigWigSummary -type=mean $PHASTCONS_DIR/${ARR[0]}.phastCons46way.wigFix.bw ${ARR[0]} ${ARR[1]} ${ARR[2]} 1 2>/dev/null)
+            if [ "$?" -ne 0 ]; then
+                MEAN_SCORE="NA"
+            fi
+            MAX_SCORE=$(bigWigSummary -type=max $PHASTCONS_DIR/${ARR[0]}.phastCons46way.wigFix.bw ${ARR[0]} ${ARR[1]} ${ARR[2]} 1 2>/dev/null)
+            if [ "$?" -ne 0 ]; then
+                MAX_SCORE="NA"
+            fi
+        else
+            MEAN_SCORE="NA"
+            MAX_SCORE="NA"
         fi
-    done
-
-    wait
-
-    ## make final output file
-    echo -e "make final output file.. "
-    NCOL=$(cat $OUTDIR/regions_with_avg_phastcons.*.bed | head -n 1 | perl -ane 'print scalar(@F);')
-
-    join -j 4 -o 1.1 1.2 1.3 1.4 1.5 2.$((NCOL-1)) 2.$NCOL <(sort -k 4,4 $INPUTBEDFILE) <(cat $OUTDIR/regions_with_avg_phastcons.*.bed | sort -k 4,4) | perl -ane '$des=(); foreach(@F) { chomp($_); $des.="$_\t"; } $des=~s/\t$//g; print "$des\n";' > $OUTDIR/ALL.CONSERVATION
-
-    cat $OUTDIR/ALL.CONSERVATION | perl -ane '$count=0; if($F[6]!~/^$/) { @t=split(/\;/,$F[6]); foreach(@t) { if($_>=0.5) { $count++; }} } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$count\n";' > $OUTDIR/ALL.CONSERVATION.COUNT
+        echo -e "${ARR[@]}\t$MEAN_SCORE\t$MAX_SCORE"
+    done < $INPUTBEDFILE | perl -an -F'/\s+/' -e 'if($F[0]=~/^chr/i) { print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n"; }'
 fi
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
     rm $TMP
 fi
-echo "done"
 
 exit
+
+## OLD (uses starch files)
+<<"COMMENT"
+    if [ ! -z "$PHYLOP" ]; then
+        awk '{ regionChromosome = $1; regionStart = $2; regionStop = $3; regionID = $4; ID = $5; baseIdx = 0; for (baseStart = regionStart; baseStart < regionStop; baseStart++) { baseStop = baseStart + 1; print regionChromosome"\t"baseStart"\t"baseStop"\t"regionID"-"baseIdx"\t"ID; baseIdx++; } }' $INPUTBEDFILE > $OUTDIR/INPUTFILE_PER_BASE.BED
+
+        ## compute phylop conservation scores for input BED file
+        for i in `seq 1 22` X Y M;
+        #for i in 15;
+        do
+            phyloPFn="$PHASTCONS_DIR/chr${i}.phyloP46way.wigFix.bed"
+            #echo "$phyloPFn"
+            if [ $(ls $phyloPFn | wc -l) -eq 1 ]; then
+                echo "mapping signal for chromosome chr${i}...";
+                bedmap --echo --echo-map-score --chrom chr${i} --delim '\t' $OUTDIR/INPUTFILE_PER_BASE.BED ${phyloPFn} > $OUTDIR/regions_with_perBase_phyloP.${i}.bed &
+            fi
+        done
+
+        #cat $OUTDIR/*.bed | perl -ane 'if($F[5]!~/^$/) { $F[3]=~s/\-.*//g; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' | mergeBed -i stdin -d 1 -c 4,5,6 -o distinct,distinct,median > $OUTDIR/ALL.CONSERVATION
+        cat $OUTDIR/*.bed | perl -ane 'if($F[5]!~/^$/) { $F[3]=~s/\-.*//g; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' | perl -ane 'if(!defined($info{$F[3]}) && $id!~/^$/) { print "$info{$id}{'0'}\t$info{$id}{'1'}\t$info{$id}{'2'}\t$info{$id}{'3'}\t$info{$id}{'4'}\t$info{$id}{'5'}\t$info{$id}{count}\n"; %info=(); $info{$F[3]}{'0'}=$F[0]; $info{$F[3]}{'1'}=$F[1]; $info{$F[3]}{'2'}=$F[2]; $info{$F[3]}{'3'}=$F[3]; $info{$F[3]}{'4'}=$F[4]; $info{$F[3]}{'5'}=$F[5]; $info{$F[3]}{count}=1; } elsif(defined($info{$F[3]})) { $id=$F[3]; $info{$id}{'2'}=$F[2]; $info{$id}{'5'}+=$F[5]; $info{$id}{count}++; } else { $info{$F[3]}{'0'}=$F[0]; $info{$F[3]}{'1'}=$F[1]; $info{$F[3]}{'2'}=$F[2]; $info{$F[3]}{'3'}=$F[3]; $info{$F[3]}{'4'}=$F[4]; $info{$F[3]}{'5'}=$F[5]; $info{$F[3]}{count}=1; }' > $OUTDIR/ALL.CONSERVATION 
+    else
+        ## compute phastcons conservation scores for input BED file
+        for i in `seq 1 22` X Y M;
+        do
+            phastConFn="$PHASTCONS_DIR/chr${i}.phastCons*.wigFix.starch";
+            #echo "$phastConFn"
+            if [ $(ls $phastConFn | wc -l) -eq 1 ]; then
+                echo "mapping signal for chromosome chr${i}...";
+                bedmap --echo --sum --echo-map-score --chrom chr${i} --delim '\t' $INPUTBEDFILE ${phastConFn} > $OUTDIR/regions_with_avg_phastcons.${i}.bed &
+            fi
+        done
+
+        wait
+
+        ## make final output file
+        echo -e "make final output file.. "
+        NCOL=$(cat $OUTDIR/regions_with_avg_phastcons.*.bed | head -n 1 | perl -ane 'print scalar(@F);')
+
+        join -j 4 -o 1.1 1.2 1.3 1.4 1.5 2.$((NCOL-1)) 2.$NCOL <(sort -k 4,4 $INPUTBEDFILE) <(cat $OUTDIR/regions_with_avg_phastcons.*.bed | sort -k 4,4) | perl -ane '$des=(); foreach(@F) { chomp($_); $des.="$_\t"; } $des=~s/\t$//g; print "$des\n";' > $OUTDIR/ALL.CONSERVATION
+
+        cat $OUTDIR/ALL.CONSERVATION | perl -ane '$count=0; if($F[6]!~/^$/) { @t=split(/\;/,$F[6]); foreach(@t) { if($_>=0.5) { $count++; }} } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$count\n";' > $OUTDIR/ALL.CONSERVATION.COUNT
+    fi
+COMMENT
