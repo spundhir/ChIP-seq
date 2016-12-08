@@ -162,6 +162,8 @@ if [ "$MODE" -eq 1 ]; then
         ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -minT $MIN_T"
     fi
 
+<<"COMMENT"
+COMMENT
     if [ -z "$BKG_FILE" ]; then
         findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS_FILE -mknown $TFBS_FILE -p $PROCESSOR -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -dumpFasta -S $S $ADDITIONAL_ARGUMENT -size $SIZE &> $OUTDIR/findMotifs.log
     else
