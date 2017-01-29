@@ -2,11 +2,11 @@
 
 #### usage ####
 usage() {
-	echo Program: "binorm.sh (perform binomial test)"
+	echo Program: "binomTest.sh (perform binomial test)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: binorm.sh -i <file> -j <file> -k <string>"
+	echo "Usage: binomTest.sh -i <file> -j <file> -k <string>"
 	echo "Options:"
     echo " -i <file>   [input file containing reference features, eg. genome segementation in BED format]"
     echo " -j <file>   [input file containing features of interest, eg. NFRs in BED format (can be stdin)]"
@@ -57,6 +57,7 @@ if [ ! -z "$FILTER_INT" ]; then
     mv $FEATURES_INT.tmp $FEATURES_INT
 fi
 
+echo -e "#file\tfeatures\ttotal\toverlap\tmean\tstddev\tp-value\tpercentage\texpr_overlap\texp_per"
 #echo "$FEATURES_REF\t$FEATURES_INT\t$FILTER_REF";
 
 if [ -z "$FILTER_REF" ]; then
@@ -68,9 +69,13 @@ if [ -z "$FILTER_REF" ]; then
     overlap=`intersectBed -a $FEATURES_INT -b $FEATURES_REF -u | wc -l`;
     pvalue=`Rscript /home/pundhir/software/myScripts/PredictNFR_v0.01/pnorm.R $overlap $mean $stdev | cut -f 2 -d " "`;
     per=`perl -e '$per=('$overlap'*100)/'$N'; printf("%0.2f", $per);'`;
-    #echo -e "$entity\t$N\t$Pr\t$mean\t$stdev\t$overlap\t$per"; exit;
+
+    exp_overlap=`Rscript /home/pundhir/software/myScripts/PredictNFR_v0.01/qnorm.R $mean $stdev | cut -f 2 -d " "`;
+    exp_per=`perl -e '$exp_per=('$exp_overlap'*100)/'$N'; printf("%0.2f", $exp_per);'`;
+
+    #echo -e "$entity\t$N\t$Pr\t$mean\t$stdev\t$overlap\t$per\t$exp_overlap"; exit;
     file=`echo $FEATURES_REF | sed 's/^.*\///g'`;
-    echo -e "$file\tNA\t$N\t$overlap\t$mean\t$stdev\t$pvalue\t$per";
+    echo -e "$file\tNA\t$N\t$overlap\t$mean\t$stdev\t$pvalue\t$per\t$exp_overlap\t$expr_per";
 else
     IFS=","
     FEATURES=($FILTER_REF)
@@ -96,13 +101,17 @@ else
        else 
             overlap=0
         fi
-        #echo -e "Entity: $entity; N: $N; Pr: $Pr; Mean: $mean; Stdev: $stdev; Overlap: $overlap"; exit;
+        #echo -e "Entity: $entity; N: $N; Pr: $Pr; Mean: $mean; Stdev: $stdev; Overlap: $overlap; Expected value: $exp_overlap"; exit;
 
         pvalue=`Rscript /home/pundhir/software/myScripts/PredictNFR_v0.01/pnorm.R $overlap $mean $stdev | cut -f 2 -d " "`;
         per=`perl -e '$per=('$overlap'*100)/'$N'; printf("%0.2f", $per);'`;
-        #echo -e "$entity\t$N\t$Pr\t$mean\t$stdev\t$overlap\t$pvalue";
+
+        exp_overlap=`Rscript /home/pundhir/software/myScripts/PredictNFR_v0.01/qnorm.R $mean $stdev | cut -f 2 -d " "`;
+        exp_per=`perl -e '$exp_per=('$exp_overlap'*100)/'$N'; printf("%0.2f", $exp_per);'`;
+        
+        #echo -e "$entity\t$N\t$Pr\t$mean\t$stdev\t$overlap\t$pvalue\t$exp_overlap";
         file=`echo $FEATURES_REF | sed 's/^.*\///g'`;
-        echo -e "$file\t${FEATURES[$i]}\t$N\t$overlap\t$mean\t$stdev\t$pvalue\t$per";
+        echo -e "$file\t${FEATURES[$i]}\t$N\t$overlap\t$mean\t$stdev\t$pvalue\t$per\t$exp_overlap\t$exp_per";
     done
 
     ## performing enrichment analysis for features that do not overlap with reference
@@ -113,9 +122,13 @@ else
     overlap=`intersectBed -a $FEATURES_INT -b $FEATURES_REF -v | wc -l`;
     pvalue=`Rscript /home/pundhir/software/myScripts/PredictNFR_v0.01/pnorm.R $overlap $mean $stdev | cut -f 2 -d " "`;
     per=`perl -e '$per=('$overlap'*100)/'$N'; printf("%0.2f", $per);'`;
-    #echo -e "$entity\t$N\t$Pr\t$mean\t$stdev\t$overlap\t$pvalue";
+
+    exp_overlap=`Rscript /home/pundhir/software/myScripts/PredictNFR_v0.01/qnorm.R $mean $stdev | cut -f 2 -d " "`;
+    exp_per=`perl -e '$exp_per=('$exp_overlap'*100)/'$N'; printf("%0.2f", $exp_per);'`;
+
+    #echo -e "$entity\t$N\t$Pr\t$mean\t$stdev\t$overlap\t$pvalue\t$exp_overlap";
     file=`echo $FEATURES_REF | sed 's/^.*\///g'`;
-    echo -e "$file\tother\t$N\t$overlap\t$mean\t$stdev\t$pvalue\t$per";
+    echo -e "$file\tother\t$N\t$overlap\t$mean\t$stdev\t$pvalue\t$per\t$exp_overlap\t$exp_per";
 fi
 
 if [ ! -z "$TMP" ]; then

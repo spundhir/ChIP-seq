@@ -49,7 +49,7 @@ if [ -z "$TAB" ]; then
         #tr -s '\t' < $INFILE
         perl -ane '$_=~s/\s+$//g; print "$_\n";' < $INFILE
     else
-        zless $INFILE | perl -ane 'print scalar(@F)."\n";' | sort | uniq -c
+        zless $INFILE | perl -an -F'/\t{1}/' -e 'print scalar(@F)."\n";' | sort | uniq -c
     fi
 
     ## remove temporary file, if exists

@@ -62,8 +62,10 @@ if [ "$GENOME" == "mm9" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
 elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+elif [ "$GENOME" == "rn5" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/rat.rn5.genome"
 else
-    echo "Presently the program only support analysis for mm9 or hg19"
+    echo "Presently the program only support analysis for mm9, hg19 or rn5"
     echo
     usage
 fi

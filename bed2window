@@ -49,9 +49,9 @@ fi
 
 if [ ! -z "$TSS" ]; then
     if [ -f "$INPUTBEDFILE" ]; then
-        zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/) { next; } if($F[5]=~/^\-$/) { $start=$F[2]; $end=$start+'$WIN'; } else { $end=$F[1]; $start=$end-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' 
+        zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $start=$F[2]; $end=$start+'$WIN'; } else { $end=$F[1]; $start=$end-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
     elif [ "$INPUTBEDFILE" == "stdin" ]; then 
-        while read LINE; do echo ${LINE}; done | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/) { next; } if($F[5]=~/^\-$/) { $start=$F[2]; $end=$start+'$WIN'; } else { $end=$F[1]; $start=$end-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
+        while read LINE; do echo ${LINE}; done | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $start=$F[2]; $end=$start+'$WIN'; } else { $end=$F[1]; $start=$end-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
     else
         usage
     fi
@@ -87,5 +87,7 @@ else
     else
         usage
     fi
-fi | if [ -z "$NOSORT" ]; then sortBed -i stdin; else perl -ane 'print $_;'; fi
+fi 
+exit
+| if [ -z "$NOSORT" ]; then sortBed -i stdin; else perl -ane 'print $_;'; fi
 exit

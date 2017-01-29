@@ -40,14 +40,11 @@ data$V14 <- gsub("^.*BestGuess:", "", data$V2)
 data$V14 <- gsub("\\(.*", "", data$V14)
 data$V15 <- gsub("^.*BestGuess:", "", data$V2)
 data <- data[which(data$V11>=as.numeric(opt$minFreq)),]
-if(is.numeric(gsub("\\)", "", gsub("^.*\\(", "", data$V15)))){
-    data$V15 <- as.numeric(gsub("\\)", "", gsub("^.*\\(", "", data$V15)))
-    if(length(which( !is.na(data$V15), arr.ind=TRUE))>0) {
-        data <- data[which(data$V11>=as.numeric(opt$minFreq) & data$V15>=0.80),]
-    } else {
-        data <- data[which(data$V11>=as.numeric(opt$minFreq)),]
-    }
+data$V15 <- as.numeric(gsub("\\)", "", gsub("^.*\\(", "", data$V15)))
+if(length(which( !is.na(data$V15), arr.ind=TRUE))>0) {
+    data <- data[which(data$V11>=as.numeric(opt$minFreq) & data$V15>=0.80),]
 } else {
+    data <- data[which(data$V11>=as.numeric(opt$minFreq)),]
     data$V15 <- 0
 }
 no_rows=nrow(data)/length(unique(data$V1))
