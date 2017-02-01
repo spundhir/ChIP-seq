@@ -57,7 +57,7 @@ usage() {
     echo "             [total, hc, max, prod, diff, km, width, none]"
     echo " -b <int>    [reduce ratio for heatmap (default: 30)]"
     echo "             [the parameter controls the heatmap height. The smaller the value, the taller the heatmap]"
-    echo " -q <int>    [K-means or HC number of clusters (default=5)"
+    echo " -q <int>    [K-means or HC number of clusters (default=5)]"
     echo " -k <int>    [remove all zero profiles in heatmap (default: 0) ]"
     echo "             [set 1 to remove them]"
     echo " -n          [scale signal profile between 0 and 1]"

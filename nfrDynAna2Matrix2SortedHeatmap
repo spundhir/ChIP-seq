@@ -11,6 +11,7 @@ CD="0.6"
 SC="global"
 WIN=1000
 GENOMIC_REGIONS="bed"
+KNC=5
 
 #### usage ####
 usage() {
@@ -39,6 +40,7 @@ usage() {
     echo " -y <int>            [minimum number of elements within each nfr dynamic class to plot (default: 50)]"
     echo " -a <string>         [gene order algorithm for heatmap (default: none)]"
     echo "                     [total, hc, max, prod, diff, km, none, h3k27ac, cobinding, expr, tf_fc, tf_expr, sum"
+    echo " -q <int>            [K-means or HC number of clusters (default=5)]"
     echo " -c <string>         [color for heatmap (like red2, blue2, darkgreen yellow. default: red2)]"
     echo " -t <float>          [color distribution for heatmap (positive number; default: 0.6)]"
     echo "                     [    Hint: lower values give more widely spaced colors at the negative end]"
@@ -60,7 +62,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:k:l:vo:f:d:g:p:y:a:c:t:s:w:xz:e:h ARG; do
+while getopts i:k:l:vo:f:d:g:p:y:a:q:c:t:s:w:xz:e:h ARG; do
 	case "$ARG" in
 		i) NFR=$OPTARG;;
         k) CHIPDIR=$OPTARG;;
@@ -73,6 +75,7 @@ while getopts i:k:l:vo:f:d:g:p:y:a:c:t:s:w:xz:e:h ARG; do
         p) PROCESSOR=$OPTARG;;
         y) MIN_N_CLASS=$OPTARG;;
         a) GENE_ORDER=$OPTARG;;
+        q) KNC=$OPTARG;;
         c) COLOR=$OPTARG;;
         t) CD=$OPTARG;;
         s) SC=$OPTARG;;
@@ -248,21 +251,21 @@ HEATMAP_FILES=$(echo $HEATMAP_FILES | sed -E 's/^\,//g')
 #echo "nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -c $COLOR -d $CD";
 #if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
     if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
-        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -s $SC -l $WIN -e $GENOMIC_REGIONS
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
     elif [ ! -z "$CHIP_INCL_FILTER" ]; then
-        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -s $SC -l $WIN -e $GENOMIC_REGIONS
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
     elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
-        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -s $SC -l $WIN -e $GENOMIC_REGIONS
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
     else
-        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -s $SC -l $WIN -e $GENOMIC_REGIONS
+        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
     fi
 #fi
 
 echo -n "replot heatmap with specified color: $COLOR.. "
 if [ ! -z "$SIZE_FACTORS" ]; then
-    nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -c $COLOR -d $CD -s $SIZE_FACTORS 
+    nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -q $KNC -c $COLOR -d $CD -s $SIZE_FACTORS 
 else
-    nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -c $COLOR -d $CD
+    nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -q $KNC -c $COLOR -d $CD
 fi
 echo "done"
 

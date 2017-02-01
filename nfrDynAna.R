@@ -14,6 +14,7 @@ option_list <- list(
     make_option(c("-l", "--logScale"), help="plot histone profile in log scale (optional)", action="store_true"),
     make_option(c("-m", "--heatMap"), help="plot heatmap instead (optional)", action="store_true"),
     make_option(c("-a", "--go"), help="gene order algorithm for heatmap (total, hc, max, prod, diff, km, none)"),
+    make_option(c("-q", "--knc"), default=5, help="K-means or HC number of clusters (default=%default)"),
     make_option(c("-b", "--sc"), help="color scale for heatmap (min,max; local; region; global)"),
     make_option(c("-c", "--co"), help="Color for heatmap (like red2, blue2, darkgreen yellow)"),
     make_option(c("-d", "--cd"), help="Color distribution for heatmap (between 0 and 1)"),
@@ -758,7 +759,7 @@ if(!is.null(opt$heatMap)) {
         }
         out.hm <- paste(oname, '.pdf', sep='')
         font.size=20
-        if(!is.null(opt$go)) { go.algo <- opt$go; } 
+        if(!is.null(opt$go)) { go.algo <- opt$go; go.paras$knc <- opt$knc; } 
         if(!is.null(opt$sc)) { color.scale <- opt$sc; } 
         if(!is.null(opt$co)) { hm.color <- opt$co; } 
         if(!is.null(opt$cd)) { color.distr <- as.numeric(opt$cd); } 
