@@ -73,9 +73,9 @@ if [ -z "$FILTER_REF" ]; then
     exp_overlap=`Rscript /home/pundhir/software/myScripts/PredictNFR_v0.01/qnorm.R $mean $stdev | cut -f 2 -d " "`;
     exp_per=`perl -e '$exp_per=('$exp_overlap'*100)/'$N'; printf("%0.2f", $exp_per);'`;
 
-    #echo -e "$entity\t$N\t$Pr\t$mean\t$stdev\t$overlap\t$per\t$exp_overlap"; exit;
+    #echo -e "$entity\t$N\t$Pr\t$mean\t$stdev\t$overlap\t$per\t$exp_overlap\t$exp_per"; exit;
     file=`echo $FEATURES_REF | sed 's/^.*\///g'`;
-    echo -e "$file\tNA\t$N\t$overlap\t$mean\t$stdev\t$pvalue\t$per\t$exp_overlap\t$expr_per";
+    echo -e "$file\tNA\t$N\t$overlap\t$mean\t$stdev\t$pvalue\t$per\t$exp_overlap\t$exp_per";
 else
     IFS=","
     FEATURES=($FILTER_REF)

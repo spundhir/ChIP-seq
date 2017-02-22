@@ -515,7 +515,6 @@ plotheat <- function(reg.list, uniq.reg, enrichList, v.low.cutoff, go.algo,
     } else {
         if(hm.color != "default") {
             if(hm.color=="blue") {
-                #enrich.palette <- colorRampPalette(c('snow', 'blue3', hm.color), bias=color.distr, interpolate='spline')
                 enrich.palette <- colorRampPalette(c('#ffffff', '#253494', "#081d58"), bias=color.distr, interpolate='spline')
             } else if(hm.color=="coral") {
                 enrich.palette <- colorRampPalette(c('#ffffff', '#a63603', "#7f2704"), bias=color.distr, interpolate='spline')
@@ -532,11 +531,16 @@ plotheat <- function(reg.list, uniq.reg, enrichList, v.low.cutoff, go.algo,
             } else if(hm.color=="red_dark") {
                 enrich.palette <- colorRampPalette(c('midnightblue', 'red3', "red4"), bias=color.distr, interpolate='spline')
             } else {
+                enrich.palette <- colorRampPalette(brewer.pal(9, hm.color), bias=color.distr, interpolate='spline')
                 #enrich.palette <- colorRampPalette(c('snow', hm.color))
-                enrich.palette <- colorRampPalette(c('snow', hm.color, hm.color), bias=color.distr, interpolate='spline')
+                #enrich.palette <- colorRampPalette(c('snow', 'hm.color', hm.color), bias=color.distr, interpolate='spline')
+                #enrich.palette <- colorRampPalette(c('snow', 'snow', hm.color), bias=color.distr, interpolate='spline')
+                #enrich.palette <- colorRampPalette(c('#f7fbff', '#c6dbef', '#6baed6', '#2171b5', hm.color), bias=color.distr, interpolate='spline')
+                #enrich.palette <- colorRampPalette(c('snow', '#fb6a4a', hm.color), bias=color.distr, interpolate='spline')
             }
         } else {
-            enrich.palette <- colorRampPalette(c('snow', 'red2'))    
+            enrich.palette <- colorRampPalette(brewer.pal(9, "Reds"), bias=color.distr, interpolate='spline')
+            #enrich.palette <- colorRampPalette(c('snow', 'red2'))    
         }
     }
 
@@ -781,6 +785,14 @@ if(!is.null(opt$heatMap)) {
                                 color.scale=color.scale)
         }
         out.dev <- dev.off()
+
+        #save.session(sprintf("%s.heatmap.RData", sessionFile[row]))
+    }
+
+    ## output cluster information to file
+    if(!is.null(opt$go) & opt$go=="km") {
+        km.info <- rbind.data.frame(go.list)
+        write.table(km.info, file = sprintf("%s/KM.INFO", dirname(opt$sessionFile)), sep="\t", quote = F, col.names = F, row.names = T)
     }
 } else {
     ## plot line plot
