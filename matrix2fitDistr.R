@@ -61,15 +61,15 @@ fitDistr <- function(values,distr) {
   return(sprintf("%E", pvalue))
 }
 
-# data <- read.table("nfr_dynamics/matrix/NFR_DYNAMICS_SIG.stat")
-# distr <- "pois"
+# data <- read.table("nfr_dynamics_count/matrix/NFR_DYNAMICS_SIG.stat")
+# distr <- "nbinom"
 # descdist(as.numeric(data[,22]))
 # model <- fitdist(as.numeric(data[,c(25)]), distr, method="mme")
 # plot(model)
 # cdfcomp(model, legendtext=distr)
 # qqcomp(model, legendtext=distr)
 # model$aic
-#data.pVal <- cbind(data, apply(data[,c(10:25)], 2, function(x) fitDistr(x, "pois")))
+# data.pVal <- cbind(data, apply(data[,c(10:25)], 2, function(x) fitDistr(x, "pois")))
 
 ## fit the distribution
 data.pVal <- apply(data, 2, function(x) fitDistr(x, opt$distribution))
