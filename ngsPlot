@@ -196,14 +196,14 @@ if [ -z "$EXIST" ]; then
             for file in $DIR/*.bam; do
                 MATCH_COUNT=0
                 for (( i=0; i<${#FILTERS_MATCH[@]}; i++ )); do
-                    FOUND=`echo $file | perl -ane 'if($_=~/'${FILTERS_MATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
+                    FOUND=`echo $file | perl -ane '$_=~s/^.*\///g; if($_=~/'${FILTERS_MATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
                     #echo "${FILTERS_MATCH[$i]} $file $FOUND $i"
                     MATCH_COUNT=$(($MATCH_COUNT + $FOUND))
                 done
                 
                 NOMATCH_COUNT=0
                 for (( i=0; i<${#FILTERS_NOMATCH[@]}; i++ )); do
-                    FOUND=`echo $file | perl -ane 'if($_=~/'${FILTERS_NOMATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
+                    FOUND=`echo $file | perl -ane '$_=~s/^.*\///g; if($_=~/'${FILTERS_NOMATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
                     #echo "${FILTERS_NOMATCH[$i]} $file $FOUND $i"
                     NOMATCH_COUNT=$(($NOMATCH_COUNT + $FOUND))
                 done
