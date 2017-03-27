@@ -41,8 +41,8 @@ usage() {
     echo " -a <string>         [gene order algorithm for heatmap (default: none)]"
     echo "                     [total, hc, max, prod, diff, km, none, h3k27ac, cobinding, expr, tf_fc, tf_expr, sum"
     echo " -q <int>            [K-means or HC number of clusters (default=5)]"
-    echo " -c <string>         [color for heatmap (like red2, blue2, darkgreen yellow. default: red2)]"
-    echo " -t <float>          [color distribution for heatmap (positive number; default: 0.6)]"
+    echo " -c <string>         [color for heatmap (like red2, blue2, darkgreen yellow (default: red2)]"
+    echo " -t <float>          [color distribution for heatmap (positive number (default: 0.6)]"
     echo "                     [    Hint: lower values give more widely spaced colors at the negative end]"
     echo "                     [    In other words, they shift the neutral color to positive values]"
     echo "                     [    If set to 1, the neutral color represents 0 (i.e. no bias)]"
@@ -56,13 +56,14 @@ usage() {
     echo " -z <float>          [size factors to normalize the TPM read counts (RLE normalization)]"
     echo "                     [if multiple, separate them by a comma]"
     echo " -e <string>         [genomic regions (bed or genebody; default: bed)]"
+    echo " -n                  [DO NOT merge replicates of input BAM files]"
 	echo " -h                  [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:k:l:vo:f:d:g:p:y:a:q:c:t:s:w:xz:e:h ARG; do
+while getopts i:k:l:vo:f:d:g:p:y:a:q:c:t:s:w:xz:e:nh ARG; do
 	case "$ARG" in
 		i) NFR=$OPTARG;;
         k) CHIPDIR=$OPTARG;;
@@ -82,7 +83,8 @@ while getopts i:k:l:vo:f:d:g:p:y:a:q:c:t:s:w:xz:e:h ARG; do
         w) WIN=$OPTARG;;
         x) IGNORE_CLASS=1;;
         z) SIZE_FACTORS=$OPTARG;;
-        e) GENOMIC_REGIONS=$OPTARG;; 
+        e) GENOMIC_REGIONS=$OPTARG;;
+        n) NOMERGE=1;;
 		h) HELP=1;;
 	esac
 done
@@ -248,31 +250,44 @@ HEATMAP_FILES=$(echo $HEATMAP_FILES | sed -E 's/^\,//g')
 #echo "$PLOT_TITLES"; exit
 
 ## plot nfr dynamics as heatmap
-#echo "nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -c $COLOR -d $CD";
-if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
-    if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
-        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
-    elif [ ! -z "$CHIP_INCL_FILTER" ]; then
-        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
-    elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
-        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
+if [ -z "$NOMERGE" ]; then
+    #echo "nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -c $COLOR -d $CD";
+    if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
+        if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
+        elif [ ! -z "$CHIP_INCL_FILTER" ]; then
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
+        elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
+        else
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
+        fi
+    fi
+
+    echo -n "replot heatmap with specified color: $COLOR.. "
+    if [ ! -z "$SIZE_FACTORS" ]; then
+        nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -q $KNC -c $COLOR -d $CD -s $SIZE_FACTORS -b $SC 
     else
-        ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
+        nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -q $KNC -c $COLOR -d $CD -b $SC
+    fi
+    echo "done"
+
+    echo -n "replot avgprofile as separate plots..  "
+    nfrDynAna.R -i $OUTDIR/heatmap -j avgprof -o $OUTDIR/heatmap.avgprof.pdf
+    echo "done"
+else
+    if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
+        if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD
+        elif [ ! -z "$CHIP_INCL_FILTER" ]; then
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD
+        elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD
+        else
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD
+        fi
     fi
 fi
-
-echo -n "replot heatmap with specified color: $COLOR.. "
-if [ ! -z "$SIZE_FACTORS" ]; then
-    nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -q $KNC -c $COLOR -d $CD -s $SIZE_FACTORS -b $SC 
-else
-    nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -q $KNC -c $COLOR -d $CD -b $SC
-fi
-echo "done"
-
-echo -n "replot avgprofile as separate plots..  "
-nfrDynAna.R -i $OUTDIR/heatmap -j avgprof -o $OUTDIR/heatmap.avgprof.pdf
-echo "done"
-
 ## remove temporary file
 if [ ! -z "$TMP" ]; then
     rm $OUTDIR/$TMP

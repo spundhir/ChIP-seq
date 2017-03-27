@@ -6,6 +6,7 @@ FORBIDIMG=0;
 #YLIM="0";
 YLIM="auto";
 L=1000;
+CD=0.6
 SC="global";
 CO="red2";
 SHIFT=0;
@@ -42,6 +43,10 @@ usage() {
     echo "             [if multiple seperate them by a comma]"
     echo " -r <string> [specify color for heatmap (default: red2)]"
     echo "             [for bam-pair, use color-pair(neg_color:pos_color)]"
+    echo " -p <float>  [color distribution for heatmap (positive number; default: 0.6)]"
+    echo "             [    Hint: lower values give more widely spaced colors at the negative end]"
+    echo "             [    In other words, they shift the neutral color to positive values]"
+    echo "             [    If set to 1, the neutral color represents 0 (i.e. no bias)]"
     echo " -m          [merge replicates of input BAM files]"
     echo " -w          [ngsPlot description file already exists]"
     echo " -x <int>    [forbid image output if set to 1 (default: 0)]"
@@ -69,7 +74,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:o:f:d:g:t:u:c:r:mwx:y:s:l:z:a:b:q:k:nv:e:h ARG; do
+while getopts i:j:o:f:d:g:t:u:c:r:p:mwx:y:s:l:z:a:b:q:k:nv:e:h ARG; do
 	case "$ARG" in
 		i) REGION=$OPTARG;;
 		j) BAMDIR=$OPTARG;;
@@ -81,6 +86,7 @@ while getopts i:j:o:f:d:g:t:u:c:r:mwx:y:s:l:z:a:b:q:k:nv:e:h ARG; do
         u) REGIONTITLE=$OPTARG;;
         c) COLOR=$OPTARG;;
         r) CO=$OPTARG;;
+        p) CD=$OPTARG;;
         m) MERGE=1;;
         w) EXIST=1;;
         x) FORBIDIMG=$OPTARG;;
@@ -264,10 +270,10 @@ echo "done"
 FORBIDIMG=0
 if [ ! -z "$MERGE" ]; then
     replotMergedReplicates.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 10 -GO $GO -KNC $KNC
-    replotMergedReplicates.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 15 -CO $CO -RR $RR -GO $GO -KNC $KNC
+    replotMergedReplicates.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 15 -CO $CO -CD $CD -RR $RR -GO $GO -KNC $KNC
 else
     replot.r prof -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".avgprof" -FI $FORBIDIMG -YAS $YLIM -MW 13 -FS 10 -GO $GO -KNC $KNC
-    replot.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 15 -CO $CO -RR $RR -GO $GO -KNC $KNC
+    replot.r heatmap -I $OUTDIR/$PLOTTITLE".zip" -O $OUTDIR/$PLOTTITLE".heatmap" -FI $FORBIDIMG -MW 13 -SC $SC -FS 15 -CO $CO -CD $CD -RR $RR -GO $GO -KNC $KNC
 fi
 
 echo -n "scale signal profile between 0 and 1.. "
