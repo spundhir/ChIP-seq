@@ -60,7 +60,7 @@ fi
 zless $BEDFILE | perl -ane '
     $key="$F[0]_$F[1]_$F[2]_$F[3]";
     if($i==0) {
-        $line="$F[0]\t";
+        $line="$F[0]";
         foreach(@F[1..5]) { $line.="\t$_"; }
         $gene{$key}{'coor'}=$line;
         @columns=split(/\,/, "'$COLUMN'");
@@ -80,16 +80,18 @@ zless $BEDFILE | perl -ane '
             print "$gene{$prev_key}{'coor'}";
             @columns=split(/,/, "'$COLUMN'");
             $operation="'$OPERATION'";
+            $line="";
             foreach(@columns) {
                 if($operation=~/mean/) {
-                    printf("\t%0.2f", $gene{$prev_key}{$_}/$gene{$prev_key}{'count'});
+                    $line.=sprintf("\t%0.2f", $gene{$prev_key}{$_}/$gene{$prev_key}{'count'});
                 } else {
-                    print "\t$gene{$prev_key}{$_}";
+                    $line.=sprintf("\t%d", $gene{$prev_key}{$_});
                 }
             }
-            print "\n";
+            $line=~s/\s+$//g;
+            print "$line\n";
 
-            $line="$F[0]\t";
+            $line="$F[0]";
             foreach(@F[1..5]) { $line.="\t$_"; }
             $gene{$key}{'coor'}=$line;
             @columns=split(/,/, "'$COLUMN'");
