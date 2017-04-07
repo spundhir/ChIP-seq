@@ -1,0 +1,70 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+
+#### usage ####
+usage() {
+    echo
+	echo Program: "bed2shuffle (shuffle input bed file)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2shuffle -i <file> [OPTIONS]"
+	echo "Options:"
+    echo " -i <files>  [input BED file (can be stdin)]"
+    echo "[NOTE]"
+    echo "             [differs from shuffleBed since it performs shuffling separately for each chromosome]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:g:h ARG; do
+	case "$ARG" in
+		i) BEDFILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$BEDFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## populate files based on input genome
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    echo
+    echo "computation for $GENOME is not available yet"
+    echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    echo
+    usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "BEDFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    BEDFILE=$TMP
+fi
+
+## shuffle bed file for each chromosome
+CHR=(`zless $BEDFILE | cut -f 1 | grep -v "_" | sort | uniq`)
+
+for chr in "${CHR[@]}"; do
+    zgrep -E "^$chr\s+" $BEDFILE | bedtools shuffle -i - -g $GENOME_FILE -seed 1 -noOverlapping -chrom
+done
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
