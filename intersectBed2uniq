@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 COLUMN=5
-OPERATION="mean"
+OPERATION="sum"
 
 #### usage ####
 usage() {
@@ -17,7 +17,7 @@ usage() {
     echo "[OPTIONS]"
     echo " -c <int>    [columns from the B file to map onto intervals in A (default: 5)]"
     echo "             [if multiple, please separate them by a comma]"
-    echo " -o <string> [operation that should be applied to -c (default: mean)]"
+    echo " -o <string> [operation that should be applied to -c (default: sum)]"
     echo "             [valid operations: sum, mean]"
 	echo " -h          [help]"
 	echo
