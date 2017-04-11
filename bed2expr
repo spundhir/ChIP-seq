@@ -42,7 +42,7 @@ while getopts i:j:s:mkde:g:v:rh ARG; do
         j) INPUTBAMFILES=$OPTARG;;
         s) INPUTSIZEFACTORS=$OPTARG;; 
         m) CPM=1;;
-        k) CPKM=1;;
+        k) FPKM=1;;
         d) REMOVE_DUPLICATE=1;;
         e) INPUTEXTENDS=$OPTARG;;
         g) GENOME=$OPTARG;;
@@ -78,7 +78,7 @@ BAMFILES_COUNT=${#BAMFILES[@]}
 IFS=$oIFS
 
 ## initialize size factors, if both size factors and total reads not provided
-if [ -z "$INPUTSIZEFACTORS" -a -z "$CPM" -a -z "$CPKM" ]; then
+if [ -z "$INPUTSIZEFACTORS" -a -z "$CPM" -a -z "$FPKM" ]; then
     INPUTSIZEFACTORS=""
     for(( i=0; i<$BAMFILES_COUNT; i++ )); do
         INPUTSIZEFACTORS="$INPUTSIZEFACTORS,1"
@@ -140,7 +140,7 @@ if [ ! -z "$INPUTSIZEFACTORS" ]; then
             bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10
         fi
     fi | perl -ane '@sizeFactors=split(/\,/, "'$INPUTSIZEFACTORS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", $_/$sizeFactors[$i]); $i++; } print "\n";'
-elif [ ! -z "$CPKM" ]; then
+elif [ ! -z "$FPKM" ]; then
     MAPPEDREADS=""
     for(( i=0; i<$BAMFILES_COUNT; i++ )); do
         ## create index of input BAM file, if does not exist
