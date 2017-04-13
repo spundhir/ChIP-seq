@@ -15,7 +15,8 @@ usage() {
     echo "[OPTIONS]"
     echo " -w <int>    [flanking window length (default: 200 bp)]"
     echo "             [200 bp up- and downstream to middle point]"
-    echo " -t          [instead of mid point flank it to the TSS]"
+    echo " -x          [instead of mid point flank it to the TSS, both up- and down-stream]"
+    echo " -t          [instead of mid point flank it to the TSS, only up-stream]"
     echo " -u          [instead of mid point flank it to the TSS, however keep the whole gene region intact]"
     echo " -l          [instead of mid point flank it to the left coordinate boundary]"
     echo " -r          [instead of mid point flank it to the right coordinate boundary]"
@@ -28,10 +29,11 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:w:tulrsmh ARG; do
+while getopts i:w:xtulrsmh ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         w) WIN=$OPTARG;;
+        x) TSS_BOTH=1;;
         t) TSS=1;;
         u) TSS_GENE=1;;
         l) LEFT=1;;
@@ -47,15 +49,25 @@ if [ -z "$INPUTBEDFILE" -o "$HELP" ]; then
 	usage
 fi
 
-if [ ! -z "$TSS" ]; then
+if [ ! -z "$TSS_BOTH" ]; then
+    if [ -f "$INPUTBEDFILE" ]; then
+        zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $start=$F[2]-'$WIN'; $end=$F[2]+'$WIN'; } else { $end=$F[1]+'$WIN'; $start=$F[1]-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
+    elif [ "$INPUTBEDFILE" == "stdin" ]; then 
+        while read LINE; do echo ${LINE}; done | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $start=$F[2]-'$WIN'; $end=$F[2]+'$WIN'; } else { $end=$F[1]+'$WIN'; $start=$F[1]-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
+    else
+        usage
+    fi
+elif [ ! -z "$TSS" ]; then
     if [ -f "$INPUTBEDFILE" ]; then
         zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $start=$F[2]; $end=$start+'$WIN'; } else { $end=$F[1]; $start=$end-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
-    elif [ "$INPUTBEDFILE" == "stdin" ]; then 
+    elif [ "$INPUTBEDFILE" == "stdin" ]; then
         while read LINE; do echo ${LINE}; done | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $start=$F[2]; $end=$start+'$WIN'; } else { $end=$F[1]; $start=$end-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
     else
         usage
     fi
 elif [ ! -z "$TSS_GENE" ]; then
+    ## Code to count number of genes having overlapping TSS windows 
+    ## zless ~/project/genome_annotations/ucscGenes_mm9.bed.gz | sortBed -i stdin | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $start=$F[2]-1; $end=$F[2]; } else { $end=$F[1]+1; $start=$F[1]; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' | sortBed -i stdin | awk -F" " '{ if (  FNR == 1  ) {a=$0;getline} ;  {print a"\t"$0;a=$0} }' | perl -ane '$distance=$F[8]-$F[2]; if($F[1]!~/\Q$F[7]\E/ && $F[0]=~/^$F[6]$/ && $distance < 2*1000) { print $_; }' | grep -v DQ
     if [ -f "$INPUTBEDFILE" ]; then
         zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[5]=~/^\-$/) { $start=$F[1]; $end=$F[2]+'$WIN'; } else { $end=$F[2]; $start=$F[1]-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' 
     elif [ "$INPUTBEDFILE" == "stdin" ]; then 
@@ -87,7 +99,7 @@ else
     else
         usage
     fi
-fi 
+fi
 exit
-| if [ -z "$NOSORT" ]; then sortBed -i stdin; else perl -ane 'print $_;'; fi
+#| if [ -z "$NOSORT" ]; then sortBed -i stdin; else perl -ane 'print $_;'; fi
 exit
