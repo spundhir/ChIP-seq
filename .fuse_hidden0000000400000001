@@ -1,0 +1,87 @@
+#!/usr/bin/env Rscript
+suppressPackageStartupMessages(library("optparse"))
+
+## parse command line arguments
+option_list <- list(
+	make_option(c("-i", "--bedFile"), help="input genomic coordinates in BED format (extension SHOULD be .bed)"),
+	make_option(c("-b", "--bamFile"), help="input BAM file(s) (if multiple, seperate them by a comma)"),
+	make_option(c("-w", "--windows"), help="number of windows used to divide the input coordinates (useful when computing coverage for gene body)"),
+	make_option(c("-e", "--extend"), default=1000, help="number of base pairs by which to extend the coordinates (default: %default)"),
+	make_option(c("-p", "--processors"), default=1, help="number of processors to use (default: %default)"),
+    make_option(c("-v", "--coveragePlot"), action="store_true", help="make coverage plot as output"),
+    make_option(c("-a", "--average"), action="store_true", help="instead of giving expression for each replicate, output only the mean (assumes that consecutive BAM files are replicates 1 and 2, respectively)")
+)
+
+parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
+opt <- parse_args(parser)
+
+## check, if all required arguments are given
+if(is.null(opt$bedFile) | is.null(opt$bamFile)) {
+	cat("\nProgram: bed2coverageMatrix.R (R script to compute read coverage matrix for given genomic regions in BED format)\n")
+	cat("Author: BRIC, University of Copenhagen, Denmark\n")
+	cat("Version: 1.0\n")
+	cat("Contact: pundhir@binf.ku.dk\n");
+	print_help(parser)
+	q()
+}
+
+## load libraries
+suppressPackageStartupMessages(library(CoverageView))
+suppressPackageStartupMessages(library(session))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(RColorBrewer))
+
+####################
+## For Debugging
+#opt<-list()
+#opt$bamFile <- "/home/pundhir/project/chip-seq-analysis/data_whale/histone_marks/mouse/h3k4me3_tall_jarid_wt_Rep1.bam,/home/pundhir/project/chip-seq-analysis/data_whale/histone_marks/mouse/h3k4me3_tall_jarid_wt_Rep2.bam,/home/pundhir/project/chip-seq-analysis/data_whale/histone_marks/mouse/h3k4me3_tall_jarid_ko_Rep1.bam,/home/pundhir/project/chip-seq-analysis/data_whale/histone_marks/mouse/h3k4me3_tall_jarid_ko_Rep2.bam"
+#opt$matrixFile <- "matrix"
+#opt$bedFile <- "test.bed"
+#opt$extend <- 1000
+#opt$processors <- 10
+#opt$windows <- 100
+
+bamFile <- unlist(strsplit(opt$bamFile, ","))
+
+if(file.exists(sprintf("%s.session", opt$bedFile))) {
+    coveragePlot <- opt$coveragePlot
+    load(sprintf("%s.session", opt$bedFile))
+    opt$coveragePlot <- coveragePlot
+} else {
+    cov.mat.list<-list()
+    for(i in 1:length(bamFile)) {
+        trm<-CoverageBamFile(bamFile[i])
+        if(is.null(opt$windows)) {
+            cov.mat <- cov.matrix(trm, coordfile=opt$bedFile, extend=as.numeric(opt$extend), num_cores=as.numeric(opt$processors))
+        } else {
+            cov.mat <- cov.matrix(trm, coordfile=opt$bedFile, no_windows=as.numeric(opt$windows), offset=as.numeric(opt$extend), num_cores=as.numeric(opt$processors))
+        }
+        cov.mat.list[[i]]<-cov.mat
+    }
+    #save.session(sprintf("%s.session", opt$bedFile))
+
+    if(!is.null(opt$average)) {
+        cov.mat.list.avg<-list()
+        j <- 1
+        for(i in seq(1, length(bamFile), 2)) {
+            cov.mat.list.avg[[j]] <- (cov.mat.list[[i]]+cov.mat.list[[i+1]])/2
+            j <- j+1
+        }
+        cov.mat.list<-cov.mat.list.avg
+        names(cov.mat.list) <- unique(gsub("_Rep.*", "", basename(bamFile)))
+    } else {
+        names(cov.mat.list) <- basename(bamFile)
+    }
+
+    cov.mat.combined <- t(do.call(rbind, cov.mat.list))
+}
+
+write.table(cov.mat.combined, file = "", sep="\t", quote = F, col.names = T, row.names = T)
+
+if(!is.null(opt$coveragePlot)) {
+    draw.heatmap(data=cov.mat.list,outfile=sprintf("%s.png", opt$bedFile))
+}
+
+#save.session(sprintf("%s.session", opt$bedFile))
+
+q()

@@ -127,6 +127,13 @@ if [ ! -z "$INPUTSIZEFACTORS" ]; then
         usage
     fi
 
+    for(( i=0; i<$BAMFILES_COUNT; i++ )); do
+        ## create index of input BAM file, if does not exist
+        if [ ! -f "${BAMFILES[$i]}.bai" ]; then
+            samtools index ${BAMFILES[$i]}
+        fi
+    done
+
     if [ -z "$REMOVE_DUPLICATE" ]; then
         if [ ! -z "$SAME_STRAND" ]; then
             bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D -s
