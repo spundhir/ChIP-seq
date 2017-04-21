@@ -8,7 +8,7 @@ YLIM="auto";
 L=1000;
 CD=0.6
 SC="global";
-CO="red2";
+CO="Reds";
 SHIFT=0;
 GO="none"
 RR=30
@@ -41,7 +41,7 @@ usage() {
     echo "             [if multiple seperate them by a comma]"
     echo " -c <string> [specify line color for average profile in hexadecimal code (enclose in double quotes)]"
     echo "             [if multiple seperate them by a comma]"
-    echo " -r <string> [specify color for heatmap (default: red2)]"
+    echo " -r <string> [specify color for heatmap (default: Reds)]"
     echo "             [for bam-pair, use color-pair(neg_color:pos_color)]"
     echo " -p <float>  [color distribution for heatmap (positive number; default: 0.6)]"
     echo "             [    Hint: lower values give more widely spaced colors at the negative end]"
@@ -160,14 +160,18 @@ if [ -z "$EXIST" ]; then
         ## determine, if the input peaks are from a file or stdin
         echo -n "Create peak file depending on if the input is from file or STDIN... " >&2
         if [ -f "${REGIONS[$j]}" ]; then
-            if [ "$GENOMIC_REGIONS" == "bed" ]; then
+            if [ "$GENOMIC_REGIONS" == "bed" -a "$L" -gt 0 ]; then
                 zless ${REGIONS[$j]} | perl -ane '$mid=sprintf("%0.0f", ($F[1]+$F[2])/2); $mid=$mid+'$SHIFT'; $start=$mid; $end=$mid+1; $line="$F[0]\t$start\t$end"; foreach(@F[3..3]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
+            elif [ "$GENOMIC_REGIONS" == "bed" ]; then
+                zless ${REGIONS[$j]} > $OUTDIR/REGIONS_INTEREST$j.bed
             else
                 zless ${REGIONS[$j]} | perl -ane 'chomp($F[0]); print "$F[0]\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
             fi
         elif [ "${REGIONS[$j]}" == "stdin" ]; then
-            if [ "$GENOMIC_REGIONS" == "bed" ]; then
+            if [ "$GENOMIC_REGIONS" == "bed" -a "$L" -gt 0 ]; then
                 while read LINE; do echo ${LINE}; done | perl -ane '$mid=sprintf("%0.0f", ($F[1]+$F[2])/2); $mid=$mid+'$SHIFT'; $start=$mid; $end=$mid+1; $line="$F[0]\t$start\t$end"; foreach(@F[3..3]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
+            elif [ "$GENOMIC_REGIONS" == "bed" ]; then
+                while read LINE; do echo ${LINE}; done | perl -ane '$line="$F[0]\t$F[1]\t$F[2]"; foreach(@F[3..3]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
             else
                 while read LINE; do echo ${LINE}; done | perl -ane 'chomp($_); print "$F[0]\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
             fi
