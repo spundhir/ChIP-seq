@@ -1,8 +1,9 @@
 #!/bin/bash
 #PBS -l nodes=1:ppn=4
 
-COLUMN=5
+COLUMN=11
 OPERATION="sum"
+COLUMN_PRIMARY=6
 
 #### usage ####
 usage() {
@@ -15,21 +16,23 @@ usage() {
 	echo "Options:"
     echo " -i <files>  [input file containing output from intersectBed (can be stdin)]"
     echo "[OPTIONS]"
-    echo " -c <int>    [columns from the B file to map onto intervals in A (default: 5)]"
+    echo " -c <int>    [columns from the B file to map onto intervals in A (default: 10)]"
     echo "             [if multiple, please separate them by a comma]"
     echo " -o <string> [operation that should be applied to -c (default: sum)]"
     echo "             [valid operations: sum, mean]"
+    echo " -n <int>    [number of columns to include from primary bed (A) file (default: 6)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:c:o:h ARG; do
+while getopts i:c:o:n:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         c) COLUMN=$OPTARG;;
         o) OPERATION=$OPTARG;;
+        n) COLUMN_PRIMARY=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -57,11 +60,13 @@ if [ "$BEDFILE" == "stdin" ]; then
     BEDFILE=$TMP
 fi
 
+COLUMN_PRIMARY=$(echo $COLUMN_PRIMARY | perl -ane '$_=$_-1; print $_;')
+
 zless $BEDFILE | perl -ane '
     $key="$F[0]_$F[1]_$F[2]_$F[3]";
     if($i==0) {
         $line="$F[0]";
-        foreach(@F[1..5]) { $line.="\t$_"; }
+        foreach(@F[1..'$COLUMN_PRIMARY']) { $line.="\t$_"; }
         $gene{$key}{'coor'}=$line;
         @columns=split(/\,/, "'$COLUMN'");
         foreach(@columns) {
@@ -92,7 +97,7 @@ zless $BEDFILE | perl -ane '
             print "$line\n";
 
             $line="$F[0]";
-            foreach(@F[1..5]) { $line.="\t$_"; }
+            foreach(@F[1..'$COLUMN_PRIMARY']) { $line.="\t$_"; }
             $gene{$key}{'coor'}=$line;
             @columns=split(/,/, "'$COLUMN'");
             foreach(@columns) {
