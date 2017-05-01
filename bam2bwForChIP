@@ -3,7 +3,7 @@
 
 ## DEPENDENCIES
 GENOME="mm9"
-EXTEND=0
+EXTEND_VALUE=0
 
 #### usage ####
 usage() {
