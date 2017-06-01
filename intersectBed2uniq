@@ -70,6 +70,7 @@ zless $BEDFILE | perl -ane '
         $gene{$key}{'coor'}=$line;
         @columns=split(/\,/, "'$COLUMN'");
         foreach(@columns) {
+            if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
             $gene{$key}{$_}+=$F[$_-1];
         }
         $gene{$key}{'count'}=1;
@@ -78,6 +79,7 @@ zless $BEDFILE | perl -ane '
         if(defined($gene{$key})) {
             @columns=split(/,/, "'$COLUMN'");
             foreach(@columns) {
+                if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
                 $gene{$key}{$_}+=$F[$_-1];
             }
             $gene{$key}{'count'}++;
@@ -88,7 +90,7 @@ zless $BEDFILE | perl -ane '
             $line="";
             foreach(@columns) {
                 if($operation=~/mean/) {
-                    $line.=sprintf("\t%0.2f", $gene{$prev_key}{$_}/$gene{$prev_key}{'count'});
+                    $line.=sprintf("\t%0.6f", $gene{$prev_key}{$_}/$gene{$prev_key}{'count'});
                 } else {
                     $line.=sprintf("\t%d", $gene{$prev_key}{$_});
                 }
@@ -101,6 +103,7 @@ zless $BEDFILE | perl -ane '
             $gene{$key}{'coor'}=$line;
             @columns=split(/,/, "'$COLUMN'");
             foreach(@columns) {
+                if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
                 $gene{$key}{$_}+=$F[$_-1];
             }
             $gene{$key}{'count'}=1;
