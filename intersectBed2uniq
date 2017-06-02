@@ -19,7 +19,7 @@ usage() {
     echo " -c <int>    [columns from the B file to map onto intervals in A (default: 10)]"
     echo "             [if multiple, please separate them by a comma]"
     echo " -o <string> [operation that should be applied to -c (default: sum)]"
-    echo "             [valid operations: sum, mean, collapse]"
+    echo "             [valid operations: sum, mean, collapse, max]"
     echo " -n <int>    [number of columns to include from primary bed (A) file (default: 6)]"
 	echo " -h          [help]"
 	echo
@@ -70,7 +70,7 @@ zless $BEDFILE | perl -ane '
         $gene{$key}{'coor'}=$line;
         @columns=split(/\,/, "'$COLUMN'");
         foreach(@columns) {
-            if($F[$_-1]=~/^[0-9\.]+$/) { 
+            if($F[$_-1]=~/^[0-9\.]+$/ && ('$OPERATION'=~/sum/ || '$OPERATION'=~/mean/)) { 
                 if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
                 $gene{$key}{$_}+=$F[$_-1];
             } else {
@@ -84,7 +84,7 @@ zless $BEDFILE | perl -ane '
         if(defined($gene{$key})) {
             @columns=split(/,/, "'$COLUMN'");
             foreach(@columns) {
-                if($F[$_-1]=~/^[0-9\.]+$/) { 
+                if($F[$_-1]=~/^[0-9\.]+$/ && ('$OPERATION'=~/sum/ || '$OPERATION'=~/mean/)) { 
                     if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
                     $gene{$key}{$_}+=$F[$_-1];
                 } else {
@@ -104,6 +104,12 @@ zless $BEDFILE | perl -ane '
                 } elsif($operation=~/collapse/) {
                     $gene{$prev_key}{$_}=~s/^\,//g;
                     $line.=sprintf("\t%s", $gene{$prev_key}{$_});
+                } elsif($operation=~/max/) {
+                    $gene{$prev_key}{$_}=~s/^\,//g;
+                    @t=split(/\,/,$gene{$prev_key}{$_});
+                    $max=0;
+                    foreach(@t) { if ($_ > $max) { $max=$_; } }
+                    $line.="\t$max";
                 } else {
                     $line.=sprintf("\t%d", $gene{$prev_key}{$_});
                 }
@@ -116,7 +122,7 @@ zless $BEDFILE | perl -ane '
             $gene{$key}{'coor'}=$line;
             @columns=split(/,/, "'$COLUMN'");
             foreach(@columns) {
-                if($F[$_-1]=~/^[0-9\.]+$/) { 
+                if($F[$_-1]=~/^[0-9\.]+$/ && ('$OPERATION'=~/sum/ || '$OPERATION'=~/mean/)) { 
                     if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
                     $gene{$key}{$_}+=$F[$_-1];
                 } else {
@@ -140,6 +146,12 @@ zless $BEDFILE | perl -ane '
             } elsif($operation=~/collapse/) {
                 $gene{$prev_key}{$_}=~s/^\,//g;
                 $line.=sprintf("\t%s", $gene{$prev_key}{$_});
+            } elsif($operation=~/max/) {
+                $gene{$prev_key}{$_}=~s/^\,//g;
+                @t=split(/\,/,$gene{$prev_key}{$_});
+                $max=0;
+                foreach(@t) { if ($_ > $max) { $max=$_; } }
+                $line.="\t$max";
             } else {
                 $line.=sprintf("\t%d", $gene{$prev_key}{$_});
             }
