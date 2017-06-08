@@ -203,6 +203,8 @@ elsif($option=~/[bB]+/) {
     if($IS_BED>0 && ! -e "$coorFile.gtf") {
         system("zless $coorFile | perl -ane 'chomp(\$F[5]); if(\$F[0]=~/\\_/) { next; } \$count++; \$F[3]=~s/^.*\\\///g; print \"\$F[0]\\tregion\\t$feature\\t\$F[1]\\t\$F[2]\\t.\\t\$F[5]\\t.\\tgene_id \\\"\$F[3]\\\"\\n\";' > $coorFile.gtf");
         $coorFile = "$coorFile.gtf"
+    } elsif($IS_BED>0) {
+        $coorFile = "$coorFile.gtf"
     }
 
     foreach my $file(@files) {
@@ -216,8 +218,10 @@ elsif($option=~/[bB]+/) {
             else {
                 if($countMultiMap==0) {
                     system("featureCounts -t $feature -a $coorFile -o $countFile.$count -T 5 --readExtension3 $extends[$count-1] $file");
+                    #print("featureCounts -t $feature -a $coorFile -o $countFile.$count -T 5 --readExtension3 $extends[$count-1] $file\n");
                 } else {
                     system("featureCounts -t $feature -a $coorFile -o $countFile.$count -T 5 --readExtension3 $extends[$count-1] -M $file");
+                    #print("featureCounts -t $feature -a $coorFile -o $countFile.$count -T 5 --readExtension3 $extends[$count-1] -M $file\n");
                 }
             }
             $file=~s/^.*\///g;
@@ -237,7 +241,7 @@ elsif($option=~/[bB]+/) {
         system("rm -f $countFile.*.summary");
         system("paste $countFile.* | perl -ane 'next if(\$_=~/^[\\#|Geneid]+/); \$line=(); \$line.=\"\$F[0]\\t\"; \$index=6; foreach(\@F) { \$line.=\"\$F[\$index]\\t\"; \$index+=7; } \$line=~s/[\\t\\r]+\$//g; print \"\$line\\n\";' >> $countFile\n");
     }
-    system("rm -i $countFile.*");
+    system("rm $countFile.*");
 }
 elsif($option=~/[cC]+/) {
 	## compute size factor for all samples

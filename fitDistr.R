@@ -4,7 +4,7 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 option_list <- list(
 	make_option(c("-i", "--inFile"), help="input file containing numeric value for fit (first column) (can be stdin)"),
-    make_option(c("-o", "--outDir"), help="output directory"),
+    make_option(c("-o", "--outFile"), help="output file"),
     make_option(c("-d", "--distribution"), default="pois", help="name of distribution to fit (pois, nbinom, gamma, weibull, nnorm, gumbel, binom, geom, hyper) (if multiple separate them by a comma) (default=%default)"),
     make_option(c("-c", "--discrete"), default=T, help="if distribution of discrete or continuous (default: %default)")
 )
@@ -13,7 +13,7 @@ parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
 opt <- parse_args(parser)
 
 ## check, if all required arguments are given
-if(is.null(opt$inFile) | is.null(opt$outDir)) {
+if(is.null(opt$inFile) | is.null(opt$outFile)) {
 	cat("\nProgram: fitDistr.R (R script to fit distributions)\n")
 	cat("Author: BRIC, University of Copenhagen, Denmark\n")
 	cat("Version: 1.0\n")
@@ -35,14 +35,14 @@ if(identical(opt$inFile, "stdin")==T) {
 }
 
 ## create output directory, if does not exist
-dir.create(file.path(opt$outDir), showWarnings = FALSE)
+#dir.create(file.path(opt$outDir), showWarnings = FALSE)
 
 ## extract input distribution names
 distr=as.vector(unlist(strsplit(opt$distr, ",")))
 
 if(nrow(data)>=10) { 
     ## analyze each model fit
-    outPdf <- sprintf("%s/plots.pdf", opt$outDir)
+    outPdf <- sprintf("%s_PLOTS.pdf", opt$outFile)
     pdf(outPdf)
     
     ## check as to which distribution is the best
@@ -58,7 +58,7 @@ if(nrow(data)>=10) {
             data$pois <- laply(as.integer(data[,1]), function(x) { ppois(x, lambda = param[1], lower.tail = F) })
 
             ## write AIC value
-            outFile <- sprintf("%s/AIC", opt$outDir)
+            outFile <- sprintf("%s_AIC", opt$outFile)
             write(sprintf("POIS: %s", model[[i]]$aic), outFile, append=T)
         }
         else if(distr[i]=="nbinom") {
@@ -67,7 +67,7 @@ if(nrow(data)>=10) {
             data$pnorm <- laply(as.integer(data[,1]), function(x) { pnbinom(x, size = param[1], mu=param[2], lower.tail = F) })
 
             ## write AIC value
-            outFile <- sprintf("%s/AIC", opt$outDir)
+            outFile <- sprintf("%s_AIC", opt$outFile)
             write(sprintf("NBINOM: %s", model[[i]]$aic), outFile, append=T)
         }
         else if(distr[i]=="geom") {
@@ -76,14 +76,14 @@ if(nrow(data)>=10) {
             data$geom <- laply(as.integer(data[,1]), function(x) { pgeom(x, param[1], lower.tail = F) })
 
             ## write AIC value
-            outFile <- sprintf("%s/AIC", opt$outDir)
+            outFile <- sprintf("%s_AIC", opt$outFile)
             write(sprintf("GEOM: %s", model[[i]]$aic), outFile, append=T)
         }
     }
 
     #gofstat(model[[i]], fitnames=distr)
     cdfcomp(model, legendtext=distr)
-    qqcomp(model, legendtext=distr)
+    #qqcomp(model, legendtext=distr)
     dev.off()
 
     ## HOW TO EVALUATE WHICH MODEL IS BETTER
@@ -94,11 +94,11 @@ if(nrow(data)>=10) {
 }
  
 ## write output file containing pvalue information
-outTable <- sprintf("%s/table", opt$outDir)
+outTable <- sprintf("%s", opt$outFile)
 write.table(data[order(-data[,1]),], outTable, sep="\t", row.names = F, col.names = F, quote = F)
 
 ## write output session file
-outSession <- sprintf("%s/session", opt$outDir)
+outSession <- sprintf("%s_SESSION", opt$outFile)
 save.session(outSession)
 q()
 
