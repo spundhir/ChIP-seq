@@ -161,7 +161,7 @@ if [ -z "$EXIST" ]; then
         echo -n "Create peak file depending on if the input is from file or STDIN... " >&2
         if [ -f "${REGIONS[$j]}" ]; then
             if [ "$GENOMIC_REGIONS" == "bed" -a "$L" -gt 0 ]; then
-                zless ${REGIONS[$j]} | perl -ane '$mid=sprintf("%0.0f", ($F[1]+$F[2])/2); $mid=$mid+'$SHIFT'; $start=$mid; $end=$mid+1; $line="$F[0]\t$start\t$end"; foreach(@F[3..3]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
+                zless ${REGIONS[$j]} | perl -ane '$mid=sprintf("%0.0f", ($F[1]+$F[2])/2); $mid=$mid+'$SHIFT'; $start=$mid; $end=$mid+1; $line="$F[0]\t$start\t$end"; foreach(@F[3..5]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
             elif [ "$GENOMIC_REGIONS" == "bed" ]; then
                 zless ${REGIONS[$j]} > $OUTDIR/REGIONS_INTEREST$j.bed
             else
@@ -169,9 +169,9 @@ if [ -z "$EXIST" ]; then
             fi
         elif [ "${REGIONS[$j]}" == "stdin" ]; then
             if [ "$GENOMIC_REGIONS" == "bed" -a "$L" -gt 0 ]; then
-                while read LINE; do echo ${LINE}; done | perl -ane '$mid=sprintf("%0.0f", ($F[1]+$F[2])/2); $mid=$mid+'$SHIFT'; $start=$mid; $end=$mid+1; $line="$F[0]\t$start\t$end"; foreach(@F[3..3]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
+                while read LINE; do echo ${LINE}; done | perl -ane '$mid=sprintf("%0.0f", ($F[1]+$F[2])/2); $mid=$mid+'$SHIFT'; $start=$mid; $end=$mid+1; $line="$F[0]\t$start\t$end"; foreach(@F[3..5]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
             elif [ "$GENOMIC_REGIONS" == "bed" ]; then
-                while read LINE; do echo ${LINE}; done | perl -ane '$line="$F[0]\t$F[1]\t$F[2]"; foreach(@F[3..3]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
+                while read LINE; do echo ${LINE}; done | perl -ane '$line="$F[0]\t$F[1]\t$F[2]"; foreach(@F[3..5]) { chomp($_); $line.="\t$_"; } print "$line\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
             else
                 while read LINE; do echo ${LINE}; done | perl -ane 'chomp($_); print "$F[0]\n";' > $OUTDIR/REGIONS_INTEREST$j.bed
             fi
