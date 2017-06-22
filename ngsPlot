@@ -2,8 +2,6 @@
 #PBS -l nodes=1:ppn=4
 
 GENOME="mm9";
-FORBIDIMG=0;
-#YLIM="0";
 YLIM="auto";
 L=1000;
 CD=0.6
@@ -14,8 +12,10 @@ GO="none"
 RR=30
 RZ=0
 KNC=5
+SS="both"
 REORDER_NGSPLOT="lsk,pregm,gmp,granulocytes"
 GENOMIC_REGIONS="bed"
+PLOTTITLE="ngsplot"
 
 #### usage ####
 usage() {
@@ -36,7 +36,7 @@ usage() {
     echo " -d <string> [filter BAM files not matching identifiers eg. wt or gmp]"
     echo "             [if multiple seperate them by a comma]"
     echo " -g <string> [genome (default: mm9)]"
-    echo " -t <string> [name of the output histone profile plot]"
+    echo " -t <string> [name of the output histone profile plot (default: ngsplot)]"
     echo " -u <string> [text identifier for input file(s)]"
     echo "             [if multiple seperate them by a comma]"
     echo " -c <string> [specify line color for average profile in hexadecimal code (enclose in double quotes)]"
@@ -49,7 +49,6 @@ usage() {
     echo "             [    If set to 1, the neutral color represents 0 (i.e. no bias)]"
     echo " -m          [merge replicates of input BAM files]"
     echo " -w          [ngsPlot description file already exists]"
-    echo " -x <int>    [forbid image output if set to 1 (default: 0)]"
     echo " -y <string> [y-axis limit (min,max)]"
     echo " -s <string> [color scale for heatmap (min,max) (default: global)]"
     echo "             [local: base on each individual heatmap]"
@@ -67,14 +66,15 @@ usage() {
     echo "             [set 1 to remove them]"
     echo " -n          [scale signal profile between 0 and 1]"
     echo " -v <string> [reorder NGSPLOT.TXT based on input keywords (default: lsk,pregm,gmp,granulocytes)]"
-    echo " -e <string> [genomic regions (bed or genebody; default: bed)]" 
+    echo " -e <string> [genomic regions (bed or genebody; default: bed)]"
+    echo " -x <string> [Strand-specific coverage calculation: both(default), same, opposite]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:o:f:d:g:t:u:c:r:p:mwx:y:s:l:z:a:b:q:k:nv:e:h ARG; do
+while getopts i:j:o:f:d:g:t:u:c:r:p:mwy:s:l:z:a:b:q:k:nv:e:x:h ARG; do
 	case "$ARG" in
 		i) REGION=$OPTARG;;
 		j) BAMDIR=$OPTARG;;
@@ -89,7 +89,6 @@ while getopts i:j:o:f:d:g:t:u:c:r:p:mwx:y:s:l:z:a:b:q:k:nv:e:h ARG; do
         p) CD=$OPTARG;;
         m) MERGE=1;;
         w) EXIST=1;;
-        x) FORBIDIMG=$OPTARG;;
         y) YLIM=$OPTARG;;
         s) SC=$OPTARG;;
         l) L=$OPTARG;;
@@ -101,6 +100,7 @@ while getopts i:j:o:f:d:g:t:u:c:r:p:mwx:y:s:l:z:a:b:q:k:nv:e:h ARG; do
         n) SCALE=1;;
         v) REORDER_NGSPLOT=$OPTARG;;
         e) GENOMIC_REGIONS=$OPTARG;;
+        x) SS=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -263,12 +263,8 @@ if [ -z "$EXIST" ]; then
 fi
 
 echo -n "plot signal profile.. "
-if [ ! -z "$PLOTTITLE" ]; then
-    FORBIDIMG=1
-    ngs.plot.r -G $GENOME -R $GENOMIC_REGIONS -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/$PLOTTITLE -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG -KNC $KNC -D refseq
-else
-    ngs.plot.r -G $GENOME -R $GENOMIC_REGIONS -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/combined -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG -KNC $KNC -D refseq
-fi
+FORBIDIMG=1
+ngs.plot.r -G $GENOME -R $GENOMIC_REGIONS -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/$PLOTTITLE -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG -KNC $KNC -D refseq -SS $SS
 echo "done"
 
 FORBIDIMG=0
@@ -286,6 +282,11 @@ if [ ! -z "$SCALE" ]; then
 fi
 echo "done"
 
+if [ -s "$OUTDIR/$PLOTTITLE.heatmap.clusterInfo" -a "${#REGIONS[@]}" -eq 1 ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    join -1 4 -2 1 <(sort -k 4,4 $OUTDIR/REGIONS_INTEREST0.bed) <(cat $OUTDIR/$PLOTTITLE.heatmap.clusterInfo | perl -ane '$F[0]=~s/\:.*//g; print "$F[0]\t$F[1]\n";' | sort -k 1,1) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\n";' > $OUTDIR/$TMP
+    mv $OUTDIR/$TMP $OUTDIR/$PLOTTITLE.heatmap.clusterInfo
+fi
 
 ## OLD CODE
 
