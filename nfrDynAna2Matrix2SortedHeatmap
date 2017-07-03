@@ -6,12 +6,13 @@ GENOME="mm9"
 PROCESSOR=1
 MIN_N_CLASS=50
 GENE_ORDER="none"
-COLOR="red2"
+COLOR="Reds"
 CD="0.6"
 SC="global"
 WIN=1000
 GENOMIC_REGIONS="bed"
 KNC=5
+SS="both"
 
 #### usage ####
 usage() {
@@ -28,8 +29,6 @@ usage() {
     echo "                     [(...) additional columns can be TPM values by which to sort coordinates using -a param]"
     echo " -k <dir>            [input directory containing BAM files for various histone marks]"
     echo "[OPTIONS]"
-    echo " -l <file>           [file containing TF coordinate. Analyze NFRs which overlap the TF coordinate (can be stdin)]"
-    echo " -v                  [exclude NFRs which overlap the TF coordinate]"
     echo " -o <dir>            [output directory to store results (default: ./matrix)"
     echo " -f <string>         [filter BAM files matching identifiers eg. wt or gmp]"
     echo "                     [if multiple, seperate them by a comma]"
@@ -37,11 +36,10 @@ usage() {
     echo "                     [if multiple seperate them by a comma]"
     echo " -g <string>         [genome (default: mm9]"
     echo " -p <int>            [number of processor to use (default: 1)]"
-    echo " -y <int>            [minimum number of elements within each nfr dynamic class to plot (default: 50)]"
     echo " -a <string>         [gene order algorithm for heatmap (default: none)]"
     echo "                     [total, hc, max, prod, diff, km, none, h3k27ac, cobinding, expr, tf_fc, tf_expr, sum"
     echo " -q <int>            [K-means or HC number of clusters (default=5)]"
-    echo " -c <string>         [color for heatmap (like red2, blue2, darkgreen yellow (default: red2)]"
+    echo " -c <string>         [color for heatmap (default: Reds)]"
     echo " -t <float>          [color distribution for heatmap (positive number (default: 0.6)]"
     echo "                     [    Hint: lower values give more widely spaced colors at the negative end]"
     echo "                     [    In other words, they shift the neutral color to positive values]"
@@ -52,39 +50,47 @@ usage() {
     echo "                     [global: base on all heatmaps together]"
     echo "                     [min_val,max_val: custom scale using a pair of numerics]"
     echo " -w <int>            [flanking region size (default: 1000)]"
-    echo " -x                  [ignore class, meaning do not make separate plot for each class]"
     echo " -z <float>          [size factors to normalize the TPM read counts (RLE normalization)]"
     echo "                     [if multiple, separate them by a comma]"
     echo " -e <string>         [genomic regions (bed or genebody; default: bed)]"
     echo " -n                  [DO NOT merge replicates of input BAM files]"
+    echo " -r <string>         [strand-specific coverage calculation: both (default), same, opposite]"
+    echo "[CLASSES]"
+    echo " -y <int>            [minimum number of elements within each nfr dynamic class to plot (default: 50)]"
+    echo " -x                  [ignore class, meaning do not make separate plot for each class]"
+    echo " -u <int>            [define classes by splitting input file into input number of subsets]"
+    echo " -l <file>           [file containing TF coordinate. Analyze NFRs which overlap the TF coordinate (can be stdin)]"
+    echo " -v                  [exclude NFRs which overlap the TF coordinate]"
 	echo " -h                  [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:k:l:vo:f:d:g:p:y:a:q:c:t:s:w:xz:e:nh ARG; do
+while getopts i:k:o:f:d:g:p:y:a:q:c:t:s:w:z:e:nr:y:xu:l:vh ARG; do
 	case "$ARG" in
 		i) NFR=$OPTARG;;
         k) CHIPDIR=$OPTARG;;
-		l) TFSUMMIT=$OPTARG;;
-        v) TFSUMMIT_EXCL=1;;
         o) OUTDIR=$OPTARG;;
         f) CHIP_INCL_FILTER=$OPTARG;;
         d) CHIP_EXCL_FILTER=$OPTARG;;
         g) GENOME=$OPTARG;;
         p) PROCESSOR=$OPTARG;;
-        y) MIN_N_CLASS=$OPTARG;;
         a) GENE_ORDER=$OPTARG;;
         q) KNC=$OPTARG;;
         c) COLOR=$OPTARG;;
         t) CD=$OPTARG;;
         s) SC=$OPTARG;;
         w) WIN=$OPTARG;;
-        x) IGNORE_CLASS=1;;
         z) SIZE_FACTORS=$OPTARG;;
         e) GENOMIC_REGIONS=$OPTARG;;
         n) NOMERGE=1;;
+        r) SS=$OPTARG;;
+        y) MIN_N_CLASS=$OPTARG;;
+        x) IGNORE_CLASS=1;;
+        u) SPLIT=$OPTARG;;
+		l) TFSUMMIT=$OPTARG;;
+        v) TFSUMMIT_EXCL=1;;
 		h) HELP=1;;
 	esac
 done
@@ -175,6 +181,16 @@ else
     scp $NFR $OUTDIR/NFR_DYNAMICS.TXT
 fi
 
+if [ ! -z "$SPLIT" ]; then
+    echo -n "Define classes by splitting input files into $SPLIT subsets (`date`).. "
+    LINES=$(cat $OUTDIR/NFR_DYNAMICS.TXT | wc -l | perl -ane 'printf("%0.0f", $_/'$SPLIT');')
+    SPLIT_TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    cat $OUTDIR/NFR_DYNAMICS.TXT | split -l $LINES --additional-suffix $SPLIT_TMP
+    for i in $(ls *$SPLIT_TMP); do cat $i | perl -ane '$id='$i'; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$id\t$F[5]\n";'; done > $OUTDIR/NFR_DYNAMICS.TXT
+    rm *$SPLIT_TMP
+    echo "done"
+fi
+
 echo -n "Create files for each NFR dynamic class sorted by h3k27ac signal (`date`).. "
 PLOT_TITLES=""
 REGIONS_INTEREST_COUNTS=""
@@ -252,21 +268,21 @@ HEATMAP_FILES=$(echo $HEATMAP_FILES | sed -E 's/^\,//g')
 ## plot nfr dynamics as heatmap
 if [ -z "$NOMERGE" ]; then
     #echo "nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -c $COLOR -d $CD";
-    if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
+    #if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
         if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS
         elif [ ! -z "$CHIP_INCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS
         elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS
         else
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS
         fi
-    fi
+    #fi
 
     echo -n "replot heatmap with specified color: $COLOR.. "
     if [ ! -z "$SIZE_FACTORS" ]; then
-        nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -q $KNC -c $COLOR -d $CD -s $SIZE_FACTORS -b $SC 
+        nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -q $KNC -c $COLOR -d $CD -s $SIZE_FACTORS -b $SC
     else
         nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -q $KNC -c $COLOR -d $CD -b $SC
     fi
@@ -276,18 +292,19 @@ if [ -z "$NOMERGE" ]; then
     nfrDynAna.R -i $OUTDIR/heatmap -j avgprof -o $OUTDIR/heatmap.avgprof.pdf
     echo "done"
 else
-    if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
+    #if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
         if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS
         elif [ ! -z "$CHIP_INCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS
         elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS
         else
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS
         fi
-    fi
+    #fi
 fi
+
 ## remove temporary file
 if [ ! -z "$TMP" ]; then
     rm $OUTDIR/$TMP
