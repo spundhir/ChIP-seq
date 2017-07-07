@@ -27,6 +27,7 @@ usage() {
 	echo "Options:"
 	echo " -i <file>   [input file(s) having regions of interest in BED format or gene id's, one per line ]"
     echo "             [if multiple seperate them by a comma]"
+    echo "             [FORMAT: chr start end name score strand]"
 	echo " -j <dir>    [input directory containing BAM files for various histone marks]"
     echo "             [if multiple seperate them by a comma]"
     echo " -o <dir>    [output directory to store results]"

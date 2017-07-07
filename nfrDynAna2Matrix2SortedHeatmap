@@ -183,7 +183,7 @@ fi
 
 if [ ! -z "$SPLIT" ]; then
     echo -n "Define classes by splitting input files into $SPLIT subsets (`date`).. "
-    LINES=$(cat $OUTDIR/NFR_DYNAMICS.TXT | wc -l | perl -ane 'printf("%0.0f", $_/'$SPLIT');')
+    LINES=$(cat $OUTDIR/NFR_DYNAMICS.TXT | wc -l | perl -ane 'use POSIX; printf("%0.0f", ceil($_/'$SPLIT'));')
     SPLIT_TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     cat $OUTDIR/NFR_DYNAMICS.TXT | split -l $LINES --additional-suffix $SPLIT_TMP
     for i in $(ls *$SPLIT_TMP); do cat $i | perl -ane '$id='$i'; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$id\t$F[5]\n";'; done > $OUTDIR/NFR_DYNAMICS.TXT
