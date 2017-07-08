@@ -247,6 +247,7 @@ if [ -z "$EXIST" ]; then
         COLORS=($(getRColor.R -i $(cat $OUTDIR/NGSPLOT.txt.tmp | wc -l) -p));
         IFS=$oIFS
     else
+        COLOR=$(echo $COLOR | perl -ane '$_=~s/\"//g; print $_;')
         IFS=","
         COLORS=($COLOR);
         IFS=$oIFS

@@ -39,6 +39,8 @@ usage() {
     echo " -a <string>         [gene order algorithm for heatmap (default: none)]"
     echo "                     [total, hc, max, prod, diff, km, none, h3k27ac, cobinding, expr, tf_fc, tf_expr, sum"
     echo " -q <int>            [K-means or HC number of clusters (default=5)]"
+    echo " -b <string>         [specify line color for average profile in hexadecimal code (enclose in double quotes)]"
+    echo "                     [if multiple seperate them by a comma]"
     echo " -c <string>         [color for heatmap (default: Reds)]"
     echo " -t <float>          [color distribution for heatmap (positive number (default: 0.6)]"
     echo "                     [    Hint: lower values give more widely spaced colors at the negative end]"
@@ -67,7 +69,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:k:o:f:d:g:p:y:a:q:c:t:s:w:z:e:nr:y:xu:l:vh ARG; do
+while getopts i:k:o:f:d:g:p:y:a:q:b:c:t:s:w:z:e:nr:y:xu:l:vh ARG; do
 	case "$ARG" in
 		i) NFR=$OPTARG;;
         k) CHIPDIR=$OPTARG;;
@@ -78,6 +80,7 @@ while getopts i:k:o:f:d:g:p:y:a:q:c:t:s:w:z:e:nr:y:xu:l:vh ARG; do
         p) PROCESSOR=$OPTARG;;
         a) GENE_ORDER=$OPTARG;;
         q) KNC=$OPTARG;;
+        b) LINE_COLOR=$OPTARG;;
         c) COLOR=$OPTARG;;
         t) CD=$OPTARG;;
         s) SC=$OPTARG;;
@@ -292,20 +295,29 @@ if [ -z "$NOMERGE" ]; then
     nfrDynAna.R -i $OUTDIR/heatmap -j avgprof -o $OUTDIR/heatmap.avgprof.pdf
     echo "done"
 else
+    ## define color codes (http://colorbrewer2.org)
+    if [ -z "$LINE_COLOR" ]; then
+        LINE_COLOR=$(echo $(getRColor.R -i $(cat $OUTDIR/NFR_DYNAMICS.TXT | cut -f $CLASS_COL | sort | uniq | wc -l) -c Set1) | perl -ane 'print "\"$F[0]"; foreach(@F[1..scalar(@F)-1]) { print ",$_"; } print "\"";')
+    fi
+
     #if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
         if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -c $LINE_COLOR
         elif [ ! -z "$CHIP_INCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -c $LINE_COLOR
         elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -c $LINE_COLOR
         else
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -c $LINE_COLOR
         fi
     #fi
 fi
 
-## remove temporary file
+## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
     rm $OUTDIR/$TMP
+fi
+
+if [ ! -z "$SPLIT" ]; then
+    rm $OUTDIR/x*.bed
 fi
