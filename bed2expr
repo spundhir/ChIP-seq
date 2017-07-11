@@ -25,6 +25,7 @@ usage() {
     echo " -v <int>    [instead of giving expression for each replicate, output only the mean (deafult: 0)]"
     echo "             [assumes that consecutive input files are replicates 1 and 2, respectively]"
     echo " -r          [require same strandedness]"
+    echo " -n          [add 1 to all the raw expression counts - useful while taking log]"
     echo " -g <string> [genome (default: mm9)]"
 	echo " -h          [help]"
     echo "[NOTE]"
@@ -36,7 +37,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:s:mkde:g:v:rh ARG; do
+while getopts i:j:s:mkde:v:rng:h ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         j) INPUTBAMFILES=$OPTARG;;
@@ -45,9 +46,10 @@ while getopts i:j:s:mkde:g:v:rh ARG; do
         k) FPKM=1;;
         d) REMOVE_DUPLICATE=1;;
         e) INPUTEXTENDS=$OPTARG;;
-        g) GENOME=$OPTARG;;
         v) AVG=$OPTARG;;
         r) SAME_STRAND=1;;
+        n) ADDONE=1;;
+        g) GENOME=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -106,6 +108,11 @@ IFS=","
 INPUTBAMFILES=$(echo $INPUTBAMFILES | sed 's/\,/ /g')
 IFS=$oIFS
 
+## initialize ADDONE based on -n parameter
+if [ -z "$ADDONE" ]; then
+    ADDONE=0
+fi
+
 ## create temporary BED file if input is from stdin
 if [ "$INPUTBEDFILE" == "stdin" ]; then
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
@@ -146,7 +153,7 @@ if [ ! -z "$INPUTSIZEFACTORS" ]; then
         else
             bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10
         fi
-    fi | perl -ane '@sizeFactors=split(/\,/, "'$INPUTSIZEFACTORS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", $_/$sizeFactors[$i]); $i++; } print "\n";'
+    fi | perl -ane '@sizeFactors=split(/\,/, "'$INPUTSIZEFACTORS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", ($_+'$ADDONE')/$sizeFactors[$i]); $i++; } print "\n";'
 elif [ ! -z "$FPKM" ]; then
     MAPPEDREADS=""
     for(( i=0; i<$BAMFILES_COUNT; i++ )); do
@@ -174,7 +181,8 @@ elif [ ! -z "$FPKM" ]; then
         else
             bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10
         fi
-    fi | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); $length=(($F[2]-$F[1])+1)/1000; foreach(@F[$field_count..scalar(@F)-1]) { $line.=sprintf("%0.5f\t", ($_*1000000)/($mappedReads[$i]*$length)); $i++; } $line=~s/\t$//g; print "$line\n";'
+    fi | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); $length=(($F[2]-$F[1])+1)/1000; foreach(@F[$field_count..scalar(@F)-1]) { $line.=sprintf("%0.5f\t", (($_+'$ADDONE')*1000000)/($mappedReads[$i]*$length)); $i++; } $line=~s/\t$//g; print "$line\n";'
+    #| perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); $length=(($F[2]-$F[1])+1)/1000; foreach(@F[$field_count..scalar(@F)-1]) { $line.=sprintf("%0.5f\t", exp(log($_+1) + log(1000000) - log($length) - log($mappedReads[$i]))); $i++; } $line=~s/\t$//g; print "$line\n";'
 else
     MAPPEDREADS=""
     for(( i=0; i<$BAMFILES_COUNT; i++ )); do
@@ -202,7 +210,7 @@ else
         else
             bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10
         fi
-    fi | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.=sprintf("%0.5f\t", ($_*1000000)/$mappedReads[$i]); $i++; } $line=~s/\t$//g; print "$line\n";'
+    fi | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.=sprintf("%0.5f\t", (($_+'$ADDONE')*1000000)/$mappedReads[$i]); $i++; } $line=~s/\t$//g; print "$line\n";'
 fi | perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); for($i=$field_count; $i<scalar(@F); $i+=2) { if(!defined($F[$i+1])) { $F[$i+1]=$F[$i]; } $line.=sprintf("%0.5f\t", ($F[$i]+$F[$i+1])/2); } $line=~s/\t$//g; $line=~s/\s+$//g;print "$line\n"; } else { $_=~s/\s+$//g; print "$_\n"; }'
 
 if [ ! -z "$TMP" ]; then
