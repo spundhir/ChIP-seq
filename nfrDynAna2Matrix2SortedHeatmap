@@ -41,7 +41,7 @@ usage() {
     echo " -q <int>            [K-means or HC number of clusters (default=5)]"
     echo " -b <string>         [specify line color for average profile in hexadecimal code (enclose in double quotes)]"
     echo "                     [if multiple seperate them by a comma]"
-    echo " -c <string>         [color for heatmap (default: Reds)]"
+    echo " -c <string>         [color for heatmap (default: Reds); suffix -R to reverse the order of color palette, eg. RdBu-R]"
     echo " -t <float>          [color distribution for heatmap (positive number (default: 0.6)]"
     echo "                     [    Hint: lower values give more widely spaced colors at the negative end]"
     echo "                     [    In other words, they shift the neutral color to positive values]"

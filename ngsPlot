@@ -42,7 +42,7 @@ usage() {
     echo "             [if multiple seperate them by a comma]"
     echo " -c <string> [specify line color for average profile in hexadecimal code (enclose in double quotes)]"
     echo "             [if multiple seperate them by a comma]"
-    echo " -r <string> [specify color for heatmap (default: Reds)]"
+    echo " -r <string> [specify color for heatmap (default: Reds); suffix -R to reverse the order of color palette, eg. RdBu-R]"
     echo "             [for bam-pair, use color-pair(neg_color:pos_color)]"
     echo " -p <float>  [color distribution for heatmap (positive number; default: 0.6)]"
     echo "             [    Hint: lower values give more widely spaced colors at the negative end]"

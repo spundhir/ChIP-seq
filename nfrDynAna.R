@@ -531,12 +531,16 @@ plotheat <- function(reg.list, uniq.reg, enrichList, v.low.cutoff, go.algo,
             } else if(hm.color=="red_dark") {
                 enrich.palette <- colorRampPalette(c('midnightblue', 'red3', "red4"), bias=color.distr, interpolate='spline')
             } else {
-                enrich.palette <- colorRampPalette(brewer.pal(9, hm.color), bias=color.distr, interpolate='spline')
-                #enrich.palette <- colorRampPalette(c('snow', hm.color))
-                #enrich.palette <- colorRampPalette(c('snow', 'hm.color', hm.color), bias=color.distr, interpolate='spline')
-                #enrich.palette <- colorRampPalette(c('snow', 'snow', hm.color), bias=color.distr, interpolate='spline')
-                #enrich.palette <- colorRampPalette(c('#f7fbff', '#c6dbef', '#6baed6', '#2171b5', hm.color), bias=color.distr, interpolate='spline')
-                #enrich.palette <- colorRampPalette(c('snow', '#fb6a4a', hm.color), bias=color.distr, interpolate='spline')
+                if(grepl("-R", hm.color)) {
+                    enrich.palette <- colorRampPalette(rev(brewer.pal(9, unlist(strsplit(hm.color, "-"))[1])), bias=color.distr, interpolate='spline')
+                } else {
+                    enrich.palette <- colorRampPalette(brewer.pal(9, hm.color), bias=color.distr, interpolate='spline')
+                    #enrich.palette <- colorRampPalette(c('snow', hm.color))
+                    #enrich.palette <- colorRampPalette(c('snow', 'hm.color', hm.color), bias=color.distr, interpolate='spline')
+                    #enrich.palette <- colorRampPalette(c('snow', 'snow', hm.color), bias=color.distr, interpolate='spline')
+                    #enrich.palette <- colorRampPalette(c('#f7fbff', '#c6dbef', '#6baed6', '#2171b5', hm.color), bias=color.distr, interpolate='spline')
+                    #enrich.palette <- colorRampPalette(c('snow', '#fb6a4a', hm.color), bias=color.distr, interpolate='spline')
+                }
             }
         } else {
             enrich.palette <- colorRampPalette(brewer.pal(9, "Reds"), bias=color.distr, interpolate='spline')
