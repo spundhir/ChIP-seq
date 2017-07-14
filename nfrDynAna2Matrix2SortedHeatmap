@@ -271,7 +271,7 @@ HEATMAP_FILES=$(echo $HEATMAP_FILES | sed -E 's/^\,//g')
 ## plot nfr dynamics as heatmap
 if [ -z "$NOMERGE" ]; then
     #echo "nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -c $COLOR -d $CD";
-    #if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
+    if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
         if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
             ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS
         elif [ ! -z "$CHIP_INCL_FILTER" ]; then
@@ -281,7 +281,7 @@ if [ -z "$NOMERGE" ]; then
         else
             ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS
         fi
-    #fi
+    fi
 
     echo -n "replot heatmap with specified color: $COLOR.. "
     if [ ! -z "$SIZE_FACTORS" ]; then

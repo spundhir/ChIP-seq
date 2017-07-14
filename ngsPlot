@@ -266,7 +266,9 @@ fi
 
 echo -n "plot signal profile.. "
 FORBIDIMG=1
-ngs.plot.r -G $GENOME -R $GENOMIC_REGIONS -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/$PLOTTITLE -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG -KNC $KNC -D refseq -SS $SS
+#if [ ! -f "$OUTDIR/$PLOTTITLE.zip" ]; then
+    ngs.plot.r -G $GENOME -R $GENOMIC_REGIONS -C $OUTDIR/NGSPLOT.txt -O $OUTDIR/$PLOTTITLE -T "$REGIONTITLE" -RZ $RZ -MW 13 -Al spline -FL 150 -GO $GO -RR $RR -SC $SC -L $L -YAS $YLIM -SE 1 -FI $FORBIDIMG -KNC $KNC -D refseq -SS $SS
+#fi
 echo "done"
 
 FORBIDIMG=0
