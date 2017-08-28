@@ -18,6 +18,7 @@ usage() {
     echo "             [output from nfrDynAna or multiIntersectBed.sh script]"
     echo "             [chr start end stages_count stages (..)]"
     echo " -j <file>   [configuration file]"
+    echo "             [<id> <bam file> (id can be: nfrdip, tpm, expr, cobound, tss)]"
     echo " -o <dir>    [output directory]"
     echo "[OPTIONS]"
     echo " -r <int>    [number of replicates. used to compute mean (default: 2)]"
@@ -53,7 +54,7 @@ while getopts i:o:j:r:n:g:ax:ch ARG; do
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ -z "$BED_FILE" -o ! -f "$CONFIG_FILE" -o ! -d "$OUTDIR" -o "$HELP" ]; then
+if [ -z "$BED_FILE" -o ! -f "$CONFIG_FILE" -o "$HELP" ]; then
 	usage
 fi
 
@@ -68,6 +69,11 @@ else
     echo "Presently the program only support analysis for mm9, hg19 or rn5"
     echo
     usage
+fi
+
+## create output directory, if do not exist
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
 fi
 
 ## create temporary BED file if input is from stdin
