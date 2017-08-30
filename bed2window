@@ -83,7 +83,7 @@ elif [ ! -z "$TSS_GENE" ]; then
     else
         usage
     fi
-elif [ ! -z "GENE" ]; then
+elif [ ! -z "$GENE" ]; then
     if [ -f "$INPUTBEDFILE" ]; then
         zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[5]=~/^\-$/) { $start=$F[1]; $end=$F[2]-'$WIN'; } else { $end=$F[2]; $start=$F[1]+'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' 
     elif [ "$INPUTBEDFILE" == "stdin" ]; then 
