@@ -14,7 +14,7 @@ usage() {
 	echo "Options:"
 	echo " -i <file>   [input file containing genomic coordinate in BED format (can be stdin)]"
     echo " -j <file>   [input mapped reads in BAM format]"
-    echo "             [if multiple seperate by a comma]"
+    echo "             [if multiple, separate them by a comma]"
     echo "[OPTIONS]"
     echo " -s <float>  [normalize expression by input size factor]"
     echo "             [if multiple, seperate them by a comma]"

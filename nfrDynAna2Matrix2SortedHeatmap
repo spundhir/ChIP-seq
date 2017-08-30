@@ -227,7 +227,7 @@ if [ ! -z "$IGNORE_CLASS" ]; then
         cat $OUTDIR/NFR_DYNAMICS.TXT | cut -f 1-9 > $OUTDIR/$PLOT_TITLES.bed
     fi
 else
-    for CLASS in $(cat $OUTDIR/NFR_DYNAMICS.TXT | cut -f $CLASS_COL | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>'$MIN_N_CLASS') { print "$F[1]\n"; }'); do
+    for CLASS in $(cat $OUTDIR/NFR_DYNAMICS.TXT | cut -f $CLASS_COL | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
         PLOT_TITLE=$(echo $CLASS | sed 's/\,/_/g')
         REGIONS_INTEREST_COUNT=$(perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | wc -l)
 

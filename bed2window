@@ -18,6 +18,7 @@ usage() {
     echo " -x          [instead of mid point flank it to the TSS, both up- and down-stream]"
     echo " -t          [instead of mid point flank it to the TSS, only up-stream]"
     echo " -u          [instead of mid point flank it to the TSS, however keep the whole gene region intact]"
+    echo " -v          [keep the whole gene region minus the input window flanking to the TSS]"
     echo " -l          [instead of mid point flank it to the left coordinate boundary]"
     echo " -r          [instead of mid point flank it to the right coordinate boundary]"
     echo " -s          [do not sort output BED file]"
@@ -29,13 +30,14 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:w:xtulrsmh ARG; do
+while getopts i:w:xtuvlrsmh ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         w) WIN=$OPTARG;;
         x) TSS_BOTH=1;;
         t) TSS=1;;
         u) TSS_GENE=1;;
+        v) GENE=1;;
         l) LEFT=1;;
         r) RIGHT=1;;
         s) NOSORT=1;;
@@ -78,6 +80,14 @@ elif [ ! -z "$TSS_GENE" ]; then
         zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[5]=~/^\-$/) { $start=$F[1]; $end=$F[2]+'$WIN'; } else { $end=$F[2]; $start=$F[1]-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' 
     elif [ "$INPUTBEDFILE" == "stdin" ]; then 
         while read LINE; do echo "${LINE}"; done | grep -v "^\#" | perl -ane 'if($F[5]=~/^\-$/) { $start=$F[1]; $end=$F[2]+'$WIN'; } else { $end=$F[2]; $start=$F[1]-'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
+    else
+        usage
+    fi
+elif [ ! -z "GENE" ]; then
+    if [ -f "$INPUTBEDFILE" ]; then
+        zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[5]=~/^\-$/) { $start=$F[1]; $end=$F[2]-'$WIN'; } else { $end=$F[2]; $start=$F[1]+'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' 
+    elif [ "$INPUTBEDFILE" == "stdin" ]; then 
+        while read LINE; do echo "${LINE}"; done | grep -v "^\#" | perl -ane 'if($F[5]=~/^\-$/) { $start=$F[1]; $end=$F[2]-'$WIN'; } else { $end=$F[2]; $start=$F[1]+'$WIN'; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
     else
         usage
     fi

@@ -13,6 +13,7 @@ PVALUE="1e-15" ## recommended 1e-15 (Andersson et al. 2014)
 MIN_P_T=3 ## recommended 3 (Andersson et al. 2014)
 B=100 ## recommended 30 (Andersson et al. 2014)
 S=100 ## recommended 100 (Andersson et al. 2014)
+MIN_N_CLASS=1
 
 #### usage ####
 usage() {
@@ -41,13 +42,14 @@ echo Program: "multiClassMotifAna (perform motif analysis on genomic regions fro
     echo " -z <float>  [remove motifs with background percentage greater than # (default: 100)]"
     echo " -n <int>    [number of motifs to optimize for each motif length (default: 100)]"
     echo " -b <file>   [custom background file]"
+    echo " -x <int>    [minimum number of elements within each region class to plot (default: 1)]" 
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:s:g:r:c:t:u:v:w:p:y:z:n:b:h ARG; do
+while getopts i:o:s:g:r:c:t:u:v:w:p:y:z:n:b:x:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -64,6 +66,7 @@ while getopts i:o:s:g:r:c:t:u:v:w:p:y:z:n:b:h ARG; do
         z) B=$OPTARG;;
         n) S=$OPTARG;;
         b) BKG_FILE=$OPTARG;;
+        x) MIN_N_CLASS=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -121,7 +124,7 @@ fi
 
 echo "Initiate motif analysis (`date`).. "
 MOTIFDIR_ALL=""
-for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$/) { print "$F[5]\n"; }' | sort | uniq); do
+for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$/) { print "$F[5]\n"; }' | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
     ID=$(echo $CLASS | perl -ane 'if($_=~/^\.$/) { print "other"; } else { $_=~s/\,/\_/; print $_; }')
     cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[5]=~/^'$CLASS'$/) { print $_; }' > $OUTDIR/enhancer_$ID.bed
 
