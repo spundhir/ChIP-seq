@@ -125,7 +125,7 @@ fi
 echo "Initiate motif analysis (`date`).. "
 MOTIFDIR_ALL=""
 for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$/) { print "$F[5]\n"; }' | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
-    ID=$(echo $CLASS | perl -ane 'if($_=~/^\.$/) { print "other"; } else { $_=~s/\,/\_/; print $_; }')
+    ID=$(echo $CLASS | perl -ane 'if($_=~/^\.$/) { print "other"; } else { $_=~s/\,/\_/g; print $_; }')
     cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[5]=~/^'$CLASS'$/) { print $_; }' > $OUTDIR/enhancer_$ID.bed
 
     MOTIFDIR="$OUTDIR/$ID"

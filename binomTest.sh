@@ -57,14 +57,14 @@ if [ ! -z "$FILTER_INT" ]; then
     mv $FEATURES_INT.tmp $FEATURES_INT
 fi
 
-echo -e "#file\tfeatures\ttotal\toverlap\tmean\tstddev\tp-value\tpercentage\texpr_overlap\texp_per"
+echo -e "#file\tfeatures\ttotal\toverlap\tmean\tstddev\tp-value\tpercentage\texp_overlap\texp_per"
 #echo "$FEATURES_REF\t$FEATURES_INT\t$FILTER_REF";
 
 if [ -z "$FILTER_REF" ]; then
     N=`zless $FEATURES_INT | wc -l | cut -f 1 -d " "`;
-    Pr=`zless $FEATURES_REF | perl -ane '$cov+=($F[2]-$F[1])+1; END { printf("%0.3f", $cov/3000000000); }'`;
-    mean=`echo $Pr | perl -ane '$mean='$N'*$_; printf("%0.3f", $mean);'`;
-    stdev=`echo $Pr | perl -ane '$stdev=sqrt('$N'*$_*(1-$_)); printf("%0.3f", $stdev);'`;
+    Pr=`zless $FEATURES_REF | perl -ane '$cov+=($F[2]-$F[1])+1; END { printf("%0.6f", $cov/3000000000); }'`;
+    mean=`echo $Pr | perl -ane '$mean='$N'*$_; printf("%0.6f", $mean);'`;
+    stdev=`echo $Pr | perl -ane '$stdev=sqrt('$N'*$_*(1-$_)); printf("%0.6f", $stdev);'`;
 
     overlap=`intersectBed -a $FEATURES_INT -b $FEATURES_REF -u | wc -l`;
     pvalue=`Rscript /home/pundhir/software/myScripts/PredictNFR_v0.01/pnorm.R $overlap $mean $stdev | cut -f 2 -d " "`;
@@ -88,9 +88,9 @@ else
         entity=${FEATURES[$i]};
         ENTITY_COL=$(intersectBed -a $FEATURES_INT -b $FEATURES_REF -wo | grep -w $entity | head -n 1 | perl -ane 'BEGIN { $col=1; } foreach(@F) { if($_=~/^'$entity'$/) { print $col; last; } $col++; }')
         N=`zless $FEATURES_INT | wc -l | cut -f 1 -d " "`;
-        Pr=`zgrep -w $entity $FEATURES_REF | perl -ane '$cov+=($F[2]-$F[1])+1; END { printf("%0.3f", $cov/3000000000); }'`;
-        mean=`echo $Pr | perl -ane '$mean='$N'*$_; printf("%0.3f", $mean);'`;
-        stdev=`echo $Pr | perl -ane '$stdev=sqrt('$N'*$_*(1-$_)); printf("%0.3f", $stdev);'`;
+        Pr=`zgrep -w $entity $FEATURES_REF | perl -ane '$cov+=($F[2]-$F[1])+1; END { printf("%0.6f", $cov/3000000000); }'`;
+        mean=`echo $Pr | perl -ane '$mean='$N'*$_; printf("%0.6f", $mean);'`;
+        stdev=`echo $Pr | perl -ane '$stdev=sqrt('$N'*$_*(1-$_)); printf("%0.6f", $stdev);'`;
 
         if [ ! -z "$ENTITY_COL" ]; then
             #echo "intersectBed -a $FEATURES_INT -b $FEATURES_REF -wao | sort -k 1,1 -k 2n,2 -k 3n,3 -k $FIELD | perl -ane '\$key=\"\$F[0]_\$F[1]_\$F[2]\"; if(!defined(\$seen{\$key})) { print \$_; \$seen{\$key}=1;}' | cut -f $ENTITY_COL | sort | uniq -c | sed -E 's/^\s+//g' | grep -w $entity | cut -f 1 -d \" \""; exit;
@@ -101,7 +101,7 @@ else
        else 
             overlap=0
         fi
-        #echo -e "Entity: $entity; N: $N; Pr: $Pr; Mean: $mean; Stdev: $stdev; Overlap: $overlap; Expected value: $exp_overlap"; exit;
+        #echo -e "Entity: $entity; N: $N; Pr: $Pr; Mean: $mean; Stdev: $stdev; Overlap: $overlap; Expected overlap: $exp_overlap"; exit;
 
         pvalue=`Rscript /home/pundhir/software/myScripts/PredictNFR_v0.01/pnorm.R $overlap $mean $stdev | cut -f 2 -d " "`;
         per=`perl -e '$per=('$overlap'*100)/'$N'; printf("%0.2f", $per);'`;
@@ -116,9 +116,9 @@ else
 
     ## performing enrichment analysis for features that do not overlap with reference
     N=`zless $FEATURES_INT | wc -l | cut -f 1 -d " "`;
-    Pr=`zless $FEATURES_REF | perl -ane '$cov+=($F[2]-$F[1])+1; END { printf("%0.3f", (3000000000-$cov)/3000000000); }'`;
-    mean=`echo $Pr | perl -ane '$mean='$N'*$_; printf("%0.3f", $mean);'`;
-    stdev=`echo $Pr | perl -ane '$stdev=sqrt('$N'*$_*(1-$_)); printf("%0.3f", $stdev);'`;
+    Pr=`zless $FEATURES_REF | perl -ane '$cov+=($F[2]-$F[1])+1; END { printf("%0.6f", (3000000000-$cov)/3000000000); }'`;
+    mean=`echo $Pr | perl -ane '$mean='$N'*$_; printf("%0.6f", $mean);'`;
+    stdev=`echo $Pr | perl -ane '$stdev=sqrt('$N'*$_*(1-$_)); printf("%0.6f", $stdev);'`;
     overlap=`intersectBed -a $FEATURES_INT -b $FEATURES_REF -v | wc -l`;
     pvalue=`Rscript /home/pundhir/software/myScripts/PredictNFR_v0.01/pnorm.R $overlap $mean $stdev | cut -f 2 -d " "`;
     per=`perl -e '$per=('$overlap'*100)/'$N'; printf("%0.2f", $per);'`;
