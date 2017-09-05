@@ -20,19 +20,23 @@ usage() {
     echo "             [if multiple, please separate them by a comma]"
     echo " -o <string> [operation that should be applied to -c (default: sum)]"
     echo "             [valid operations: sum, mean, collapse, max]"
+    echo "             [if multiple, please separate them by a comma]"
     echo " -n <int>    [number of columns to include from primary bed (A) file (default: 6)]"
+    echo " -v          [output most overlapping region from file B instead]"
+    echo "             [-v option is exclusive to -c, -o and -n options]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:c:o:n:h ARG; do
+while getopts i:c:o:n:vh ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         c) COLUMN=$OPTARG;;
         o) OPERATION=$OPTARG;;
         n) COLUMN_PRIMARY=$OPTARG;;
+        v) MOST_OVERLAPPING=1;;
 		h) HELP=1;;
 	esac
 done
@@ -60,51 +64,105 @@ if [ "$BEDFILE" == "stdin" ]; then
     BEDFILE=$TMP
 fi
 
-COLUMN_PRIMARY=$(echo $COLUMN_PRIMARY | perl -ane '$_=$_-1; print $_;')
+if [ -z "$MOST_OVERLAPPING" ]; then
+    COLUMN_PRIMARY=$(echo $COLUMN_PRIMARY | perl -ane '$_=$_-1; print $_;')
 
-zless $BEDFILE | perl -ane '
-    $key="$F[0]_$F[1]_$F[2]_$F[3]";
-    if($i==0) {
-        $line="$F[0]";
-        foreach(@F[1..'$COLUMN_PRIMARY']) { $line.="\t$_"; }
-        $gene{$key}{'coor'}=$line;
-        @columns=split(/\,/, "'$COLUMN'");
-        foreach(@columns) {
-            if($F[$_-1]=~/^[0-9\.]+$/ && ('$OPERATION'=~/sum/ || '$OPERATION'=~/mean/)) { 
-                if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
-                $gene{$key}{$_}+=$F[$_-1];
-            } else {
-                if(!defined($gene{$key}{$_})) { $gene{$key}{$_}=""; }
-                $gene{$key}{$_}="$gene{$key}{$_},$F[$_-1]";
-            }
-        }
-        $gene{$key}{'count'}=1;
-        $prev_key=$key;
-    } else {
-        if(defined($gene{$key})) {
-            @columns=split(/,/, "'$COLUMN'");
+    zless $BEDFILE | perl -ane '
+        $key="$F[0]_$F[1]_$F[2]_$F[3]";
+        if($i==0) {
+            $line="$F[0]";
+            foreach(@F[1..'$COLUMN_PRIMARY']) { $line.="\t$_"; }
+            $gene{$key}{'coor'}=$line;
+            @columns=split(/\,/, "'$COLUMN'");
+            @operations=split(/\,/, "'$OPERATION'");
+            $j=0;
             foreach(@columns) {
-                if($F[$_-1]=~/^[0-9\.]+$/ && ('$OPERATION'=~/sum/ || '$OPERATION'=~/mean/)) { 
+                if($F[$_-1]=~/^[0-9\.]+$/ && ($operations[$j]=~/sum/ || $operations[$j]=~/mean/)) { 
                     if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
                     $gene{$key}{$_}+=$F[$_-1];
                 } else {
                     if(!defined($gene{$key}{$_})) { $gene{$key}{$_}=""; }
                     $gene{$key}{$_}="$gene{$key}{$_},$F[$_-1]";
                 }
+                $j++;
             }
-            $gene{$key}{'count'}++;
+            $gene{$key}{'count'}=1;
+            $prev_key=$key;
         } else {
+            if(defined($gene{$key})) {
+                @columns=split(/,/, "'$COLUMN'");
+                @operations=split(/\,/, "'$OPERATION'");
+                $j=0;
+                foreach(@columns) {
+                    if($F[$_-1]=~/^[0-9\.]+$/ && ($operations[$j]=~/sum/ || $operations[$j]=~/mean/)) { 
+                        if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
+                        $gene{$key}{$_}+=$F[$_-1];
+                    } else {
+                        if(!defined($gene{$key}{$_})) { $gene{$key}{$_}=""; }
+                        $gene{$key}{$_}="$gene{$key}{$_},$F[$_-1]";
+                    }
+                    $j++;
+                }
+                $gene{$key}{'count'}++;
+            } else {
+                print "$gene{$prev_key}{'coor'}";
+                @columns=split(/,/, "'$COLUMN'");
+                @operations=split(/,/, "'$OPERATION'");
+                $line="";
+                $j=0;
+                foreach(@columns) {
+                    if($operations[$j]=~/mean/) {
+                        $line.=sprintf("\t%0.6f", $gene{$prev_key}{$_}/$gene{$prev_key}{'count'});
+                    } elsif($operations[$j]=~/collapse/) {
+                        $gene{$prev_key}{$_}=~s/^\,//g;
+                        $line.=sprintf("\t%s", $gene{$prev_key}{$_});
+                    } elsif($operations[$j]=~/max/) {
+                        $gene{$prev_key}{$_}=~s/^\,//g;
+                        @t=split(/\,/,$gene{$prev_key}{$_});
+                        $max=0;
+                        foreach(@t) { if ($_ > $max) { $max=$_; } }
+                        $line.="\t$max";
+                    } else {
+                        $line.=sprintf("\t%d", $gene{$prev_key}{$_});
+                    }
+                    $j++;
+                }
+                $line=~s/\s+$//g;
+                print "$line\n";
+
+                $line="$F[0]";
+                foreach(@F[1..'$COLUMN_PRIMARY']) { $line.="\t$_"; }
+                $gene{$key}{'coor'}=$line;
+                @columns=split(/,/, "'$COLUMN'");
+                @operations=split(/,/, "'$OPERATION'");
+                $j=0;
+                foreach(@columns) {
+                    if($F[$_-1]=~/^[0-9\.]+$/ && ($operations[$j]=~/sum/ || $operations[$j]=~/mean/)) { 
+                        if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
+                        $gene{$key}{$_}+=$F[$_-1];
+                    } else {
+                        if(!defined($gene{$key}{$_})) { $gene{$key}{$_}=""; }
+                        $gene{$key}{$_}="$gene{$key}{$_},$F[$_-1]";
+                    }
+                }
+                $gene{$key}{'count'}=1;
+                $prev_key=$key;
+            }
+        } $i++;
+        
+        END {
             print "$gene{$prev_key}{'coor'}";
             @columns=split(/,/, "'$COLUMN'");
-            $operation="'$OPERATION'";
+            @operations=split(/,/, "'$OPERATION'");
             $line="";
+            $j=0;
             foreach(@columns) {
-                if($operation=~/mean/) {
+                if($operations[$j]=~/mean/) {
                     $line.=sprintf("\t%0.6f", $gene{$prev_key}{$_}/$gene{$prev_key}{'count'});
-                } elsif($operation=~/collapse/) {
+                } elsif($operations[$j]=~/collapse/) {
                     $gene{$prev_key}{$_}=~s/^\,//g;
                     $line.=sprintf("\t%s", $gene{$prev_key}{$_});
-                } elsif($operation=~/max/) {
+                } elsif($operations[$j]=~/max/) {
                     $gene{$prev_key}{$_}=~s/^\,//g;
                     @t=split(/\,/,$gene{$prev_key}{$_});
                     $max=0;
@@ -116,50 +174,17 @@ zless $BEDFILE | perl -ane '
             }
             $line=~s/\s+$//g;
             print "$line\n";
-
-            $line="$F[0]";
-            foreach(@F[1..'$COLUMN_PRIMARY']) { $line.="\t$_"; }
-            $gene{$key}{'coor'}=$line;
-            @columns=split(/,/, "'$COLUMN'");
-            foreach(@columns) {
-                if($F[$_-1]=~/^[0-9\.]+$/ && ('$OPERATION'=~/sum/ || '$OPERATION'=~/mean/)) { 
-                    if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
-                    $gene{$key}{$_}+=$F[$_-1];
-                } else {
-                    if(!defined($gene{$key}{$_})) { $gene{$key}{$_}=""; }
-                    $gene{$key}{$_}="$gene{$key}{$_},$F[$_-1]";
-                }
-            }
-            $gene{$key}{'count'}=1;
-            $prev_key=$key;
-        }
-    } $i++;
-    
-    END {
-        print "$gene{$prev_key}{'coor'}";
-        @columns=split(/,/, "'$COLUMN'");
-        $operation="'$OPERATION'";
-        $line="";
-        foreach(@columns) {
-            if($operation=~/mean/) {
-                $line.=sprintf("\t%0.6f", $gene{$prev_key}{$_}/$gene{$prev_key}{'count'});
-            } elsif($operation=~/collapse/) {
-                $gene{$prev_key}{$_}=~s/^\,//g;
-                $line.=sprintf("\t%s", $gene{$prev_key}{$_});
-            } elsif($operation=~/max/) {
-                $gene{$prev_key}{$_}=~s/^\,//g;
-                @t=split(/\,/,$gene{$prev_key}{$_});
-                $max=0;
-                foreach(@t) { if ($_ > $max) { $max=$_; } }
-                $line.="\t$max";
-            } else {
-                $line.=sprintf("\t%d", $gene{$prev_key}{$_});
-            }
-        }
-        $line=~s/\s+$//g;
-        print "$line\n";
-    }'
-
+        }'
+else
+    COLUMNS_TOTAL=$(zless $BEDFILE | head -n 1 | perl -ane 'print scalar(@F);')
+    STRAND_DEFINED=$(zless $BEDFILE | perl -ane 'if($F[5]=~/\+/ || $F[5]=~/\-/) { print 1; } else { print 0; }')
+    if [ "$STRAND_DEFINED" -eq 1 ]; then
+        zless $BEDFILE | sort -k 1,1 -k 2n,2 -k 3n,3 -k $COLUMNS_TOTAL'rn,'$COLUMNS_TOTAL | perl -ane '$key="$F[0]_$F[1]_$F[2]_$F[3]_$F[5]"; if(!$seen{$key}) { print "$_"; $seen{$key}=1; }'
+    else
+        zless $BEDFILE | sort -k 1,1 -k 2n,2 -k 3n,3 -k $COLUMNS_TOTAL'rn,'$COLUMNS_TOTAL | perl -ane '$key="$F[0]_$F[1]_$F[2]"; if(!$seen{$key}) { print "$_"; $seen{$key}=1; }'
+    fi
+fi
+  
 ## remove temporary files
 if [ ! -z "$TMP" ]; then
     rm $TMP
