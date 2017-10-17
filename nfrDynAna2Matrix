@@ -159,15 +159,15 @@ done
 COMMENT
 ## compute nfr dip
 NCOL=$(head $OUTDIR/$BED_FILE -n 1 | perl -ane '$ncol=scalar(@F)+1; print "$ncol";')
-if [ ! -z "$BAM_FILE_NFRDIP" ]; then
-    bed2window -i $OUTDIR/$BED_FILE -w 50 -s | bed2nfrdipV2 -i stdin -j $BAM_FILE_NFRDIP -t | rep2mean -i stdin -s $NCOL -n $REPLICATES >  $OUTDIR/$BED_FILE.nfrdip
+if [ ! -z "$BAM_FILE_NFRDIP" -a ! -s "$OUTDIR/$BED_FILE.nfrdip" ]; then
+    bed2window -i $OUTDIR/$BED_FILE -w 50 -s | bed2nfrdipV2 -i stdin -j $BAM_FILE_NFRDIP -t | rep2mean -i stdin -s $NCOL -n $REPLICATES > $OUTDIR/$BED_FILE.nfrdip
 else
     touch $OUTDIR/$BED_FILE.nfrdip
 fi
 
 ## compute TPM for TF binding
 NCOL=$(head $OUTDIR/$BED_FILE -n 1 | perl -ane '$ncol=scalar(@F)+1; print "$ncol";')
-if [ ! -z "$BAM_FILE_TPM" ]; then
+if [ ! -z "$BAM_FILE_TPM" -a ! -s "$OUTDIR/$BED_FILE.tpm" ]; then
     if [ -z "$RAW_COUNT" ]; then
         bed2expr -i $OUTDIR/$BED_FILE -j $BAM_FILE_TPM -m -d -g $GENOME | rep2mean -i stdin -s $NCOL -n $REPLICATES > $OUTDIR/$BED_FILE.tpm
         #cat $OUTDIR/$BED_FILE | bed2expr -i stdin -j $BAM_FILE_TPM -d -g $GENOME | rep2mean -i stdin -s $NCOL -n $REPLICATES > $OUTDIR/$BED_FILE.tpm
@@ -199,10 +199,10 @@ fi
 
 ## compute distance to proximal gene
 if [ ! -z "$BED_FILE_TSS" ]; then
-        closestBed -a $OUTDIR/$BED_FILE -b $BED_FILE_TSS -t first -d | perl -ane 'print $F[scalar(@F)-1]."\n";' > $OUTDIR/$BED_FILE.dist
+        closestBed -a $OUTDIR/$BED_FILE -b <(sortBed -i $BED_FILE_TSS) -t first -d | perl -ane 'print $F[scalar(@F)-1]."\n";' > $OUTDIR/$BED_FILE.dist
 else
     if [ ! -z "$BED_FILE_EXPR" ]; then
-        closestBed -a $OUTDIR/$BED_FILE -b $BED_FILE_EXPR -t first -d | perl -ane 'print $F[scalar(@F)-1]."\n";' > $OUTDIR/$BED_FILE.dist
+        closestBed -a $OUTDIR/$BED_FILE -b <(sortBed -i $BED_FILE_EXPR) -t first -d | perl -ane 'print $F[scalar(@F)-1]."\n";' > $OUTDIR/$BED_FILE.dist
     else
         touch $OUTDIR/$BED_FILE.dist
     fi
