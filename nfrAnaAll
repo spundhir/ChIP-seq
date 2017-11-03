@@ -132,6 +132,19 @@ else
 fi
 echo done
 
+echo -n "Initialize input bam files (`date`).. "
+if [ ! -s "$OUTDIR/logs/histone_Rep1.bam" ]; then
+    scp $REP1 $OUTDIR/logs/histone_Rep1.bam
+fi
+
+if [ ! -s "$OUTDIR/logs/histone_Rep2.bam" ]; then
+    scp $REP2 $OUTDIR/logs/histone_Rep2.bam
+fi
+
+REP1="$OUTDIR/logs/histone_Rep1.bam"
+REP2="$OUTDIR/logs/histone_Rep2.bam"
+echo "done"
+
 echo -n "Determine number of bases by which to extend the 3' end of reads (`date`).. "
 if [ ! -z "$EXTEND" -a ! -s "$OUTDIR/extendReads" ]; then
     macs2 predictd -i $REP1 -g $GENOME_MACS2 --outdir $OUTDIR/logs/ 2>$OUTDIR/logs/predictd.rep1 &

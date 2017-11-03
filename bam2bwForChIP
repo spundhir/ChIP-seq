@@ -68,7 +68,7 @@ COMMENT
 if [ ! -z "$EXTEND" ]; then
     echo -n "Determing read extension parameter (`date`).. "
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    macs2 predictd -i $BAMFILE -g $GENOME_MACS2 &>$TMP
+    macs2 predictd -i $BAMFILE -g $GENOME_MACS2 --rfile $TMP.predictd &>$TMP
     EXTEND_VALUE=$(cat $TMP | grep "predicted fragment length" | perl -ane 'print $F[scalar(@F)-2];')
 
     if [ -z "$EXTEND_VALUE" ]; then
@@ -80,6 +80,7 @@ if [ ! -z "$EXTEND" ]; then
 
     if [ ! -z "$TMP" ]; then
         rm $TMP
+        rm $TMP.predictd
     fi
 
     echo "$EXTEND_VALUE - done"
