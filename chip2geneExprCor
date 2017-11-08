@@ -18,13 +18,14 @@ usage() {
     echo " -c          [associate enhancers to closest gene instead to collapsed gene(s)]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
+    echo " -a          [output all columns of peaks or nfr file (default: first three)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:k:ncg:h ARG; do
+while getopts i:j:k:ncg:ah ARG; do
 	case "$ARG" in
 		i) INPUTCHIPFILE=$OPTARG;;
         j) INPUTEXPRFILE=$OPTARG;;
@@ -32,6 +33,7 @@ while getopts i:j:k:ncg:h ARG; do
         n) SHOWNULL=1;;
         c) CLOSESTGENE=1;;
         g) GENOME=$OPTARG;;
+        a) ALL=1;;
 		h) HELP=1;;
 	esac
 done
@@ -78,8 +80,11 @@ else
     #echo "$COL_EXPR $COL_OUT $NCOL_CHIP $NCOL_EXPR $NSAMPLES"; exit
     #intersectBed -a $INPUTCHIPFILE -b $INPUTEXPRFILE -loj | sortBed -i stdin | mergeBed.pl -i - -c | cut -f 1-3,$COL_EXPR | perl -ane '$end=scalar(@F); $start=$end-'$NSAMPLES'; if($_=~/\s+\.\s+/) { for($i=$start; $i<$end; $i++) { $F[$i]=0; }  $line=(); foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; print "$line\n"; } else { print "$_"; }' 
     ## Required when using with nfrDynAna2Matrix script
-    closestBed -a $INPUTCHIPFILE -b <(sortBed -i $INPUTEXPRFILE) -t first | cut -f 1-3,$COL_EXPR
-    #closestBed -a $INPUTCHIPFILE -b <(sortBed -i $INPUTEXPRFILE) -t first | cut -f 1-$NCOL_CHIP,$COL_EXPR
+    if [ ! -z "$ALL" ]; then
+        closestBed -a <(sortBed -i $INPUTCHIPFILE) -b <(sortBed -i $INPUTEXPRFILE) -t first | cut -f 1-$NCOL_CHIP,$COL_EXPR
+    else
+        closestBed -a <(sortBed -i $INPUTCHIPFILE) -b <(sortBed -i $INPUTEXPRFILE) -t first | cut -f 1-3,$COL_EXPR
+    fi
 fi
 
 if [ ! -z "$TMP" ]; then
