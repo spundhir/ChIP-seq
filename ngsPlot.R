@@ -25,7 +25,7 @@ if((is.null(opt$ngsPlotSession) | is.null(opt$outfile))) {
 suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(reshape))
 suppressPackageStartupMessages(library(caTools))
-progpath <- "/home/pundhir/software/ngsplot"
+progpath <- "/home/pundhir/software/ngsplot-master"
 source(file.path(progpath, 'lib', 'plotlib.r'))
 
 load(opt$ngsPlotSession)
@@ -34,11 +34,12 @@ scale01 <- function(x){(x-min(x))/(max(x)-min(x))}
 pdf(opt$outfile)
 ymax <- 0
 mw <- 0
+
 if(is.null(opt$logScale)) {
     regcovMat <- apply(regcovMat, 2, function(x) scale01(x))
-    plotmat(regcovMat, title, color, bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, confiMat, mw, ymax, prof.misc)
+    plotmat(regcovMat, ctg.tbl$title, ctg.tbl$color, bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, confiMat, mw, prof.misc)
 } else {
-    plotmat(log(regcovMat), title, color, bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, confiMat, mw, ymax, prof.misc)
+    plotmat(log(regcovMat), ctg.tbl$title, ctg.tbl$color, bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, confiMat, mw, prof.misc)
 }
 dev.off()
 
