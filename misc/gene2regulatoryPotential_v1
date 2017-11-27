@@ -1,0 +1,157 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "gene2regulatoryPotential (compute regulatory potential for input genes in BED format)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: gene2regulatoryPotential -i <file> -j <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input gene coordinates in BED format]"
+	echo " -j <file>   [input enhancer coordinates in BED format (can be stdin)]"
+    echo "             [format: chr start end gene_name score class]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:g:h ARG; do
+    case "$ARG" in
+    i) GENE_FILE=$OPTARG;;
+    j) ENHANCER_FILE=$OPTARG;;
+    g) GENOME=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ ! -f "$GENE_FILE" -o -z "$ENHANCER_FILE" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+else
+    echo "Presently the program only support analysis for mm9 or hg19"
+    echo
+    usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$ENHANCER_FILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    ENHANCER_FILE=$TMP
+fi
+
+## perform gene centric analysis
+<<"COMMENT"
+COMMENT
+
+NCOL_GENE_FILE=$(head -n 1 $GENE_FILE | perl -ane 'print scalar(@F);')
+NCOL_ENHANCER_FILE=$(head -n 1 $ENHANCER_FILE | cut -f 1-3,6 | perl -ane 'print scalar(@F);')
+#echo -e "$NCOL_GENE_FILE\t$NCOL_ENHANCER_FILE"; exit
+
+#cat $GENE_FILE | perl -ane '@enhancer_info=`grep -w $F[3] '$ENHANCER_FILE' | cut -f 1-3,6`; if(scalar(@enhancer_info)>0) { for($i=0; $i<scalar(@enhancer_info); $i++) { chomp($_); chomp($enhancer_info[$i]); print "$_\t$enhancer_info[$i]\t1\n"; } } else { chomp($_); print "$_\t.\t-1\t-1\t"; for($i=4;$i<='$NCOL_ENHANCER_FILE';$i++) { print ".\t"; } print "0\n"; }' > test; exit
+
+cat $GENE_FILE | perl -ane '@enhancer_info=`grep -w $F[3] '$ENHANCER_FILE' | cut -f 1-3,6`; if(scalar(@enhancer_info)>0) { for($i=0; $i<scalar(@enhancer_info); $i++) { chomp($_); chomp($enhancer_info[$i]); print "$_\t$enhancer_info[$i]\t1\n"; } } else { chomp($_); print "$_\t.\t-1\t-1\t"; for($i=4;$i<='$NCOL_ENHANCER_FILE';$i++) { print ".\t"; } print "0\n"; }' | perl -ane '
+    BEGIN { use Tie::IxHash; tie %enhancer, 'Tie::IxHash'; tie %seen, 'Tie::IxHash'; }
+    $id="$F[0]_$F[1]_$F[2]_$F[3]";
+    $mid=sprintf("%0.0f", ($F['$((NCOL_GENE_FILE+1))']+$F['$((NCOL_GENE_FILE+2))'])/2);
+    if($F[5]=~/\+/ && $F['$((NCOL_GENE_FILE+2))']>0) {
+        $dist=$mid-$F[1];
+    }
+    elsif($F[5]=~/\-/ && $F['$((NCOL_GENE_FILE+2))']>0) { 
+        $dist=$F[2]-$mid;
+    }
+    else {
+        $dist="NA";
+    }
+    foreach(@F[0..'$((NCOL_GENE_FILE-1))']) { $des.="$_\t"; }
+    $des=~s/\t$//g;
+    $class=$F['$((NCOL_GENE_FILE+3))'];
+    $enhancer{$id}{'des'}=$des;
+    $des=();
+    if($class!~/^\.$/) {
+        #print "$class\n";
+        if(defined($enhancer{$id}{$class})) {
+            $enhancer{$id}{$class}.=";$dist";
+        }
+        else {
+            $enhancer{$id}{$class}=$dist;
+        }
+        $seen{$class}=1;
+    }
+    END {
+        $i=1; foreach(@F[0..'$((NCOL_GENE_FILE-1))']) { print "gene_$i\t"; $i++; }
+        foreach $class(keys(%seen)) { print "$class (RP)\t"; }
+        foreach $class(keys(%seen)) { print "$class (distance)\t"; }
+        foreach $class(keys(%seen)) { print "$class (count)\t"; } 
+        print "max_class_rp\tmax_class_count\n";
+        foreach $id(keys(%enhancer)) {
+            ## regulatory potential
+            print "$enhancer{$id}{'des'}\t";
+            $max=0; $max_class{'RP'}="NA";
+            foreach $class(sort { $a cmp $b } keys(%seen)) {
+                if(defined($enhancer{$id}{$class})) {
+                    @t=split(/\;/,$enhancer{$id}{$class});
+                    $RP=0;
+                    foreach(@t) {
+                        if($_!~/NA/) { 
+                            $RP+=2.71828**-(0.5+4*($_/10000000));
+                        }
+                    }
+                    #print "$enhancer{$id}{$class}|";
+                    print "$RP\t";
+                    if($RP>=$max) { $max_class{'RP'}=$class; $max=$RP; }
+                }
+                else {
+                    #print ".|";
+                    print "0\t";
+                }
+            }
+            #print "\n";
+
+            ## distance to TSS
+            foreach $class(sort { $a cmp $b } keys(%seen)) {
+                if(defined($enhancer{$id}{$class})) {
+                    print "$enhancer{$id}{$class}\t";
+                }
+                else {
+                    print ".\t";
+                }
+            }
+            #print "\n";
+
+            ## number of enhancers
+            $max=0; $max_class{'count'}="NA";
+            foreach $class(sort { $a cmp $b } keys(%seen)) {
+                if(defined($enhancer{$id}{$class})) {
+                    $count=split(/\;/, $enhancer{$id}{$class});
+                    print "$count\t";
+                    if($count>=$max) { $max_class{'count'}=$class; $max=$count; }
+                }
+                else {
+                    print "0\t";
+                }
+            }
+            print "$max_class{'RP'}\t$max_class{'count'}\n";
+        }
+    }' 
+ 
+## remove temporary file
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi

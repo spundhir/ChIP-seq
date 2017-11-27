@@ -2,6 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 GENOME="mm9"
+MIN_N_CLASS=1
 
 #### usage ####
 usage() {
@@ -12,21 +13,26 @@ usage() {
 	echo "Usage: gene2regulatoryPotential -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input gene coordinates in BED format]"
+    echo "             [format: chr start end name score strand (..)]"
 	echo " -j <file>   [input enhancer coordinates in BED format (can be stdin)]"
-    echo "             [format: chr start end gene_name score class]"
+    echo "             [format: chr start end name score strand class (..)]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
+    echo " -c          [perform separate analysis for each enhancer class]"
+    echo " -n <int>    [minimum number of enhancers within each class (default: 1)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:h ARG; do
+while getopts i:j:g:cnh ARG; do
     case "$ARG" in
     i) GENE_FILE=$OPTARG;;
     j) ENHANCER_FILE=$OPTARG;;
     g) GENOME=$OPTARG;;
+    c) CLASS=1;;
+    n) MIN_N_CLASS=$OPTARG;;
     h) HELP=1;;
     esac
 done
@@ -56,102 +62,43 @@ if [ "$ENHANCER_FILE" == "stdin" ]; then
     ENHANCER_FILE=$TMP
 fi
 
-## perform gene centric analysis
-<<"COMMENT"
-COMMENT
+## reformat gene file
+TMP_GENE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+zless $GENE_FILE | bed2window -i stdin -w 1 -t > $TMP_GENE
+GENE_FILE=$TMP_GENE
 
+## perform gene centric analysis
 NCOL_GENE_FILE=$(head -n 1 $GENE_FILE | perl -ane 'print scalar(@F);')
-NCOL_ENHANCER_FILE=$(head -n 1 $ENHANCER_FILE | cut -f 1-3,6 | perl -ane 'print scalar(@F);')
+NCOL_ENHANCER_FILE=$(head -n 1 $ENHANCER_FILE | perl -ane 'print scalar(@F);')
 #echo -e "$NCOL_GENE_FILE\t$NCOL_ENHANCER_FILE"; exit
 
-#cat $GENE_FILE | perl -ane '@enhancer_info=`grep -w $F[3] '$ENHANCER_FILE' | cut -f 1-3,6`; if(scalar(@enhancer_info)>0) { for($i=0; $i<scalar(@enhancer_info); $i++) { chomp($_); chomp($enhancer_info[$i]); print "$_\t$enhancer_info[$i]\t1\n"; } } else { chomp($_); print "$_\t.\t-1\t-1\t"; for($i=4;$i<='$NCOL_ENHANCER_FILE';$i++) { print ".\t"; } print "0\n"; }' > test; exit
+if [ $NCOL_GENE_FILE -lt 6 -o $NCOL_ENHANCER_FILE -lt 6 ]; then
+    echo
+    echo "Error: format of gene or enhancer file is not accurate"
+    usage
+fi
 
-cat $GENE_FILE | perl -ane '@enhancer_info=`grep -w $F[3] '$ENHANCER_FILE' | cut -f 1-3,6`; if(scalar(@enhancer_info)>0) { for($i=0; $i<scalar(@enhancer_info); $i++) { chomp($_); chomp($enhancer_info[$i]); print "$_\t$enhancer_info[$i]\t1\n"; } } else { chomp($_); print "$_\t.\t-1\t-1\t"; for($i=4;$i<='$NCOL_ENHANCER_FILE';$i++) { print ".\t"; } print "0\n"; }' | perl -ane '
-    BEGIN { use Tie::IxHash; tie %enhancer, 'Tie::IxHash'; tie %seen, 'Tie::IxHash'; }
-    $id="$F[0]_$F[1]_$F[2]_$F[3]";
-    $mid=sprintf("%0.0f", ($F['$((NCOL_GENE_FILE+1))']+$F['$((NCOL_GENE_FILE+2))'])/2);
-    if($F[5]=~/\+/ && $F['$((NCOL_GENE_FILE+2))']>0) {
-        $dist=$mid-$F[1];
-    }
-    elsif($F[5]=~/\-/ && $F['$((NCOL_GENE_FILE+2))']>0) { 
-        $dist=$F[2]-$mid;
-    }
-    else {
-        $dist="NA";
-    }
-    foreach(@F[0..'$((NCOL_GENE_FILE-1))']) { $des.="$_\t"; }
-    $des=~s/\t$//g;
-    $class=$F['$((NCOL_GENE_FILE+3))'];
-    $enhancer{$id}{'des'}=$des;
-    $des=();
-    if($class!~/^\.$/) {
-        #print "$class\n";
-        if(defined($enhancer{$id}{$class})) {
-            $enhancer{$id}{$class}.=";$dist";
-        }
-        else {
-            $enhancer{$id}{$class}=$dist;
-        }
-        $seen{$class}=1;
-    }
-    END {
-        $i=1; foreach(@F[0..'$((NCOL_GENE_FILE-1))']) { print "gene_$i\t"; $i++; }
-        foreach $class(keys(%seen)) { print "$class (RP)\t"; }
-        foreach $class(keys(%seen)) { print "$class (distance)\t"; }
-        foreach $class(keys(%seen)) { print "$class (count)\t"; } 
-        print "max_class_rp\tmax_class_count\n";
-        foreach $id(keys(%enhancer)) {
-            ## regulatory potential
-            print "$enhancer{$id}{'des'}\t";
-            $max=0; $max_class{'RP'}="NA";
-            foreach $class(sort { $a cmp $b } keys(%seen)) {
-                if(defined($enhancer{$id}{$class})) {
-                    @t=split(/\;/,$enhancer{$id}{$class});
-                    $RP=0;
-                    foreach(@t) {
-                        if($_!~/NA/) { 
-                            $RP+=2.71828**-(0.5+4*($_/10000000));
-                        }
-                    }
-                    #print "$enhancer{$id}{$class}|";
-                    print "$RP\t";
-                    if($RP>=$max) { $max_class{'RP'}=$class; $max=$RP; }
-                }
-                else {
-                    #print ".|";
-                    print "0\t";
-                }
-            }
-            #print "\n";
+COMMAND="paste $GENE_FILE"
 
-            ## distance to TSS
-            foreach $class(sort { $a cmp $b } keys(%seen)) {
-                if(defined($enhancer{$id}{$class})) {
-                    print "$enhancer{$id}{$class}\t";
-                }
-                else {
-                    print ".\t";
-                }
-            }
-            #print "\n";
+TMP_ENHANCER=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+if [ ! -z "$CLASS" ]; then
+    COUNT=1
+    for CLASS in $(cat $ENHANCER_FILE | cut -f 7 | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
+        cat $ENHANCER_FILE | perl -ane 'if($F[6]=~/^'$CLASS'$/) { print $_; }' | cut -f 1-6 > $TMP_ENHANCER.$COUNT
+        bed2weightedSignal -i $GENE_FILE -j $TMP_ENHANCER.$COUNT -g $GENOME -y | cut -f $(($NCOL_GENE_FILE+1)),$(($NCOL_GENE_FILE+2)) > $TMP_ENHANCER.$COUNT.RC
+        COMMAND="$COMMAND $TMP_ENHANCER.$COUNT.RC"
+        COUNT=$(($COUNT+1))
+    done
+else
+    bed2weightedSignal -i $GENE_FILE -j $ENHANCER_FILE -g $GENOME -y | cut -f $(($NCOL_GENE_FILE+1)),$(($NCOL_GENE_FILE+2)) > $TMP_ENHANCER.RC
+    COMMAND="$COMMAND $TMP_ENHANCER.RC"
+fi
+#echo $COMMAND
+eval $COMMAND
 
-            ## number of enhancers
-            $max=0; $max_class{'count'}="NA";
-            foreach $class(sort { $a cmp $b } keys(%seen)) {
-                if(defined($enhancer{$id}{$class})) {
-                    $count=split(/\;/, $enhancer{$id}{$class});
-                    print "$count\t";
-                    if($count>=$max) { $max_class{'count'}=$class; $max=$count; }
-                }
-                else {
-                    print "0\t";
-                }
-            }
-            print "$max_class{'RP'}\t$max_class{'count'}\n";
-        }
-    }' 
- 
 ## remove temporary file
 if [ ! -z "$TMP" ]; then
     rm $TMP
 fi
+rm $TMP_GENE
+rm $TMP_ENHANCER*
