@@ -14,7 +14,10 @@ usage() {
 	echo "Options:"
 	echo " -i <file>   [input file containing genomic coordinate in BED format (can be stdin)]"
     echo " -j <file>   [input mapped reads in BAM format]"
-    echo "             [if multiple, separate them by a comma]"
+    echo "             [if multiple seperate by a comma]"
+    echo "             **OR**"
+    echo "             [input configuration file containing bam file information]"
+    echo "             [<id> <bam file> (id should be tpm)]"
     echo "[OPTIONS]"
     echo " -s <float>  [normalize expression by input size factor]"
     echo "             [if multiple, seperate them by a comma]"
@@ -70,6 +73,21 @@ else
     echo "Presently the program only support analysis for mm9, hg19 or rn5"
     echo
     usage
+fi
+
+## check if input is BAM files or configuration file containing BAM file information
+INPUT=$(echo $INPUTBAMFILES | perl -ane '$_=~s/\,.*//g; print $_;')
+if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
+    ## read configuration file
+    INPUT=$(cat $INPUTBAMFILES | perl -ane '
+        if($_=~/^tpm/) {
+            $file.="$F[1],";
+        } END {
+            $file=~s/\,$//g;
+            print "$file\n";
+        }'
+    )
+    INPUTBAMFILES=$INPUT
 fi
 
 ## parse input bam files in an array

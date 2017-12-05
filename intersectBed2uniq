@@ -16,7 +16,7 @@ usage() {
 	echo "Options:"
     echo " -i <files>  [input file containing output from intersectBed (can be stdin)]"
     echo "[OPTIONS]"
-    echo " -c <int>    [columns from the B file to map onto intervals in A (default: 10)]"
+    echo " -c <int>    [columns from the B file to map onto intervals in A (default: 10; A+B)]"
     echo "             [if multiple, please separate them by a comma]"
     echo " -o <string> [operation that should be applied to -c (default: sum)]"
     echo "             [valid operations: sum, mean, collapse, max]"
@@ -59,15 +59,15 @@ COMMENT
 if [ "$BEDFILE" == "stdin" ]; then
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     while read LINE; do
-        echo ${LINE}
-    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+        echo "${LINE}"
+    done > $TMP
     BEDFILE=$TMP
 fi
 
 if [ -z "$MOST_OVERLAPPING" ]; then
-    COLUMN_PRIMARY=$(echo $COLUMN_PRIMARY | perl -ane '$_=$_-1; print $_;')
+    COLUMN_PRIMARY=$(echo $COLUMN_PRIMARY | perl -an -F'/\t+/' -e '$_=$_-1; print $_;')
 
-    zless $BEDFILE | perl -ane '
+    zless $BEDFILE | perl -an -F'/\t+/' -e '
         $key="$F[0]_$F[1]_$F[2]_$F[3]";
         if($i==0) {
             $line="$F[0]";
@@ -176,12 +176,12 @@ if [ -z "$MOST_OVERLAPPING" ]; then
             print "$line\n";
         }'
 else
-    COLUMNS_TOTAL=$(zless $BEDFILE | head -n 1 | perl -ane 'print scalar(@F);')
-    STRAND_DEFINED=$(zless $BEDFILE | perl -ane 'if($F[5]=~/\+/ || $F[5]=~/\-/) { print 1; } else { print 0; }')
+    COLUMNS_TOTAL=$(zless $BEDFILE | head -n 1 | perl -an -F'/\t+/' -e 'print scalar(@F);')
+    STRAND_DEFINED=$(zless $BEDFILE | perl -an -F'/\t+/' -e 'if($F[5]=~/\+/ || $F[5]=~/\-/) { print 1; } else { print 0; }')
     if [ "$STRAND_DEFINED" -eq 1 ]; then
-        zless $BEDFILE | sort -k 1,1 -k 2n,2 -k 3n,3 -k $COLUMNS_TOTAL'rn,'$COLUMNS_TOTAL | perl -ane '$key="$F[0]_$F[1]_$F[2]_$F[3]_$F[5]"; if(!$seen{$key}) { print "$_"; $seen{$key}=1; }'
+        zless $BEDFILE | sort -k 1,1 -k 2n,2 -k 3n,3 -k $COLUMNS_TOTAL'rn,'$COLUMNS_TOTAL | perl -an -F'/\t+/' -e '$key="$F[0]_$F[1]_$F[2]_$F[3]_$F[5]"; if(!$seen{$key}) { print "$_"; $seen{$key}=1; }'
     else
-        zless $BEDFILE | sort -k 1,1 -k 2n,2 -k 3n,3 -k $COLUMNS_TOTAL'rn,'$COLUMNS_TOTAL | perl -ane '$key="$F[0]_$F[1]_$F[2]"; if(!$seen{$key}) { print "$_"; $seen{$key}=1; }'
+        zless $BEDFILE | sort -k 1,1 -k 2n,2 -k 3n,3 -k $COLUMNS_TOTAL'rn,'$COLUMNS_TOTAL | perl -an -F'/\t+/' -e '$key="$F[0]_$F[1]_$F[2]"; if(!$seen{$key}) { print "$_"; $seen{$key}=1; }'
     fi
 fi
   
