@@ -13,18 +13,20 @@ usage() {
     echo " -c          [count number of columns (default)]"
     echo " -r          [remove empty columns]"
     echo " -t          [convert spaces to tab]"
+    echo " -m          [convert comma to tab]"
     echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:crth ARG; do
+while getopts i:crtmh ARG; do
     case "$ARG" in
     i) INFILE=$OPTARG;;
     c) COUNT=1;;
     r) REMOVE=1;;
     t) TAB=1;;
+    m) COMMA=1;;
     h) HELP=1;;
     esac
 done
@@ -34,7 +36,23 @@ if [ -z "$INFILE" -o "$HELP" ]; then
 	usage
 fi
 
-if [ -z "$TAB" ]; then
+if [ ! -z "$TAB" ]; then
+    if [ "$INFILE" == "stdin" ]; then
+        while read LINE; do
+            echo ${LINE}
+        done
+    else
+        zless $INFILE 
+    fi | perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
+elif [ ! -z "$COMMA" ]; then
+    if [ "$INFILE" == "stdin" ]; then
+        while read LINE; do
+            echo ${LINE}
+        done
+    else
+        zless $INFILE 
+    fi | perl -an -F'/\,/' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
+else
     ## create temporary BED file if input is from stdin
     if [ "$INFILE" == "stdin" ]; then
         TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
@@ -56,12 +74,4 @@ if [ -z "$TAB" ]; then
     if [ ! -z "$TMP" ]; then
         rm $TMP
     fi
-else
-    if [ "$INFILE" == "stdin" ]; then
-        while read LINE; do
-            echo ${LINE}
-        done
-    else
-        zless $INFILE 
-    fi | perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
 fi

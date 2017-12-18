@@ -5,7 +5,8 @@ suppressPackageStartupMessages(library("optparse"))
 option_list <- list(
 	make_option(c("-i", "--inFile"), help="input BED file created using multiIntersectBed (can be stdin)"),
 	make_option(c("-o", "--outFile"), help="output pdf file"),
-	make_option(c("-l", "--list"), help="input file contains list (format: id condition; eg. ENSG00000001617 WT)", action="store_true")
+	make_option(c("-l", "--list"), help="input file contains list (format: id condition; eg. ENSG00000001617 WT)", action="store_true"),
+	make_option(c("-t", "--type"), default="ellipses", help="type of plot; ellipses or ChowRuskey. (default: %default)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -23,6 +24,7 @@ if(is.null(opt$inFile) | is.null(opt$outFile)) {
 
 ## load libraries
 suppressPackageStartupMessages(library(VennDiagram))
+suppressPackageStartupMessages(library(Vennerable))
 suppressPackageStartupMessages(library("RColorBrewer"))
 
 if(opt$inFile=="stdin") {
@@ -50,7 +52,12 @@ for(i in vec) {
 names(lst) <- vec
 col <- brewer.pal(length(vec)+1, "Spectral")
 col <- col[1:length(vec)]
-venn.plot <- venn.diagram(lst, fill=col, NULL)
+#venn.plot <- venn.diagram(lst, fill=col, NULL)
+#pdf(opt$outFile)
+#grid.draw(venn.plot)
+#dev.off()
+
+Vstem <- Venn(lst)
 pdf(opt$outFile)
-grid.draw(venn.plot)
+plot(Vstem, type=opt$type)
 dev.off()
