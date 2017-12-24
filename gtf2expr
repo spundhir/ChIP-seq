@@ -3,6 +3,7 @@
 
 GENOME="mm9"
 FEATURE="exon"
+GROUP="gene_id"
 PROCESSORS=1
 
 #### usage ####
@@ -27,6 +28,7 @@ usage() {
     echo " -g <string> [genome (default: mm9)]"
     echo "[OPTIONS: featureCounts]"
     echo " -t <string> [specify the feature type (default: exon)]"
+    echo " -r <string> [Specify the attribute type used to group features, gene_id or gene_name (default: gene_id)]"
     echo " -M          [if specified, multi-mapping reads/fragments will be counted]"
     echo " -p <int>    [number of processors to use (default: 1)]"
     echo " -u          [if specified, reads that were marked as duplicates will be ignored]"
@@ -36,7 +38,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:s:mde:g:t:Mp:uh ARG; do
+while getopts i:j:s:mde:g:t:r:Mp:uh ARG; do
 	case "$ARG" in
 		i) INPUTCOORFILE=$OPTARG;;
         j) INPUTCONFIGFILE=$OPTARG;;
@@ -46,6 +48,7 @@ while getopts i:j:s:mde:g:t:Mp:uh ARG; do
         e) INPUTEXTENDS=$OPTARG;;
         g) GENOME=$OPTARG;;
         t) FEATURE=$OPTARG;;
+        r) GROUP=$OPTARG;;
         M) MULTIMAPPING=1;;
         p) PROCESSORS=$OPTARG;;
         u) IGNOREDUPLICATES=1;;
@@ -134,7 +137,7 @@ if [ ! -z "$IGNOREDUPLICATES" ]; then
     ARGS_FEATURECOUNTS="$ARGS_FEATURECOUNTS -u "
 fi
 
-#echo "featureCounts -t $FEATURE -g gene_id -O $ARGS_FEATURECOUNTS -T $PROCESSORS -a $INPUTCOORFILE -o $TMP_FILE $INPUTBAMFILES"; exit
+#echo "featureCounts -t $FEATURE -g $GROUP -O $ARGS_FEATURECOUNTS -T $PROCESSORS -a $INPUTCOORFILE -o $TMP_FILE $INPUTBAMFILES"; exit
 
 if [ ! -z "$INPUTSIZEFACTORS" ]; then
     ## parse input size factors in an array
@@ -150,9 +153,9 @@ if [ ! -z "$INPUTSIZEFACTORS" ]; then
 
     if [ ! -z "$USE_SAM" ]; then
         INPUTBAMFILES=$(echo $INPUTBAMFILES | sed 's/bam/sam/g')
-        featureCounts -t $FEATURE -g gene_id -O $ARGS_FEATURECOUNTS -T $PROCESSORS -a $INPUTCOORFILE -o $TMP_FILE $INPUTBAMFILES
+        featureCounts -t $FEATURE -g $GROUP -O $ARGS_FEATURECOUNTS -T $PROCESSORS -a $INPUTCOORFILE -o $TMP_FILE $INPUTBAMFILES
     else
-        featureCounts -t $FEATURE -g gene_id -O $ARGS_FEATURECOUNTS -T $PROCESSORS -a $INPUTCOORFILE -o $TMP_FILE $INPUTBAMFILES
+        featureCounts -t $FEATURE -g $GROUP -O $ARGS_FEATURECOUNTS -T $PROCESSORS -a $INPUTCOORFILE -o $TMP_FILE $INPUTBAMFILES
     fi
 
     grep -vE '^[#|GeneId]+' $TMP_FILE | perl -ane '@sizeFactors=split(/\,/, "'$INPUTSIZEFACTORS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", $_/$sizeFactors[$i]); $i++; } print "\n";'
@@ -171,9 +174,9 @@ else
 
     if [ ! -z "$USE_SAM" ]; then
         INPUTBAMFILES=$(echo $INPUTBAMFILES | sed 's/bam/sam/g')
-        featureCounts -t $FEATURE -g gene_id -O $ARGS_FEATURECOUNTS -T $PROCESSORS -a $INPUTCOORFILE -o $TMP_FILE $INPUTBAMFILES
+        featureCounts -t $FEATURE -g $GROUP -O $ARGS_FEATURECOUNTS -T $PROCESSORS -a $INPUTCOORFILE -o $TMP_FILE $INPUTBAMFILES
     else
-        featureCounts -t $FEATURE -g gene_id -O $ARGS_FEATURECOUNTS -T $PROCESSORS -a $INPUTCOORFILE -o $TMP_FILE $INPUTBAMFILES
+        featureCounts -t $FEATURE -g $GROUP -O $ARGS_FEATURECOUNTS -T $PROCESSORS -a $INPUTCOORFILE -o $TMP_FILE $INPUTBAMFILES
     fi
 
     grep -vE '^[#|GeneId]+' $TMP_FILE | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", ($_*1000000)/$mappedReads[$i]); $i++; } print "\n";'
