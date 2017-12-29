@@ -6,7 +6,8 @@ option_list <- list(
 	make_option(c("-i", "--inFile"), help="input BED file created using multiIntersectBed (can be stdin)"),
 	make_option(c("-o", "--outFile"), help="output pdf file"),
 	make_option(c("-l", "--list"), help="input file contains list (format: id condition; eg. ENSG00000001617 WT)", action="store_true"),
-	make_option(c("-t", "--type"), default="ellipses", help="type of plot; ellipses or ChowRuskey. (default: %default)")
+	make_option(c("-t", "--type"), default="ellipses", help="type of plot; ellipses or ChowRuskey. (default: %default)"),
+	make_option(c("-s", "--gs"), default="21000", help="genome size meaning total number of genes as background to compute p-values (default: %default)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -26,6 +27,9 @@ if(is.null(opt$inFile) | is.null(opt$outFile)) {
 suppressPackageStartupMessages(library(VennDiagram))
 suppressPackageStartupMessages(library(Vennerable))
 suppressPackageStartupMessages(library("RColorBrewer"))
+suppressPackageStartupMessages(library(GeneOverlap))
+suppressPackageStartupMessages(library(session))
+suppressPackageStartupMessages(library(pheatmap))
 
 if(opt$inFile=="stdin") {
     data <- read.table(file("stdin"))
@@ -52,12 +56,27 @@ for(i in vec) {
 names(lst) <- vec
 col <- brewer.pal(length(vec)+1, "Spectral")
 col <- col[1:length(vec)]
-#venn.plot <- venn.diagram(lst, fill=col, NULL)
-#pdf(opt$outFile)
-#grid.draw(venn.plot)
-#dev.off()
 
-Vstem <- Venn(lst)
-pdf(opt$outFile)
-plot(Vstem, type=opt$type)
-dev.off()
+gom.obj <- newGOM(lst, lst, opt$gs)
+mat <- getMatrix(gom.obj, name="pval")
+
+if(length(names(lst)) <= 3 & opt$type=="ellipses") {
+    #venn.plot <- venn.diagram(lst, fill=col, NULL)
+    #pdf(opt$outFile)
+    #grid.draw(venn.plot)
+    #pheatmap(mat, display_numbers=T, number_format="%.1e", fontsize=10)
+    #dev.off()
+    Vstem <- Venn(lst)
+    pdf(opt$outFile)
+    plot(Vstem)
+    pheatmap(mat, display_numbers=T, number_format="%.1e", fontsize=10)
+    dev.off()
+} else {
+    Vstem <- Venn(lst)
+    pdf(opt$outFile)
+    plot(Vstem, type=opt$type)
+    pheatmap(mat, display_numbers=T, number_format="%.1e", fontsize=10)
+    dev.off()
+}
+
+#save.session("test.session")
