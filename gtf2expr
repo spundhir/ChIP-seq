@@ -77,7 +77,8 @@ if [ "$INPUTCOORFILE" == "stdin" ]; then
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     while read LINE; do
         echo "${LINE}"
-    done | perl -an -F'/\t+/' -e '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; chomp($line); print "$line\n";' > $TMP
+    done > $TMP
+    #| perl -an -F'/\t+/' -e '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; chomp($line); print "$line\n";' > $TMP
     INPUTCOORFILE=$TMP
 fi
 
