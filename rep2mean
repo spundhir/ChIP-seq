@@ -59,7 +59,7 @@ cat $BEDFILE | perl -ane '
         }
         printf("%0.5f\t", $sum/'$COUNT');
     }
-    print "\n";'
+    print "\n";' | perl -ane '$_=~s/\s+$//g; print "$_\n";'
 
 if [ ! -z "$TMP" ]; then
     rm $TMP

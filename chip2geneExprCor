@@ -61,6 +61,12 @@ if [ "$INPUTCHIPFILE" == "stdin" ]; then
     INPUTCHIPFILE=$TMP
 fi
 
+## filter gene expression file for entries where genomic coordinate of not available (starting with #)
+TMP_EXPRFILE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+cat $INPUTEXPRFILE | perl -ane 'if($_!~/^\#/) { print $_; }' > $TMP_EXPRFILE
+INPUTEXPRFILE=$TMP_EXPRFILE
+
+
 NCOL_CHIP=$(cat $INPUTCHIPFILE | head -n 1 | perl -ane 'print scalar(@F);')
 NCOL_EXPR=$(cat $INPUTEXPRFILE | head -n 1 | perl -ane 'print scalar(@F);')
 
@@ -90,4 +96,5 @@ fi
 if [ ! -z "$TMP" ]; then
     rm $TMP
 fi
+rm $TMP_EXPRFILE
 exit
