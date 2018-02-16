@@ -138,7 +138,7 @@ if [ ! -z "$IGNOREDUPLICATES" ]; then
     ARGS_FEATURECOUNTS="$ARGS_FEATURECOUNTS -u "
 fi
 
-#echo "featureCounts -t $FEATURE -g $GROUP -O $ARGS_FEATURECOUNTS -T $PROCESSORS -a $INPUTCOORFILE -o $TMP_FILE $INPUTBAMFILES"; exit
+echo "featureCounts -t $FEATURE -g $GROUP -O $ARGS_FEATURECOUNTS -T $PROCESSORS -a $INPUTCOORFILE -o $TMP_FILE $INPUTBAMFILES"; exit
 
 if [ ! -z "$INPUTSIZEFACTORS" ]; then
     ## parse input size factors in an array

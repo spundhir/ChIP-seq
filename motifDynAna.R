@@ -3,7 +3,7 @@ suppressPackageStartupMessages(library("optparse"))
 
 ## parse command line arguments
 option_list <- list(
-	make_option(c("-i", "--inFile"), help="input file containing motif enrichment dynamics"),
+	make_option(c("-i", "--inFile"), help="input file containing motif enrichment dynamics (can be stdin)"),
     make_option(c("-n", "--minFreq"), default="50", help="minimum frequency of NFRs in each nfr dynamic class (defaut=%default)"),
     make_option(c("-d", "--diffFreq"), default="0", help="minimum difference in enrichment between categories (defaut=%default)"),
 	make_option(c("-o", "--outPdfFile"), help="output pdf image file"),
@@ -34,7 +34,12 @@ suppressPackageStartupMessages(library(RColorBrewer))
 suppressPackageStartupMessages(library(gplots))
 suppressPackageStartupMessages(library(session))
 
-data <- read.table(opt$inFile)
+if(identical(opt$inFile, "stdin")==T) { 
+    data <- read.table(file("stdin"))
+} else {
+    data <- read.table(opt$inFile)
+}
+
 data$V13 <- log2((data$V8+0.01)/(data$V10+0.01))
 data$V14 <- gsub("^.*BestGuess:", "", data$V2)
 data$V14 <- gsub("\\(.*", "", data$V14)
