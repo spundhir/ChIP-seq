@@ -70,8 +70,9 @@ if(!is.null(opt$listAnnotation)) {
     opt$sessionFile <- sprintf("%s/go_analysis_compareCluster_%s.Rsession", opt$outDir, opt$annotation)
     if(!is.null(opt$ftrResFile)) {
        ftr_results <- read.table(opt$ftrResFile, sep="\t")
-       data <- ftr_results[,c(1,2,3,4,5,6,7,8,10)]
-       colnames(data) <- c("Cluster", "ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "Count")
+       data <- ftr_results
+       #data <- ftr_results[,c(1,2,3,4,5,6,7,8,10)]
+       #colnames(data) <- c("Cluster", "ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "Count")
     } else if(!file.exists(opt$sessionFile)) {
         ## convert gene symbol to entrex gene id
         gene[gene==""]  <- NA
@@ -95,7 +96,7 @@ if(!is.null(opt$listAnnotation)) {
         } else {
             results=compareCluster(geneList, fun="enrichGO", ont="BP", OrgDb=genomeDb, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         }
-        #data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
+        #data <- as.data.frame(results)[,c(1,2,3,4,5,6,7,8,10)]
         data <- results@compareClusterResult[,c(1,3,4,5,6,7,8,9,10,11)]
     } else {
         figWidth=opt$figWidth
@@ -111,7 +112,7 @@ if(!is.null(opt$listAnnotation)) {
         opt$minGene=minGene
         opt$outDir=outDir
         opt$allowDuplicates <- allowDuplicates
-        #data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
+        #data <- as.data.frame(results)[,c(1,2,3,4,5,6,7,8,10)]
         data <- results@compareClusterResult[,c(1,3,4,5,6,7,8,9,10,11)]
     }
     #outFile <- sprintf("%s/go_analysis_compareCluster_%s.pdf", opt$outDir, opt$annotation)
@@ -174,9 +175,10 @@ if(!is.null(opt$listAnnotation)) {
 
     opt$sessionFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.Rsession", opt$outDir, opt$annotation)
     if(!is.null(opt$ftrResFile)) {
-       ftr_results <- read.table(opt$ftrResFile, sep="\t")
-       data <- ftr_results[,c(1,2,3,4,5,6,7,8,10)]
-       colnames(data) <- c("Cluster", "ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "Count")
+       ftr_results <- read.table(opt$ftrResFile, sep="\t", header=T)
+       data <- ftr_results
+       #data <- ftr_results[,c(1,2,3,4,5,6,7,8,10)]
+       #colnames(data) <- c("Cluster", "ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "Count")
     } else if(!file.exists(opt$sessionFile)) {
         ## convert gene symbol to entrex gene id
         geneList_conv <- bitr(geneList$V1, fromType=opt$geneIdType, toType="ENTREZID", OrgDb=genomeDb)
@@ -222,7 +224,7 @@ if(!is.null(opt$listAnnotation)) {
                 results_levels=compareCluster(ENTREZID~V2, data=geneList, fun="groupGO", ont="BP", OrgDb=genomeDb, level=3)
             }
         }
-        #data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
+        #data <- as.data.frame(results)[,c(1,2,3,4,5,6,7,8,10)]
         data <- results@compareClusterResult[,c(1,3,4,5,6,7,8,9,10,11)]
     } else {
         figWidth=opt$figWidth
@@ -240,7 +242,7 @@ if(!is.null(opt$listAnnotation)) {
         opt$allowDuplicates=allowDuplicates
         #opt$maxClass=10
         #opt$outDir="go_analysis/pu1_pregm_wt_ko/all"
-        #data <- summary(results)[,c(1,2,3,4,5,6,7,8,10)]
+        #data <- as.data.frame(results)[,c(1,2,3,4,5,6,7,8,10)]
         data <- results@compareClusterResult[,c(1,3,4,5,6,7,8,9,10,11)]
     }
 
@@ -340,7 +342,7 @@ if(!is.null(opt$listAnnotation)) {
 
     save.session(opt$sessionFile)
     ## compute gene enrichment network for up- and down-regulated genes
-    if(is.numeric(gene$V2) & summary(results)>=1) {
+    if(is.numeric(gene$V2) & nrow(as.data.frame(results))>=1) {
         geneList <- structure(gene$V2, names=gene$ENTREZID)
         pdf(sprintf("%s/go_analysis_list_cnetplot_%s.pdf", opt$outDir, opt$annotation), width=20, height=20)
         cnetplot(results, categorySize="pvalue", foldChange=geneList, showCategory = 3)
@@ -348,7 +350,7 @@ if(!is.null(opt$listAnnotation)) {
     }
 
     outFile <- sprintf("%s/go_analysis_list_%s.xls", opt$outDir, opt$annotation)
-    data <- as.data.frame(summary(results))
+    data <- as.data.frame(results)
     if(nrow(data)>=1) {
         data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[8], "/")), function(x) gene[which(gene$ENTREZID==x),]$V1)), collapse="/"))
     }
