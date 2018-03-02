@@ -69,10 +69,22 @@ if(!is.null(opt$listAnnotation)) {
 
     opt$sessionFile <- sprintf("%s/go_analysis_compareCluster_%s.Rsession", opt$outDir, opt$annotation)
     if(!is.null(opt$ftrResFile)) {
-       ftr_results <- read.table(opt$ftrResFile, sep="\t")
-       data <- ftr_results
-       #data <- ftr_results[,c(1,2,3,4,5,6,7,8,10)]
-       #colnames(data) <- c("Cluster", "ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "Count")
+        figWidth=opt$figWidth
+        figHeight=opt$figHeight
+        maxClass=opt$maxClass
+        minGene=opt$minGene
+        outDir=opt$outDir
+        allowDuplicates=opt$allowDuplicates
+        opt$figWidth=figWidth
+        opt$figHeight=figHeight
+        opt$maxClass=maxClass
+        opt$minGene=minGene
+        opt$outDir=outDir
+        opt$allowDuplicates <- allowDuplicates
+        ftr_results <- read.table(opt$ftrResFile, sep="\t", header=F)
+        data <- ftr_results
+        #data <- ftr_results[,c(1,2,3,4,5,6,7,8,10)]
+        colnames(data) <- c("Cluster", "V2", "ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "geneID", "Count", "geneIDf")
     } else if(!file.exists(opt$sessionFile)) {
         ## convert gene symbol to entrex gene id
         gene[gene==""]  <- NA
@@ -175,10 +187,22 @@ if(!is.null(opt$listAnnotation)) {
 
     opt$sessionFile <- sprintf("%s/go_analysis_compareClusterFormula_%s.Rsession", opt$outDir, opt$annotation)
     if(!is.null(opt$ftrResFile)) {
-       ftr_results <- read.table(opt$ftrResFile, sep="\t", header=T)
-       data <- ftr_results
-       #data <- ftr_results[,c(1,2,3,4,5,6,7,8,10)]
-       #colnames(data) <- c("Cluster", "ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "Count")
+        figWidth=opt$figWidth
+        figHeight=opt$figHeight
+        maxClass=opt$maxClass
+        minGene=opt$minGene
+        outDir=opt$outDir
+        allowDuplicates=opt$allowDuplicates
+        opt$figWidth=figWidth
+        opt$figHeight=figHeight
+        opt$maxClass=maxClass
+        opt$minGene=minGene
+        opt$outDir=outDir
+        opt$allowDuplicates <- allowDuplicates
+        ftr_results <- read.table(opt$ftrResFile, sep="\t", header=F)
+        data <- ftr_results
+        #data <- ftr_results[,c(1,2,3,4,5,6,7,8,10)]
+        colnames(data) <- c("Cluster", "V2", "ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "geneID", "Count", "geneIDf")
     } else if(!file.exists(opt$sessionFile)) {
         ## convert gene symbol to entrex gene id
         geneList_conv <- bitr(geneList$V1, fromType=opt$geneIdType, toType="ENTREZID", OrgDb=genomeDb)

@@ -11,7 +11,9 @@ option_list <- list(
     make_option(c("-t", "--plotRange"), action="store_true", help="even less stringent criteria. plot motifs within a range of differential enrichment"),
     make_option(c("-v", "--plotSim"), action="store_true", help="instead plot motifs similar in frequency"),
     make_option(c("-r", "--rescale"), action="store_true", help="rescale color bar between min and max value"),
-    make_option(c("-k", "--rescaleBreaks"), default="0.3", help="breaks for rescale color bar")
+    make_option(c("-k", "--breaks"), default="0.3", help="breaks for rescale color bar (default=%default)"),
+    make_option(c("-c", "--color"), default="RdBu", help="color palette (default=%default)"),
+    make_option(c("-b", "--colorBias"), default="1", help="bias in color (default=%default)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -66,23 +68,18 @@ row.names(mat) <- data[1:no_rows,2]
 colnames(dat) <- as.vector(unique(data$V1))
 row.names(dat) <- data[1:no_rows,2]
 if(!is.null(opt$onlyDiffFreq)) {
-    myCol <- rev(brewer.pal(11, "RdBu"))
     sig_rows <- which(apply(mat, 1, function(x) max(x)-min(x)>as.numeric(opt$diffFreq)))
 } else if(!is.null(opt$plotSim)) {
     #sig_rows <- which(apply(mat, 1, function(x) max(x) > 0.1 & min(x) > 0.1 & max(x)-min(x) <= as.numeric(opt$diffFreq)))
     #sig_rows <- which(apply(mat, 1, function(x) max(x)-min(x) <= as.numeric(opt$diffFreq)))
     sig_rows <- row(mat)[,1]
-    #myCol <- (brewer.pal(9, "OrRd"))
-    myCol <- rev(brewer.pal(11, "RdBu"))
 } else if(!is.null(opt$plotRange)) {
-    myCol <- rev(brewer.pal(11, "RdBu"))
     sig_rows <- which(apply(mat, 1, function(x) max(x) > 1.5 & max(x)-min(x) > 0.3 & max(x)-min(x) <= as.numeric(opt$diffFreq)))
 } else {
-    myCol <- rev(brewer.pal(11, "RdBu"))
     sig_rows <- which(apply(mat, 1, function(x) max(x) > 0 & min(x) < 0 & max(x)-min(x) > as.numeric(opt$diffFreq)))
     #sig_rows <- which(apply(mat, 1, function(x) max(x) > as.numeric(opt$diffFreq) & min(x) < -1*as.numeric(opt$diffFreq) & max(x)-min(x) > 1))
 }
-#sig_rows <- which(apply(dat, 1, function(x) max(x)>3))
+sig_rows <- which(apply(dat, 1, function(x) max(x)>3))
 
 if(length(sig_rows)>2) {
     pdf(opt$outPdfFile, height=20)
@@ -97,16 +94,19 @@ if(length(sig_rows)>2) {
     #            breaks3[2:length(breaks3)], breaks4[2:length(breaks4)],
     #            breaks5[2:length(breaks5)])
     if(!is.null(opt$rescale)) {
-        breaks <- seq(min(mat[sig_rows,]), max(mat[sig_rows,]), by=as.numeric(opt$rescaleBreaks))
-        if(length(breaks)<=12) {
-            myCol <- rev(brewer.pal(length(breaks)-1, "RdBu"))
-        } else {
-            myCol <- colorRampPalette(c("dodgerblue4","grey97", "sienna3"))(length(breaks)-1)
-            #myCol <- colorpanel(n=length(breaks)-1,low="blue",mid="#f7f7f7",high="red")
-            #myCol <- colorpanel(n=length(breaks)-1,low="#2166ac",mid="#f7f7f7",high="#b2182b")
-        }
+        breaks <- seq(min(mat[sig_rows,]), max(mat[sig_rows,]), by=as.numeric(opt$breaks))
+        #if(length(breaks)<=12) {
+        #    myCol <- rev(brewer.pal(length(breaks)-1, "RdBu"))
+        #} else {
+        #    myCol <- colorRampPalette(c("dodgerblue4","grey97", "sienna3"))(length(breaks)-1)
+        #    #myCol <- colorpanel(n=length(breaks)-1,low="blue",mid="#f7f7f7",high="red")
+        #    #myCol <- colorpanel(n=length(breaks)-1,low="#2166ac",mid="#f7f7f7",high="#b2182b")
+        #}
+        myCol <- rev(colorRampPalette(brewer.pal(11, opt$color), bias=as.numeric(opt$colorBias))(length(breaks)-1))
         heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1, breaks=breaks)
     } else {
+        myCol <- rev(colorRampPalette(brewer.pal(11, opt$color), bias=as.numeric(opt$colorBias))(256))
+        #myCol <- rev(brewer.pal(11, opt$color))
         heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1)
         #heatmap.2(mat, trace="none", col=myCol, margins=c(15,20), cexCol=1, cexRow=1)
     }

@@ -79,4 +79,4 @@ if(length(names(lst)) <= 3 & opt$type=="ellipses") {
     dev.off()
 }
 
-#save.session("test.session")
+#save.session("overlap_venn.session")
