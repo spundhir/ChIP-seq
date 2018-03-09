@@ -329,6 +329,7 @@ if(!is.null(opt$listAnnotation)) {
         rm(figWidth, figHeight, maxClass, minGene, outDir, allowDuplicates)
         save.session(opt$sessionFile)
     }
+    save.session("test.session")
 } else {
     ## read input gene list file
     gene <- read.table(opt$inFile)
