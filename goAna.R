@@ -19,7 +19,8 @@ option_list <- list(
     make_option(c("-t", "--figHeight"), default="20", help="height of output figure"),
     make_option(c("-u", "--allowDuplicates"), default=0, help="Plot top -m classes even if some are common between classes"),
 	make_option(c("-b", "--bkgFile"), help="input file containing background gene list"),
-	make_option(c("-r", "--ftrResFile"), help="input file containing manually filtered GO categories to plot")
+	make_option(c("-r", "--ftrResFile"), help="input file containing manually filtered GO categories to plot"),
+	make_option(c("-q", "--logCount"), help="plot count data in log", action="store_true")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -152,15 +153,27 @@ if(!is.null(opt$listAnnotation)) {
         } else { 
             data_sig$Description <-factor(data_sig$Description, levels=data_sig$Description)
         }
-        p <- ggplot(data_sig, aes(x = Cluster, y = Description)) +
-            geom_point(aes(colour=pvalue,size=Count)) +
-            #geom_point(aes(colour=pvalue,size=GeneDensity*100)) +
-            scale_colour_gradient(low="brown", high="yellow") +
-            scale_size(range=c(1,10))
-            #scale_size(range=c((min(data_sig$GeneDensity)*100),(max(data_sig$GeneDensity*100))), breaks=waiver(), labels=waiver()) +
-            scale_size_area(breaks=seq(0,100,by=5), max_size=15) +
-            theme(text=element_text(size=10), axis.text.x=element_text(angle=90)) +
-            theme_bw(base_size=15)
+        if(is.null(opt$logCount)) {
+            p <- ggplot(data_sig, aes(x = Cluster, y = Description)) +
+                geom_point(aes(colour=pvalue,size=Count)) +
+                #geom_point(aes(colour=pvalue,size=GeneDensity*100)) +
+                scale_colour_gradient(low="brown", high="yellow") +
+                scale_size(range=c(1,10))
+                #scale_size(range=c((min(data_sig$GeneDensity)*100),(max(data_sig$GeneDensity*100))), breaks=waiver(), labels=waiver()) +
+                scale_size_area(breaks=seq(0,100,by=5), max_size=15) +
+                theme(text=element_text(size=10), axis.text.x=element_text(angle=90)) +
+                theme_bw(base_size=15)
+        } else {
+            p <- ggplot(data_sig, aes(x = Cluster, y = Description)) +
+                geom_point(aes(colour=pvalue,size=log(Count))) +
+                #geom_point(aes(colour=pvalue,size=GeneDensity*100)) +
+                scale_colour_gradient(low="brown", high="yellow") +
+                scale_size(range=c(1,10))
+                #scale_size(range=c((min(data_sig$GeneDensity)*100),(max(data_sig$GeneDensity*100))), breaks=waiver(), labels=waiver()) +
+                scale_size_area(breaks=seq(1,10,by=1), max_size=10) +
+                theme(text=element_text(size=10), axis.text.x=element_text(angle=90)) +
+                theme_bw(base_size=15)
+        }
         #ggsave(p, dpi=300, height=as.numeric(opt$maxClass)*1.5, width=length(unique(data_sig$Cluster))*1.5, filename=outFile, useDingbats=FALSE)
         ggsave(p, dpi=300, height=as.numeric(opt$figHeight), width=as.numeric(opt$figWidth), filename=outFile, useDingbats=FALSE)
         #ggsave(p, dpi=300, height=20, width=10, filename=outFile, useDingbats=FALSE)
@@ -295,18 +308,33 @@ if(!is.null(opt$listAnnotation)) {
         #high <- as.vector(quantile(data_sig$pvalue)[3])
         #data_sig[which(data_sig$pvalue > high),]$pvalue <- high
         data_sig$pvalue <- -log10(data_sig$pvalue)
-        p <- ggplot(data_sig, aes(x = Cluster, y = Description)) +
-            geom_point(aes(colour=pvalue,size=Count)) +
-            #geom_point(aes(colour=pvalue,size=GeneDensity*100)) +
-            #scale_colour_gradient(high="brown", low="yellow", name="p-value") +
-            #scale_colour_gradient(low="#00441b", high="#ccece6", name="p-value") +
-            scale_colour_gradient(high="#00441b", low="#99d8c9", name="-log10(p-value)") +
+        if(is.null(opt$logCount)) {
+            p <- ggplot(data_sig, aes(x = Cluster, y = Description)) +
+                geom_point(aes(colour=pvalue,size=Count)) +
+                #geom_point(aes(colour=pvalue,size=GeneDensity*100)) +
+                #scale_colour_gradient(high="brown", low="yellow", name="p-value") +
+                #scale_colour_gradient(low="#00441b", high="#ccece6", name="p-value") +
+                scale_colour_gradient(high="#00441b", low="#99d8c9", name="-log10(p-value)") +
                 #breaks=c(1e-20, 1e-15, 1e-10, 1e-5, 0.01, 0.05)) +
-            #scale_size(range=c(1,10)) +
-            #scale_size(range=c((min(data_sig$GeneDensity)*100),(max(data_sig$GeneDensity*100))), breaks=waiver(), labels=waiver()) +
-            scale_size_area(breaks=seq(0,100,by=10), max_size=20) +
-            theme(text=element_text(size=10), axis.text.x=element_text(angle=90)) +
-            theme_bw(base_size=15)
+                #scale_size(range=c(1,10)) +
+                #scale_size(range=c((min(data_sig$GeneDensity)*100),(max(data_sig$GeneDensity*100))), breaks=waiver(), labels=waiver()) +
+                scale_size_area(breaks=seq(0,100,by=10), max_size=20) +
+                theme(text=element_text(size=10), axis.text.x=element_text(angle=90)) +
+                theme_bw(base_size=15)
+        } else {
+            p <- ggplot(data_sig, aes(x = Cluster, y = Description)) +
+                geom_point(aes(colour=pvalue,size=log(Count))) +
+                #geom_point(aes(colour=pvalue,size=GeneDensity*100)) +
+                #scale_colour_gradient(high="brown", low="yellow", name="p-value") +
+                #scale_colour_gradient(low="#00441b", high="#ccece6", name="p-value") +
+                scale_colour_gradient(high="#00441b", low="#99d8c9", name="-log10(p-value)") +
+                #breaks=c(1e-20, 1e-15, 1e-10, 1e-5, 0.01, 0.05)) +
+                #scale_size(range=c(1,10)) +
+                #scale_size(range=c((min(data_sig$GeneDensity)*100),(max(data_sig$GeneDensity*100))), breaks=waiver(), labels=waiver()) +
+                scale_size_area(breaks=seq(1,10,by=1), max_size=10) +
+                theme(text=element_text(size=10), axis.text.x=element_text(angle=90)) +
+                theme_bw(base_size=15)
+        }
         #ggsave(p, dpi=300, height=as.numeric(opt$maxClass)*1.5, width=length(unique(data_sig$Cluster))*2, filename=outFile, useDingbats=FALSE)
         ggsave(p, dpi=300, height=as.numeric(opt$figHeight), width=as.numeric(opt$figWidth), filename=outFile, useDingbats=FALSE)
         #ggsave(p, dpi=300, height=10, width=9, filename=outFile, useDingbats=FALSE)

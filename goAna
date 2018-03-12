@@ -51,13 +51,14 @@ echo Program: "goAna (perform gene ontology analysis on input gene list)"
     echo " -t <int>    [Height of output figure (default: 20)]"
     echo " -b <file>   [input file containing background gene list]"
     echo " -r <file>   [input file containing manually filtered GO categories to plot"]
+    echo " -q          [plot count data in log]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:d:a:p:m:n:cfu:w:t:b:r:h ARG; do
+while getopts i:o:g:d:a:p:m:n:cfu:w:t:b:r:qh ARG; do
 	case "$ARG" in
 		i) GENEFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -74,6 +75,7 @@ while getopts i:o:g:d:a:p:m:n:cfu:w:t:b:r:h ARG; do
         t) FIGHEIGHT=$OPTARG;;
         b) BKGFILE=$OPTARG;;
         r) FTRRESFILE=$OPTARG;;
+        q) LOGCOUNT=1;;
 		h) HELP=1;;
 	esac
 done
@@ -136,6 +138,10 @@ echo "Initiate GO analysis (`date`).. "
 ADD_ARG=""
 if [ ! -z "$BKGFILE" ]; then
     ADD_ARG="-b $BKGFILE "
+fi
+
+if [ ! -z "$LOGCOUNT" ]; then
+    ADD_ARG="$ADD_ARG -q "
 fi
 
 if [ ! -z "$FTRRESFILE" ]; then
