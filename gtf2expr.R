@@ -6,7 +6,7 @@ option_list <- list(
 	make_option(c("-i", "--configFile"), help="input configuration file containing bam file information (can be stdin; FORMAT: tpm test.bam)"),
 	make_option(c("-o", "--outFile"), help="output file containing read counts"),
     make_option(c("-n", "--genome"), help="genome (mm9, mm10, hg19, hg38)"),
-    make_option(c("-j", "--gtfFile"), help="input file containing genomic coordinate in GTF (optional)"),
+    make_option(c("-j", "--gtfFile"), help="input file containing genomic coordinate of genes in GTF format (optional)"),
     make_option(c("-t", "--featureType"), default="exon", help="specify the feature type (default: %default)"),
     make_option(c("-r", "--attributeType"), default="gene_name", help="specify the feature type (default: %default)"),
     make_option(c("-O", "--allowMultiassign"), action="store_true", help="allow reads assignment to multiple features"),
