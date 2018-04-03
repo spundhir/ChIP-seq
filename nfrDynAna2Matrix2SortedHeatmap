@@ -25,7 +25,7 @@ usage() {
 	echo "Options:"
 	echo " -i <file>           [file containing NFR with statistics from nfrDynAna2Matrix script (can be stdin)]"
     echo "                     [stdin, only if -l is not stdin]"
-    echo "                     [bed: chr start end name class (...)]"
+    echo "                     [bed: chr start end name class (strand ...)]"
     echo "                     [genebody: gene class (....)]"
     echo "                     [(...) additional columns can be TPM values by which to sort coordinates using -a param]"
     echo " -k <dir>            [input directory containing BAM files for various histone marks]"
