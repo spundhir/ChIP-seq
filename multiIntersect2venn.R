@@ -41,7 +41,7 @@ if(is.null(opt$list)) {
     ## brewer.pal minimal value for n is 3, returning requested palette with 3 different levels (uncomment)
     #vec <- as.vector(unique(data[!grepl("[,_]+", data$V5),]$V5))
     vec <- as.vector(unique(data[!grepl("[,]+", data$V5),]$V5))
-    data$id <- sprintf("%d_%d", data$V2, data$V3)
+    data$id <- sprintf("%s_%d_%d", data$V1, data$V2, data$V3)
 } else {
     colnames(data) <- c("id", "V5")
     vec <- as.vector(unique(data[!grepl(",", data$V5),]$V5))
