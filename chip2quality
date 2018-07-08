@@ -5,6 +5,7 @@
 PROGDIR="/home/pundhir/software/idrCode"
 IDR_THRESHOLD="0.01"
 PROCESSOR=1
+CONFIG_FILTER="qual"
 
 #### usage ####
 usage() {
@@ -16,24 +17,29 @@ usage() {
 	echo "Options:"
     echo " -i <file>   [mapped ChIP files in BAM format]"
     echo "             [if multiple separate them by a comma]"
+    echo "             **OR**"
+    echo "             [input configuration file containing bam file information]"
+    echo "             [<id> <bam file> (id should start with qual)]"
     echo " -o <dir>    [output directory]"
     echo "[OPTIONS]"
     echo " -p <int>    [number of processors (default: 1)]"
     echo " -t <float>  [IDR threshold (default: 0.01)]"
     echo " -d <dir>    [path to dependent R scripts (default: /home/pundhir/software/idrCode)]"
+    echo " -f <string> [filter bam files from configuration file based on input indentifier (default: qual)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:p:t:d:h ARG; do
+while getopts i:o:p:t:d:f:h ARG; do
 	case "$ARG" in
         i) BAMFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         p) PROCESSOR=$OPTARG;;
         t) IDR_THRESHOLD=$OPTARG;;
         d) PROGDIR=$OPTARG;;
+        f) CONFIG_FILTER=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -50,6 +56,21 @@ if [ ! -d "$OUTDIR" ]; then
     mkdir -p $OUTDIR
 fi
 echo "done"
+
+## check if input is BAM files or configuration file containing BAM file information
+INPUT=$(echo $BAMFILE | perl -ane '$_=~s/\,.*//g; print $_;')
+if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
+    ## read configuration file
+    INPUT=$(cat $BAMFILE | perl -ane '
+        if($_=~/^'$CONFIG_FILTER'/) {
+            $file.="$F[1],";
+        } END {
+            $file=~s/\,$//g;
+            print "$file\n";
+        }'
+    )
+    BAMFILE=$INPUT
+fi
 
 ###############################################
 ## determine number of input ChIP samples
