@@ -93,6 +93,7 @@ echo -n "Compute enrichment and quality measure for input ChIP-seq data.. "
 if [ -e "$PROGDIR/phantompeakqualtools/run_spp.R" ]; then
     for (( i=0; i<$BAMFILES_COUNT; i++ )); do
         ID=$(echo ${BAMFILES[$i]} | perl -an -F'/\,/' -e '$ID=(); foreach(@F) { $_=~s/^.+\///g; $_=~s/\..+$//g; chomp($_); $ID.=$_."_"; } $ID=~s/\_$//g; print "$ID\n";' | perl -an -F'//' -e 'chomp($_); if(scalar(@F)>50) { $_=~s/\_R[0-9]+.*$//g; print "$_\n"; } else { print "$_\n"; }');
+        echo -n "$ID.."
         #Rscript $PROGDIR/phantompeakqualtools/run_spp.R -c=$INDIR/$CHIP_ID"Rep"$i.bam -fdr=$IDR_THRESHOLD -savp -odir=$OUTDIR/quality -out=$OUTDIR/quality/quality.txt -tmpdir=$OUTDIR/quality &> $OUTDIR/logs/quality.log
         samtools view -b -F 1548 -q 30 ${BAMFILES[$i]} | bamToBed -i stdin | awk 'BEGIN{S="\t";OFS="\t"}{$4="N";print $0}' | gzip -c > $OUTDIR/$ID.tagAlign.gz
         Rscript $PROGDIR/phantompeakqualtools/run_spp.R -c=$OUTDIR/$ID.tagAlign.gz -fdr=$IDR_THRESHOLD -savp -odir=$OUTDIR -out=$OUTDIR/$ID.quality.txt &> $OUTDIR/$ID.quality.log
