@@ -91,14 +91,17 @@ echo "done"
 
 ###############################################
 echo -n "Start analysis.. "
+ID=$(echo $BAMFILE | perl -an -F'/\,/' -e '$_=~s/\,.*//g; $_=~s/^.*\///g; $_=~s/\..*//g; chomp($_); print "$_";') 
+
 BAMFILES=$(echo $BAMFILE | sed 's/\,/ /g')
+
 if [ ! -z "$CHIPSEQ" ]; then
-    multiBamSummary bins --bamfiles $BAMFILES -out $OUTDIR/covMat --ignoreDuplicates -p $PROCESSOR
+    multiBamSummary bins --bamfiles $BAMFILES -out $OUTDIR/$ID.covMat --ignoreDuplicates -p $PROCESSOR
 else
-    multiBamSummary bins --bamfiles $BAMFILES -out $OUTDIR/covMat -p $PROCESSOR
+    multiBamSummary bins --bamfiles $BAMFILES -out $OUTDIR/$ID.covMat -p $PROCESSOR
 fi
 
-plotCorrelation -in $OUTDIR/covMat.npz -o $OUTDIR/reproducibility_heatmap.pdf -c spearman -p heatmap --plotNumbers
+plotCorrelation -in $OUTDIR/$ID.covMat -o $OUTDIR/$ID.reproducibility_heatmap.pdf -c spearman -p heatmap --plotNumbers
 echo "done"
 
 exit
