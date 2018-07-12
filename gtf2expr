@@ -86,10 +86,10 @@ fi
 TMP_FILE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 
 ## check, if input genomic coordinates are in BED format, and convert to GTF
-IS_BED=$(zless $INPUTCOORFILE | cut -f 2 | head -n 2 | tail -n 1 | perl -ane 'if(\$_=~/^[0-9]+\$/) { print \$_; }' | wc -l);
+IS_BED=$(zless $INPUTCOORFILE | cut -f 2 | head -n 2 | tail -n 1 | perl -ane 'if($_=~/^[0-9]+$/) { print $_; }' | wc -l);
 
 if [ "$IS_BED" -gt 0 ]; then
-    zless $INPUTCOORFILE | perl -ane 'chomp($F[5]); if($F[0]=~/\_/) { next; } $count++; $F[3]=~s/^.*\///g; print "$F[0]\tregion\t'$FEATURE'\t\$F[1]\t$F[2]\t.\t$F[5]\t.\tgene_id \"$F[3]\"\n";' > $TMP_FILE.gtf
+    zless $INPUTCOORFILE | perl -ane 'chomp($F[5]); if($F[0]=~/\_/) { next; } $count++; $F[3]=~s/^.*\///g; print "$F[0]\tregion\t'$FEATURE'\t$F[1]\t$F[2]\t.\t$F[5]\t.\tgene_id \"$F[3]\"\n";' > $TMP_FILE.gtf
     INPUTCOORFILE="$TMP_FILE.gtf"
 fi
 
