@@ -24,14 +24,15 @@ usage() {
     echo " -s          [do not sort output BED file]"
     echo " -m          [mark window flanking to left as from - and to right as from + strand]"
     echo "             [only valid with -l or -r parameters]"
-    echo " -p          [create window for pol2 pausing calculation (-50 to -w)]"
+    echo " -S          [create TSSR for pol2 pausing calculation (TSS-50 to TSS+w)]"
+    echo " -E          [create TESR for pol2 pausing calculation (TES-w to TES+50)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:w:xtuvlrsmph ARG; do
+while getopts i:w:xtuvlrsmSEh ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         w) WIN=$OPTARG;;
@@ -43,7 +44,8 @@ while getopts i:w:xtuvlrsmph ARG; do
         r) RIGHT=1;;
         s) NOSORT=1;;
         m) MARK_STRAND=1;;
-        p) PAUSING=1;;
+        S) TSSR_PAUSING=1;;
+        E) TESR_PAUSING=1;;
 		h) HELP=1;;
 	esac
 done
@@ -53,11 +55,17 @@ if [ -z "$INPUTBEDFILE" -o "$HELP" ]; then
 	usage
 fi
 
-if [ ! -z "$PAUSING" ]; then
+if [ ! -z "$TSSR_PAUSING" ]; then
     if [ -f "$INPUTBEDFILE" ]; then
         zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $start=$F[2]-'$WIN'; $end=$F[2]+50; } else { $end=$F[1]+'$WIN'; $start=$F[1]-50; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
     elif [ "$INPUTBEDFILE" == "stdin" ]; then
         while read LINE; do echo "${LINE}"; done | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $start=$F[2]-'$WIN'; $end=$F[2]+50; } else { $end=$F[1]+'$WIN'; $start=$F[1]-50; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
+    fi
+elif [ ! -z "$TESR_PAUSING" ]; then
+    if [ -f "$INPUTBEDFILE" ]; then
+        zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $start=$F[1]+'$WIN'; $end=$F[1]-50; } else { $end=$F[2]-'$WIN'; $start=$F[2]+50; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
+    elif [ "$INPUTBEDFILE" == "stdin" ]; then
+        while read LINE; do echo "${LINE}"; done | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $start=$F[1]+'$WIN'; $end=$F[1]-50; } else { $end=$F[2]-'$WIN'; $start=$F[2]+50; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
     fi
 elif [ ! -z "$LEFT" -a ! -z "$RIGHT" ]; then
     if [ -f "$INPUTBEDFILE" ]; then
