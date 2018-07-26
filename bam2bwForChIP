@@ -4,6 +4,7 @@
 ## DEPENDENCIES
 GENOME="mm9"
 EXTEND_VALUE=0
+PROCESSORS=1
 
 #### usage ####
 usage() {
@@ -19,25 +20,29 @@ usage() {
     echo " -g <string> [genome (default: mm9)]"
     echo " -k          [keep bedGraph file also]"
     echo " -e          [extend 3' end of reads (useful for ChIP-seq data)]"
-    echo " -s          [scale the coverage to TPM]"
+    echo " -c          [scale the coverage to TPM]"
+    echo " -C          [scale the coverage to 1x]"
     echo " -z <float>  [scale the coverage by input size factor (computed using DESeq2)]"
     echo " -b          [also output the BED file]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:kesbz:h ARG; do
+while getopts i:o:g:kecCz:bp:h ARG; do
 	case "$ARG" in
 		i) BAMFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         g) GENOME=$OPTARG;;
         k) KEEP=1;;
         e) EXTEND=1;;
-        s) SCALE=1;;
+        c) SCALE=1;;
+        C) SCALE1x=1;;
         z) SIZEFACTOR=$OPTARG;;
         b) BED=1;;
+        p) PROCESSORS=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -51,15 +56,19 @@ echo -n "Populating files based on input genome, $GENOME (`date`).. "
 if [ "$GENOME" == "mm9" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
     GENOME_MACS2="mm"
+    GENOME_SIZE=2150570000
 elif [ "$GENOME" == "mm10" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm10.genome"
     GENOME_MACS2="mm"
+    GENOME_SIZE=2150570000
 elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
     GENOME_MACS2="hs"
+    GENOME_SIZE=2451960000
 elif [ "$GENOME" == "hg38" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg38.genome"
     GENOME_MACS2="hs"
+    GENOME_SIZE=2451960000
 else
     echo "Presently the program only support analysis for mm9, mm10, hg19 or hg38"
 echo
@@ -109,12 +118,15 @@ if [ ! -z "$OUTDIR" ]; then
         #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $OUTDIR/$ID.bedGraph
 
         ## use deeptools instead
-        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeUsingRPKM -e $EXTEND_VALUE
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeUsingRPKM -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+    elif [ ! -z "$SCALE1x" ]; then
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeTo1x $GENOME_SIZE -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
     elif [ ! -z "$SIZE_FACTOR" ]; then
         SCALE_FACTOR=$(echo $SIZE_FACTOR | perl -ane 'printf("%0.6f", 1/$_);')
         bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $OUTDIR/$ID.bedGraph
     else
-        bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split > $OUTDIR/$ID.bedGraph
+        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split > $OUTDIR/$ID.bedGraph
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
     fi
 
     if [ -e "$ID.bedGraph" ]; then
@@ -135,12 +147,15 @@ else
         #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $ID.bedGraph
 
         ## use deeptools instead
-        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeUsingRPKM -e $EXTEND_VALUE
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeUsingRPKM -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+    elif [ ! -z "$SCALE1x" ]; then
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeTo1x $GENOME_SIZE -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
     elif [ ! -z "$SIZE_FACTOR" ]; then
         SCALE_FACTOR=$(echo $SIZE_FACTOR | perl -ane 'printf("%0.6f", 1/$_);')
         bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $ID.bedGraph
     else
-        bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split > $ID.bedGraph
+        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split > $ID.bedGraph
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
 
     fi
 
