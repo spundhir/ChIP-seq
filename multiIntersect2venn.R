@@ -49,7 +49,7 @@ if(is.null(opt$list)) {
 lst <- list()
 k <- 1
 for(i in vec) { 
-    l <- data[grep(i, data$V5),]$id
+    l <- data[grep(sprintf("^%s$", i), data$V5),]$id
     lst[[k]] <- l
     k=k+1
 }
