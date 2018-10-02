@@ -3,7 +3,7 @@ suppressPackageStartupMessages(library("optparse"))
 
 ## parse command line arguments
 option_list <- list(
-	make_option(c("-i", "--inFile"), help="input BED file created using multiIntersectBed (can be stdin)"),
+	make_option(c("-i", "--inFile"), help="input BED file created using multiIntersectBed (can be stdin; 5th col: id_1,id_2)"),
 	make_option(c("-o", "--outFile"), help="output pdf file"),
 	make_option(c("-l", "--list"), help="input file contains list (format: id condition; eg. ENSG00000001617 WT)", action="store_true"),
 	make_option(c("-t", "--type"), default="ellipses", help="type of plot; ellipses or ChowRuskey. (default: %default)"),
@@ -46,19 +46,30 @@ if(is.null(opt$list)) {
     colnames(data) <- c("id", "V5")
     vec <- as.vector(unique(data[!grepl(",", data$V5),]$V5))
 }
-lst <- list()
-k <- 1
-for(i in vec) { 
-    l <- data[grep(sprintf("^%s$", i), data$V5),]$id
-    lst[[k]] <- l
-    k=k+1
+#lst <- list()
+#k <- 1
+#for(i in vec) {
+#    if(is.null(opt$list)) {
+#        l <- data[grep(i, data$V5),]$id
+#    } else {
+#        l <- data[grep(sprintf("^%s$", i), data$V5),]$id
+#    }
+#    lst[[k]] <- l
+#    k=k+1
+#}
+
+if(is.null(opt$list)) {
+    lst <- lapply(vec, function(x) data[grep(x, data$V5),]$id)
+} else {
+    lst <- lapply(vec, function(x) data[grep(x, data$V5),]$id)
+    #lst <- lapply(vec, function(x) data[grep(sprintf("^%s$", x), data$V5),]$id)
 }
 names(lst) <- vec
 col <- brewer.pal(length(vec)+1, "Spectral")
 col <- col[1:length(vec)]
 
-gom.obj <- newGOM(lst, lst, opt$gs)
-mat <- getMatrix(gom.obj, name="pval")
+#gom.obj <- newGOM(lst, lst, opt$gs)
+#mat <- getMatrix(gom.obj, name="pval")
 
 if(length(names(lst)) <= 3 & opt$type=="ellipses") {
     #venn.plot <- venn.diagram(lst, fill=col, NULL)
@@ -69,13 +80,13 @@ if(length(names(lst)) <= 3 & opt$type=="ellipses") {
     Vstem <- Venn(lst)
     pdf(opt$outFile)
     plot(Vstem)
-    pheatmap(mat, display_numbers=T, number_format="%.1e", fontsize=10)
+    #pheatmap(mat, display_numbers=T, number_format="%.1e", fontsize=10)
     dev.off()
 } else {
     Vstem <- Venn(lst)
     pdf(opt$outFile)
     plot(Vstem, type=opt$type)
-    pheatmap(mat, display_numbers=T, number_format="%.1e", fontsize=10)
+    #pheatmap(mat, display_numbers=T, number_format="%.1e", fontsize=10)
     dev.off()
 }
 
