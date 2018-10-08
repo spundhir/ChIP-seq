@@ -14,6 +14,7 @@ MIN_P_T=3 ## recommended 3 (Andersson et al. 2014)
 B=100 ## recommended 30 (Andersson et al. 2014)
 S=100 ## recommended 100 (Andersson et al. 2014)
 MIN_N_CLASS=1
+SIZE=200
 
 #### usage ####
 usage() {
@@ -42,14 +43,24 @@ echo Program: "multiClassMotifAna (perform motif analysis on genomic regions fro
     echo " -z <float>  [remove motifs with background percentage greater than # (default: 100)]"
     echo " -n <int>    [number of motifs to optimize for each motif length (default: 100)]"
     echo " -b <file>   [custom background file]"
-    echo " -x <int>    [minimum number of elements within each region class to plot (default: 1)]" 
+    echo " -x <int>    [minimum number of elements within each region class to plot (default: 1)]"
+    echo " -d <int>    [size of region (default: 200bp)]"  
+    echo "             [The size of the region used for motif finding is important.  If analyzing ChIP-Seq peaks from a transcription factor,]"  
+    echo "             [Chuck would recommend 50 bp for establishing the primary motif bound by a given transcription factor and 200 bp for  ]"
+    echo "             [finding both primary and 'co-enriched' motifs for a transcription factor.  When looking at histone marked regions,   ]"
+    echo "             [500-1000 bp is probably a good idea (i.e. H3K4me or H3/H4 acetylated regions).  In theory, HOMER can work with very  ]"
+    echo "             [large regions (i.e. 10kb), but with the larger the regions comes more sequence and longer execution time.  These     ]"
+    echo "             [regions will be based off the center of the peaks.  If you prefer an offset, you can specify '-size -300,100' to     ]"
+    echo "             [search a region of size 400 that is centered 100 bp upstream of the peak center (useful if doing motif finding on    ]"
+    echo "             [putative TSS regions).  If you have variable length regions, use the option '-size given' and HOMER will use the     ]"
+    echo "             [exact regions that were used as input.]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:s:g:r:c:t:u:v:w:p:y:z:n:b:x:h ARG; do
+while getopts i:o:s:g:r:c:t:u:v:w:p:y:z:n:b:x:d:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -67,6 +78,7 @@ while getopts i:o:s:g:r:c:t:u:v:w:p:y:z:n:b:x:h ARG; do
         n) S=$OPTARG;;
         b) BKG_FILE=$OPTARG;;
         x) MIN_N_CLASS=$OPTARG;;
+        d) SIZE=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -105,6 +117,10 @@ elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
     REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg19.simpleRepeat.gz"
     GENOME_NAME="human"
+elif [ "$GENOME" == "danRer7" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.simpleRepeat.gz"   
+    GENOME_NAME="zebrafish"  
 else
     echo "Presently the program only support analysis for mm9, hg19 or danRer7"
     echo
@@ -134,9 +150,9 @@ for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$
     fi
 
     if [ -z "$BKG_FILE" ]; then
-        motifAna -i $OUTDIR/enhancer_$ID.bed -o $MOTIFDIR -m 1 -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x $PVALUE -y $MIN_P_T -n $S -g $GENOME -p $PROCESSOR -s $TFBS_FILE &>$MOTIFDIR/$ID.log &
+        motifAna -i $OUTDIR/enhancer_$ID.bed -o $MOTIFDIR -m 1 -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x $PVALUE -y $MIN_P_T -n $S -g $GENOME -p $PROCESSOR -s $TFBS_FILE -d $SIZE &>$MOTIFDIR/$ID.log &
     else
-        motifAna -i $OUTDIR/enhancer_$ID.bed -o $MOTIFDIR -m 1 -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x $PVALUE -y $MIN_P_T -n $S -g $GENOME -p $PROCESSOR -s $TFBS_FILE -b $BKG_FILE &>$MOTIFDIR/$ID.log &
+        motifAna -i $OUTDIR/enhancer_$ID.bed -o $MOTIFDIR -m 1 -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x $PVALUE -y $MIN_P_T -n $S -g $GENOME -p $PROCESSOR -s $TFBS_FILE -b $BKG_FILE -d $SIZE &>$MOTIFDIR/$ID.log &
     fi
 
     MOTIFDIR_ALL="$MOTIFDIR_ALL,$MOTIFDIR"

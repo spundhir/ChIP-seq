@@ -12,6 +12,7 @@ PVALUE="0.01" ## recommended 1e-15 (Andersson et al. 2014)
 MIN_P_T=0 ## recommended 3 (Andersson et al. 2014)
 B=100 ## recommended 30 (Andersson et al. 2014)
 S=25 ## recommended 100 (Andersson et al. 2014)
+SIZE=200
 
 #### usage ####
 usage() {
@@ -37,13 +38,23 @@ usage() {
     echo " -z <float>  [remove motifs with background percentage greater than # (default: 100)]"
     echo " -n <int>    [number of motifs to optimize for each motif length (default: 25)]"
     echo " -b <file>   [custom background file]"
+    echo " -d <int>    [size of region (default: 200bp)]"
+    echo "             [The size of the region used for motif finding is important.  If analyzing ChIP-Seq peaks from a transcription factor,]"
+    echo "             [Chuck would recommend 50 bp for establishing the primary motif bound by a given transcription factor and 200 bp for  ]"
+    echo "             [finding both primary and 'co-enriched' motifs for a transcription factor.  When looking at histone marked regions,   ]"
+    echo "             [500-1000 bp is probably a good idea (i.e. H3K4me or H3/H4 acetylated regions).  In theory, HOMER can work with very  ]"
+    echo "             [large regions (i.e. 10kb), but with the larger the regions comes more sequence and longer execution time.  These     ]"
+    echo "             [regions will be based off the center of the peaks.  If you prefer an offset, you can specify '-size -300,100' to     ]"
+    echo "             [search a region of size 400 that is centered 100 bp upstream of the peak center (useful if doing motif finding on    ]"
+    echo "             [putative TSS regions).  If you have variable length regions, use the option '-size given' and HOMER will use the     ]"
+    echo "             [exact regions that were used as input.]"
     echo " -h          [help]"
     echo
     exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:h ARG; do
+while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:d:h ARG; do
 	case "$ARG" in
 		i) INDIR=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -59,6 +70,7 @@ while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:h ARG; do
         z) B=$OPTARG;;
         n) S=$OPTARG;;
         b) BKG_FILE=$OPTARG;;
+        d) SIZE=$OPTARG;;
         h) HELP=1;;
 	esac
 done
@@ -149,9 +161,9 @@ for CLASS in DENOVO KNOWN; do
             mkdir -p ${INDIRS[$i]}/$CLASS"_motifDynAna"
         fi
         if [ -z "$BKG_FILE" ]; then
-            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT
+            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -size $SIZE
         else
-            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE
+            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE
         fi
 
         if [ -z "$BKG_FILE" ]; then
