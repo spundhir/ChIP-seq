@@ -1,0 +1,54 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+#### usage ####
+usage() {
+	echo Program: "file2line (fetch line from file matching input value in defined column)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: file2line -i <file> -j <string> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input tab delimited file (can be stdin)]"
+    echo " -j          [string to match]"
+    echo "[OPTIONS]"
+    echo " -c          [column in which string to be match (default: anywhere)]"
+    echo " -h          [help]"
+    echo "[NOTE]"
+    echo " Solves following problem: grep -w 1 <file> returns both 1 as well as 10, 11 etc"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:c:h ARG; do
+    case "$ARG" in
+    i) INFILE=$OPTARG;;
+    j) PATTERN=$OPTARG;;
+    c) COLUMN=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INFILE" -o -z "$PATTERN" -o "$HELP" ]; then
+	usage
+fi
+
+if [ ! -z "$COLUMN" ]; then
+    if [ "$INFILE" == "stdin" ]; then
+        while read LINE; do
+            echo ${LINE}
+        done
+    else
+        zless $INFILE 
+    fi | perl -ane 'if($_!~/^#/) { if($F['$((COLUMN-1))']=~/^'$PATTERN'$/) { print $_; } }'
+else 
+    if [ "$INFILE" == "stdin" ]; then
+        while read LINE; do
+            echo ${LINE}
+        done
+    else
+        zless $INFILE 
+    fi | perl -ane 'if($_!~/^#/) { if($_=~/\s+'$PATTERN'\s+/) { print $_; } }'
+fi
