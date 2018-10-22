@@ -21,7 +21,7 @@ opt <- parse_args(parser)
 
 ## check, if all required arguments are given
 if(is.null(opt$configFile) | is.null(opt$outFile) | is.null(opt$genome)) {
-	cat("\nProgram: motifDynAna.R (R script to compute read count corresponding to input GTF file)\n")
+	cat("\nProgram: gtf2expr.R (R script to compute read count corresponding to input GTF file)\n")
 	cat("Author: BRIC, University of Copenhagen, Denmark\n")
 	cat("Version: 1.0\n")
 	cat("Contact: pundhir@binf.ku.dk\n");
