@@ -14,19 +14,21 @@ usage() {
     echo " -r          [remove empty columns]"
     echo " -t          [convert spaces to tab]"
     echo " -m          [convert comma to tab]"
+    echo " -n <int>    [reformat file to ensure input number of columns]"
     echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:crtmh ARG; do
+while getopts i:crtmn:h ARG; do
     case "$ARG" in
     i) INFILE=$OPTARG;;
     c) COUNT=1;;
     r) REMOVE=1;;
     t) TAB=1;;
     m) COMMA=1;;
+    n) NCOL=$OPTARG;;
     h) HELP=1;;
     esac
 done
@@ -52,6 +54,14 @@ elif [ ! -z "$COMMA" ]; then
     else
         zless $INFILE 
     fi | perl -an -F'/\,/' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
+elif [ ! -z "$NCOL" ]; then
+    if [ "$INFILE" == "stdin" ]; then
+        while read LINE; do
+            echo ${LINE}
+        done
+    else
+        zless $INFILE 
+    fi | perl -ane 'if(scalar(@F)<'$NCOL') { chomp($_); print $_; $i='$NCOL'-scalar(@F); while($i>0) { print "\tNA"; $i--; } print "\n"; } else { print $_; }'
 else
     ## create temporary BED file if input is from stdin
     if [ "$INFILE" == "stdin" ]; then
