@@ -61,7 +61,7 @@ elif [ ! -z "$NCOL" ]; then
         done
     else
         zless $INFILE 
-    fi | perl -ane 'if(scalar(@F)<'$NCOL') { chomp($_); print $_; $i='$NCOL'-scalar(@F); while($i>0) { print "\tNA"; $i--; } print "\n"; } else { print $_; }'
+    fi | perl -ane 'print $F[0]; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } if(scalar(@F)<'$NCOL') { $i='$NCOL'-scalar(@F); while($i>0) { print "\tNA"; $i--; } print "\n"; }'
 else
     ## create temporary BED file if input is from stdin
     if [ "$INFILE" == "stdin" ]; then
