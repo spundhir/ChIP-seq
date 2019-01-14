@@ -257,14 +257,23 @@ if [ -z "$EXIST" ]; then
         IFS=$oIFS
     fi
 
-    k=0;
+    k=-1;
+    LAST_SEEN_FILE="NA";
     echo -n "using colors: " >&2
     while read LINE; do
+        FILE=$(echo ${LINE} | cut -f 2 -d ' ');
+        if [ "$LAST_SEEN_FILE" != "$FILE" ]; then
+            k=$(( k+1 ))
+        fi
         echo -e "${LINE}\t150\t\"${COLORS[$k]}\""
         echo -n "${COLORS[$k]} " >&2
-        k=$(( k+1 ))
+        LAST_SEEN_FILE=$FILE;
+
         if [ -z "${COLORS[$k]}" ]; then
             k=0;
+            echo >&2
+            echo "WARNING: not enough line colors provided for region classes" >&2
+            echo >&2
         fi
     done < $OUTDIR/NGSPLOT.txt.tmp > $OUTDIR/NGSPLOT.txt
     rm $OUTDIR/NGSPLOT.txt.tmp
