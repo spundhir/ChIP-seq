@@ -263,6 +263,9 @@ if [ -z "$EXIST" ]; then
         echo -e "${LINE}\t150\t\"${COLORS[$k]}\""
         echo -n "${COLORS[$k]} " >&2
         k=$(( k+1 ))
+        if [ -z "${COLORS[$k]}" ]; then
+            k=0;
+        fi
     done < $OUTDIR/NGSPLOT.txt.tmp > $OUTDIR/NGSPLOT.txt
     rm $OUTDIR/NGSPLOT.txt.tmp
     echo "done" >&2
