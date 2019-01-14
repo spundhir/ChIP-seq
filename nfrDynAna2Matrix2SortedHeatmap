@@ -15,6 +15,7 @@ KNC=5
 SS="both"
 MW=13
 YLIM="auto"
+PLOTTITLE="ngsplot"
 
 #### usage ####
 usage() {
@@ -37,6 +38,7 @@ usage() {
     echo " -d <string>         [filter BAM files not matching identifiers eg. wt or gmp]"
     echo "                     [if multiple seperate them by a comma]"
     echo " -g <string>         [genome (default: mm9]"
+    echo " -T <string>         [name of the output histone profile plot (default: ngsplot)]"
     echo " -p <int>            [number of processor to use (default: 1)]"
     echo " -a <string>         [gene order algorithm for heatmap (default: none)]"
     echo "                     [total, hc, max, prod, diff, km, none, h3k27ac, cobinding, expr, tf_fc, tf_expr, sum"
@@ -75,7 +77,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:k:o:f:d:g:p:a:q:b:c:t:Y:s:w:z:e:nr:M:jy:xu:l:vh ARG; do
+while getopts i:k:o:f:d:g:T:p:a:q:b:c:t:Y:s:w:z:e:nr:M:jy:xu:l:vh ARG; do
 	case "$ARG" in
 		i) NFR=$OPTARG;;
         k) CHIPDIR=$OPTARG;;
@@ -83,6 +85,7 @@ while getopts i:k:o:f:d:g:p:a:q:b:c:t:Y:s:w:z:e:nr:M:jy:xu:l:vh ARG; do
         f) CHIP_INCL_FILTER=$OPTARG;;
         d) CHIP_EXCL_FILTER=$OPTARG;;
         g) GENOME=$OPTARG;;
+        T) PLOTTITLE=$OPTARG;;
         p) PROCESSOR=$OPTARG;;
         a) GENE_ORDER=$OPTARG;;
         q) KNC=$OPTARG;;
@@ -136,8 +139,9 @@ function wait_for_jobs_to_finish {
 ###############
 
 echo -n "Create directory structure (`date`).. "
-if [ ! -d "$OUTDIR" ]; then
-    mkdir -p $OUTDIR
+OUTDIR_TMP="$OUTDIR/$PLOTTITLE.tmp"
+if [ ! -d "$OUTDIR_TMP" ]; then
+    mkdir -p $OUTDIR_TMP
 fi
 echo "done"
 
@@ -162,10 +166,10 @@ if [ "$NFR" == "stdin" ]; then
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     while read LINE; do
         echo ${LINE}
-    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/$TMP
-    NFR=$OUTDIR/$TMP
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR_TMP/$TMP
+    NFR=$OUTDIR_TMP/$TMP
 else
-    scp $NFR $OUTDIR/NFR_DYNAMICS.TXT
+    scp $NFR $OUTDIR_TMP/NFR_DYNAMICS.TXT
 fi
 
 ## create temporary BED file if TF input is from stdin
@@ -174,9 +178,9 @@ if [ ! -z "$TFSUMMIT" ]; then
     if [ "$TFSUMMIT" == "stdin" ]; then
         while read LINE; do
             echo ${LINE}
-        done | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n"' > $OUTDIR/TFSUMMIT.BED
+        done | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n"' > $OUTDIR_TMP/TFSUMMIT.BED
     elif [ -f "$TFSUMMIT" ]; then
-        scp $TFSUMMIT $OUTDIR/TFSUMMIT.BED
+        scp $TFSUMMIT $OUTDIR_TMP/TFSUMMIT.BED
     else
         usage
     fi
@@ -184,21 +188,21 @@ if [ ! -z "$TFSUMMIT" ]; then
 
     echo -n "Retrieve NFR to analyse based on input criteria (`date`).. "
     if [ -z "$TFSUMMIT_EXCL" ]; then
-        intersectBed -a $NFR -b $OUTDIR/TFSUMMIT.BED -u > $OUTDIR/NFR_DYNAMICS.TXT
+        intersectBed -a $NFR -b $OUTDIR_TMP/TFSUMMIT.BED -u > $OUTDIR_TMP/NFR_DYNAMICS.TXT
     else
-        intersectBed -a $NFR -b $OUTDIR/TFSUMMIT.BED -v > $OUTDIR/NFR_DYNAMICS.TXT
+        intersectBed -a $NFR -b $OUTDIR_TMP/TFSUMMIT.BED -v > $OUTDIR_TMP/NFR_DYNAMICS.TXT
     fi
     echo "done"
 else
-    scp $NFR $OUTDIR/NFR_DYNAMICS.TXT
+    scp $NFR $OUTDIR_TMP/NFR_DYNAMICS.TXT
 fi
 
 if [ ! -z "$SPLIT" ]; then
     echo -n "Define classes by splitting input files into $SPLIT subsets (`date`).. "
-    LINES=$(cat $OUTDIR/NFR_DYNAMICS.TXT | wc -l | perl -ane 'use POSIX; printf("%0.0f", ceil($_/'$SPLIT'));')
+    LINES=$(cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | wc -l | perl -ane 'use POSIX; printf("%0.0f", ceil($_/'$SPLIT'));')
     SPLIT_TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    cat $OUTDIR/NFR_DYNAMICS.TXT | split -l $LINES --additional-suffix $SPLIT_TMP
-    for i in $(ls *$SPLIT_TMP); do cat $i | perl -ane '$id='$i'; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$id\t$F[5]\n";'; done > $OUTDIR/NFR_DYNAMICS.TXT
+    cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | split -l $LINES --additional-suffix $SPLIT_TMP
+    for i in $(ls *$SPLIT_TMP); do cat $i | perl -ane '$id='$i'; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$id\t$F[5]\n";'; done > $OUTDIR_TMP/NFR_DYNAMICS.TXT
     rm *$SPLIT_TMP
     echo "done"
 fi
@@ -216,51 +220,51 @@ fi
 
 if [ ! -z "$IGNORE_CLASS" ]; then
     PLOT_TITLES="NGSPLOT"
-    REGIONS_INTEREST_COUNTS=$(cat $OUTDIR/NFR_DYNAMICS.TXT | wc -l)
+    REGIONS_INTEREST_COUNTS=$(cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | wc -l)
 
     ## create files for plotting normalized heatmap
-    HEATMAP_FILES="$OUTDIR/$PLOT_TITLES"".bed"
+    HEATMAP_FILES="$OUTDIR_TMP/$PLOT_TITLES"".bed"
     if [ "$GENE_ORDER" == "h3k27ac" ]; then
-        cat $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[15]+$F[16]+$F[17]+$F[18])/4); chomp($_); print "$_\t$mean\n";' | sort -k 45rn,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLES.bed
+        cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[15]+$F[16]+$F[17]+$F[18])/4); chomp($_); print "$_\t$mean\n";' | sort -k 45rn,45 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLES.bed
     elif [ "$GENE_ORDER" == "cobinding" ]; then
-        cat $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[15]+$F[16]+$F[17]+$F[18])/4); chomp($_); print "$_\t$mean\n";' | sort -k 44r,44 -k 45rn,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLES.bed
+        cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[15]+$F[16]+$F[17]+$F[18])/4); chomp($_); print "$_\t$mean\n";' | sort -k 44r,44 -k 45rn,45 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLES.bed
     elif [ "$GENE_ORDER" == "expr" ]; then
-        cat $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[36]+$F[37]+$F[38]+$F[39])/4); chomp($_); print "$_\t$mean\n";' | sort -k 45rn,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLES.bed
+        cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[36]+$F[37]+$F[38]+$F[39])/4); chomp($_); print "$_\t$mean\n";' | sort -k 45rn,45 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLES.bed
     elif [ "$GENE_ORDER" == "tf_fc" ]; then
-        cat $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$fc_pu1=log(($F[29]+0.01)/($F[28]+0.01))/log(2); $fc_cebpa=log(($F[34]+0.01)/($F[33]+0.01))/log(2); chomp($_); print "$_\t$fc_pu1\t$fc_cebpa\n";' | sort -k 46rg,46 -k 45g,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLES.bed
+        cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | perl -ane '$fc_pu1=log(($F[29]+0.01)/($F[28]+0.01))/log(2); $fc_cebpa=log(($F[34]+0.01)/($F[33]+0.01))/log(2); chomp($_); print "$_\t$fc_pu1\t$fc_cebpa\n";' | sort -k 46rg,46 -k 45g,45 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLES.bed
     elif [ "$GENE_ORDER" == "tf_expr" ]; then
-        cat $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$mean_pu1=sprintf("%0.2f", ($F[27]+$F[28]+$F[29])/3); $mean_cebpa=sprintf("%0.2f", ($F[32]+$F[33]+$F[34])/3); chomp($_); print "$_\t$mean_pu1\t$mean_cebpa\n";' | sort -k 46rg,46 -k 45g,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLES.bed
+        cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | perl -ane '$mean_pu1=sprintf("%0.2f", ($F[27]+$F[28]+$F[29])/3); $mean_cebpa=sprintf("%0.2f", ($F[32]+$F[33]+$F[34])/3); chomp($_); print "$_\t$mean_pu1\t$mean_cebpa\n";' | sort -k 46rg,46 -k 45g,45 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLES.bed
     elif [ "$GENE_ORDER" == "sum" ]; then
-        cat $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$fc_me1=log(($F[26]+0.01)/($F[22]+0.01))/log(2); chomp($_); print "$_\t$fc_me1\n";' | sort -k 44r,44 -k 45g,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLES.bed
+        cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | perl -ane '$fc_me1=log(($F[26]+0.01)/($F[22]+0.01))/log(2); chomp($_); print "$_\t$fc_me1\n";' | sort -k 44r,44 -k 45g,45 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLES.bed
     else
-        cat $OUTDIR/NFR_DYNAMICS.TXT | cut -f 1-9 > $OUTDIR/$PLOT_TITLES.bed
+        cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLES.bed
     fi
 else
-    for CLASS in $(cat $OUTDIR/NFR_DYNAMICS.TXT | cut -f $CLASS_COL | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
+    for CLASS in $(cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | cut -f $CLASS_COL | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
         PLOT_TITLE=$(echo $CLASS | sed 's/\,/_/g')
-        REGIONS_INTEREST_COUNT=$(perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | wc -l)
+        REGIONS_INTEREST_COUNT=$(perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR_TMP/NFR_DYNAMICS.TXT | wc -l)
 
         PLOT_TITLES="$PLOT_TITLES,$PLOT_TITLE"
         REGIONS_INTEREST_COUNTS="$REGIONS_INTEREST_COUNTS,$REGIONS_INTEREST_COUNT"
 
         ## create files for plotting normalized heatmap
-        HEATMAP_FILES="$HEATMAP_FILES,$OUTDIR/$PLOT_TITLE"".bed"
+        HEATMAP_FILES="$HEATMAP_FILES,$OUTDIR_TMP/$PLOT_TITLE"".bed"
         if [ "$GENE_ORDER" == "h3k27ac" ]; then
-            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[15]+$F[16]+$F[17]+$F[18])/4); chomp($_); print "$_\t$mean\n";' | sort -k 45rn,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
+            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR_TMP/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[15]+$F[16]+$F[17]+$F[18])/4); chomp($_); print "$_\t$mean\n";' | sort -k 45rn,45 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLE.bed
         elif [ "$GENE_ORDER" == "cobinding" ]; then
-            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[15]+$F[16]+$F[17]+$F[18])/4); chomp($_); print "$_\t$mean\n";' | sort -k 44r,44 -k 45rn,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
-            #perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | sort -k 44r,44 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
+            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR_TMP/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[15]+$F[16]+$F[17]+$F[18])/4); chomp($_); print "$_\t$mean\n";' | sort -k 44r,44 -k 45rn,45 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLE.bed
+            #perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR_TMP/NFR_DYNAMICS.TXT | sort -k 44r,44 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLE.bed
         elif [ "$GENE_ORDER" == "expr" ]; then
-            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[36]+$F[37]+$F[38]+$F[39])/4); chomp($_); print "$_\t$mean\n";' | sort -k 45rn,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
-            #perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$fc_gran_lsk=log(($F[39]+1)/($F[36]+1))/log(2); chomp($_); print "$_\t$fc_gran_lsk\n";' | sort -k 45rn,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
+            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR_TMP/NFR_DYNAMICS.TXT | perl -ane '$mean=sprintf("%0.2f", ($F[36]+$F[37]+$F[38]+$F[39])/4); chomp($_); print "$_\t$mean\n";' | sort -k 45rn,45 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLE.bed
+            #perl -ane 'if($F[4]=~/^'$CLASS'$/) { print $_; }' $OUTDIR_TMP/NFR_DYNAMICS.TXT | perl -ane '$fc_gran_lsk=log(($F[39]+1)/($F[36]+1))/log(2); chomp($_); print "$_\t$fc_gran_lsk\n";' | sort -k 45rn,45 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLE.bed
         elif [ "$GENE_ORDER" == "tf_fc" ]; then
-            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$fc_pu1=log(($F[29]+0.01)/($F[28]+0.01))/log(2); $fc_cebpa=log(($F[34]+0.01)/($F[33]+0.01))/log(2); chomp($_); print "$_\t$fc_pu1\t$fc_cebpa\n";' | sort -k 46rg,46 -k 45g,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
+            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR_TMP/NFR_DYNAMICS.TXT | perl -ane '$fc_pu1=log(($F[29]+0.01)/($F[28]+0.01))/log(2); $fc_cebpa=log(($F[34]+0.01)/($F[33]+0.01))/log(2); chomp($_); print "$_\t$fc_pu1\t$fc_cebpa\n";' | sort -k 46rg,46 -k 45g,45 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLE.bed
         elif [ "$GENE_ORDER" == "tf_expr" ]; then
-            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$mean_pu1=sprintf("%0.2f", ($F[27]+$F[28]+$F[29])/3); $mean_cebpa=sprintf("%0.2f", ($F[32]+$F[33]+$F[34])/3); chomp($_); print "$_\t$mean_pu1\t$mean_cebpa\n";' | sort -k 46rg,46 -k 45g,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
+            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR_TMP/NFR_DYNAMICS.TXT | perl -ane '$mean_pu1=sprintf("%0.2f", ($F[27]+$F[28]+$F[29])/3); $mean_cebpa=sprintf("%0.2f", ($F[32]+$F[33]+$F[34])/3); chomp($_); print "$_\t$mean_pu1\t$mean_cebpa\n";' | sort -k 46rg,46 -k 45g,45 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLE.bed
         elif [ "$GENE_ORDER" == "sum" ]; then
-            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | perl -ane '$fc_me1=log(($F[26]+0.01)/($F[22]+0.01))/log(2); chomp($_); print "$_\t$fc_me1\n";' | sort -k 44r,44 -k 45g,45 | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
+            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR_TMP/NFR_DYNAMICS.TXT | perl -ane '$fc_me1=log(($F[26]+0.01)/($F[22]+0.01))/log(2); chomp($_); print "$_\t$fc_me1\n";' | sort -k 44r,44 -k 45g,45 | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLE.bed
         else
-            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR/NFR_DYNAMICS.TXT | cut -f 1-9 > $OUTDIR/$PLOT_TITLE.bed
+            perl -ane 'if($F['$CLASS_COL'-1]=~/^'$CLASS'$/) { print $_; }' $OUTDIR_TMP/NFR_DYNAMICS.TXT | cut -f 1-9 > $OUTDIR_TMP/$PLOT_TITLE.bed
         fi
     done
 fi
@@ -284,54 +288,54 @@ fi
 
 ## plot nfr dynamics as heatmap
 if [ -z "$NOMERGE" ]; then
-    #echo "nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -c $COLOR -d $CD";
-    #if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
+    #echo "nfrDynAna.R -i $OUTDIR_TMP/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -c $COLOR -d $CD";
+    #if [ ! -f "$OUTDIR_TMP/heatmap.avgprof.RData" ]; then
         if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM
         elif [ ! -z "$CHIP_INCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM
         elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM
         else
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM
         fi
     #fi
 
     echo -n "replot heatmap with specified color: $COLOR.. "
     if [ ! -z "$SIZE_FACTORS" ]; then
-        nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -q $KNC -c $COLOR -d $CD -s $SIZE_FACTORS -b $SC
+        nfrDynAna.R -i $OUTDIR_TMP/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -q $KNC -c $COLOR -d $CD -s $SIZE_FACTORS -b $SC
     else
-        nfrDynAna.R -i $OUTDIR/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -q $KNC -c $COLOR -d $CD -b $SC
+        nfrDynAna.R -i $OUTDIR_TMP/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -q $KNC -c $COLOR -d $CD -b $SC
     fi
     echo "done"
 
     echo -n "replot avgprofile as separate plots..  "
-    #nfrDynAna.R -i $OUTDIR/heatmap -j avgprof -o $OUTDIR/heatmap.avgprof.pdf
+    #nfrDynAna.R -i $OUTDIR_TMP/heatmap -j avgprof -o $OUTDIR_TMP/heatmap.avgprof.pdf
     echo "done"
 else
     ## define color codes (http://colorbrewer2.org)
     if [ -z "$LINE_COLOR" ]; then
-        LINE_COLOR=$(echo $(getRColor.R -i $(cat $OUTDIR/NFR_DYNAMICS.TXT | cut -f $CLASS_COL | sort | uniq | wc -l) -c Set1) | perl -ane 'print "\"$F[0]"; foreach(@F[1..scalar(@F)-1]) { print ",$_"; } print "\"";')
+        LINE_COLOR=$(echo $(getRColor.R -i $(cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | cut -f $CLASS_COL | sort | uniq | wc -l) -c Set1) | perl -ane 'print "\"$F[0]"; foreach(@F[1..scalar(@F)-1]) { print ",$_"; } print "\"";')
     fi
 
-    #if [ ! -f "$OUTDIR/heatmap.avgprof.RData" ]; then
+    #if [ ! -f "$OUTDIR_TMP/heatmap.avgprof.RData" ]; then
         if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
         elif [ ! -z "$CHIP_INCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
         elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
         else
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
         fi
     #fi
 fi
 
-## remove temporary file, if exists
-if [ ! -z "$TMP" ]; then
-    rm $OUTDIR/$TMP
-fi
+## reorganize final output files
+scp $OUTDIR_TMP/heatmap.avgprof.pdf $OUTDIR/$PLOTTITLE.avgprof.pdf
+scp $OUTDIR_TMP/heatmap.heatmap.pdf $OUTDIR/$PLOTTITLE.heatmap.pdf
+#scp $OUTDIR_TMP/heatmap.avgprof.R $OUTDIR/$PLOTTITLE.avgprof.RData
+#scp $OUTDIR_TMP/heatmap.heatmap.R $OUTDIR/$PLOTTITLE.heatmap.RData
 
-if [ ! -z "$SPLIT" ]; then
-    rm $OUTDIR/x*.bed
-fi
+## remove temporary file
+rm -r $OUTDIR_TMP
