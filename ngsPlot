@@ -258,16 +258,19 @@ if [ -z "$EXIST" ]; then
     fi
 
     k=-1;
-    LAST_SEEN_FILE="NA";
+    LAST_SEEN_BAM_FILE="NA";
+    LAST_SEEN_BED_FILE="NA";
     echo -n "using colors: " >&2
     while read LINE; do
-        FILE=$(echo ${LINE} | cut -f 2 -d ' ');
-        if [ "$LAST_SEEN_FILE" != "$FILE" ]; then
+        BAM_FILE=$(echo ${LINE} | cut -f 1 -d ' ');
+        BED_FILE=$(echo ${LINE} | cut -f 2 -d ' ');
+        if [ "$LAST_SEEN_BED_FILE" != "$BED_FILE" -o "$LAST_SEEN_BAM_FILE" != "$BAM_FILE" ]; then
             k=$(( k+1 ))
         fi
         echo -e "${LINE}\t150\t\"${COLORS[$k]}\""
         echo -n "${COLORS[$k]} " >&2
-        LAST_SEEN_FILE=$FILE;
+        LAST_SEEN_BED_FILE=$BED_FILE;
+        LAST_SEEN_BAM_FILE=$BAM_FILE;
 
         if [ -z "${COLORS[$k]}" ]; then
             k=0;

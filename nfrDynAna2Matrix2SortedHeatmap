@@ -283,7 +283,11 @@ HEATMAP_FILES=$(echo $HEATMAP_FILES | sed -E 's/^\,//g')
 
 PARAM=""
 if [ ! -z "$SCALE" ]; then
-    PARAM="-n "
+    PARAM="$PARAM -n "
+fi
+
+if [ ! -z "$LINE_COLOR" ]; then
+    PARAM="$PARAM -c $LINE_COLOR "
 fi
 
 ## plot nfr dynamics as heatmap
@@ -291,13 +295,13 @@ if [ -z "$NOMERGE" ]; then
     #echo "nfrDynAna.R -i $OUTDIR_TMP/heatmap -j heatmap -o NONE -m -a $GENE_ORDER -c $COLOR -d $CD";
     #if [ ! -f "$OUTDIR_TMP/heatmap.avgprof.RData" ]; then
         if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM
         elif [ ! -z "$CHIP_INCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM
         elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM
         else
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -g $GENOME -t heatmap -u $PLOT_TITLES -m -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -x $SS -M $MW -y $YLIM $PARAM
         fi
     #fi
 
@@ -314,19 +318,19 @@ if [ -z "$NOMERGE" ]; then
     echo "done"
 else
     ## define color codes (http://colorbrewer2.org)
-    if [ -z "$LINE_COLOR" ]; then
-        LINE_COLOR=$(echo $(getRColor.R -i $(cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | cut -f $CLASS_COL | sort | uniq | wc -l) -c Set1) | perl -ane 'print "\"$F[0]"; foreach(@F[1..scalar(@F)-1]) { print ",$_"; } print "\"";')
-    fi
+    #if [ -z "$LINE_COLOR" ]; then
+    #    LINE_COLOR=$(echo $(getRColor.R -i $(cat $OUTDIR_TMP/NFR_DYNAMICS.TXT | cut -f $CLASS_COL | sort | uniq | wc -l) -c Set1) | perl -ane 'print "\"$F[0]"; foreach(@F[1..scalar(@F)-1]) { print ",$_"; } print "\"";')
+    #fi
 
     #if [ ! -f "$OUTDIR_TMP/heatmap.avgprof.RData" ]; then
         if [ ! -z "$CHIP_INCL_FILTER" -a ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -f $CHIP_INCL_FILTER -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM
         elif [ ! -z "$CHIP_INCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -f $CHIP_INCL_FILTER -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM
         elif [ ! -z "$CHIP_EXCL_FILTER" ]; then
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -g $GENOME -d $CHIP_EXCL_FILTER -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM
         else
-            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM -c $LINE_COLOR
+            ngsPlot -i $HEATMAP_FILES -j $CHIPDIR -o $OUTDIR_TMP -g $GENOME -t heatmap -u $PLOT_TITLES -a $GENE_ORDER -q $KNC -s $SC -l $WIN -e $GENOMIC_REGIONS -r $COLOR -p $CD -x $SS -M $MW -y $YLIM $PARAM
         fi
     #fi
 fi
