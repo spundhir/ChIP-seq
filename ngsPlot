@@ -264,20 +264,21 @@ if [ -z "$EXIST" ]; then
     while read LINE; do
         BAM_FILE=$(echo ${LINE} | cut -f 1 -d ' ');
         BED_FILE=$(echo ${LINE} | cut -f 2 -d ' ');
-        if [ "$LAST_SEEN_BED_FILE" != "$BED_FILE" -o "$LAST_SEEN_BAM_FILE" != "$BAM_FILE" ]; then
+        if [ "$LAST_SEEN_BED_FILE" != "$BED_FILE" -o "$LAST_SEEN_BAM_FILE" != "$BAM_FILE" -a -z "$MERGE" ]; then
             k=$(( k+1 ))
         fi
-        echo -e "${LINE}\t150\t\"${COLORS[$k]}\""
-        echo -n "${COLORS[$k]} " >&2
-        LAST_SEEN_BED_FILE=$BED_FILE;
-        LAST_SEEN_BAM_FILE=$BAM_FILE;
 
         if [ -z "${COLORS[$k]}" ]; then
-            k=0;
+            k=-1;
             echo >&2
             echo "WARNING: not enough line colors provided for region classes" >&2
             echo >&2
         fi
+
+        echo -e "${LINE}\t150\t\"${COLORS[$k]}\""
+        echo -n "${COLORS[$k]} " >&2
+        LAST_SEEN_BED_FILE=$BED_FILE;
+        LAST_SEEN_BAM_FILE=$BAM_FILE;
     done < $OUTDIR/NGSPLOT.txt.tmp > $OUTDIR/NGSPLOT.txt
     rm $OUTDIR/NGSPLOT.txt.tmp
     echo "done" >&2
