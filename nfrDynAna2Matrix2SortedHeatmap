@@ -338,8 +338,8 @@ fi
 ## reorganize final output files
 scp $OUTDIR_TMP/heatmap.avgprof.pdf $OUTDIR/$PLOTTITLE.avgprof.pdf
 scp $OUTDIR_TMP/heatmap.heatmap.pdf $OUTDIR/$PLOTTITLE.heatmap.pdf
-#scp $OUTDIR_TMP/heatmap.avgprof.R $OUTDIR/$PLOTTITLE.avgprof.RData
-#scp $OUTDIR_TMP/heatmap.heatmap.R $OUTDIR/$PLOTTITLE.heatmap.RData
+#scp $OUTDIR_TMP/heatmap.avgprof.RData $OUTDIR/$PLOTTITLE.avgprof.RData
+#scp $OUTDIR_TMP/heatmap.heatmap.RData $OUTDIR/$PLOTTITLE.heatmap.RData
 
 ## remove temporary file
 rm -r $OUTDIR_TMP
