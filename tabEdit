@@ -15,13 +15,16 @@ usage() {
     echo " -t          [convert spaces to tab]"
     echo " -m          [convert comma to tab]"
     echo " -n <int>    [reformat file to ensure input number of columns]"
+    echo " -a <file>   [input file in BED format containing gene coordintaes]"
+    echo "             [used to add gene coordinate information to file]"
+    echo "             [assumes gene name in fourth column]"
     echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:crtmn:h ARG; do
+while getopts i:crtmn:a:h ARG; do
     case "$ARG" in
     i) INFILE=$OPTARG;;
     c) COUNT=1;;
@@ -29,6 +32,7 @@ while getopts i:crtmn:h ARG; do
     t) TAB=1;;
     m) COMMA=1;;
     n) NCOL=$OPTARG;;
+    a) ADDGENE=$OPTARG;;
     h) HELP=1;;
     esac
 done
@@ -38,40 +42,25 @@ if [ -z "$INFILE" -o "$HELP" ]; then
 	usage
 fi
 
-if [ ! -z "$TAB" ]; then
-    if [ "$INFILE" == "stdin" ]; then
-        while read LINE; do
-            echo ${LINE}
-        done
-    else
-        zless $INFILE 
-    fi | perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
-elif [ ! -z "$COMMA" ]; then
-    if [ "$INFILE" == "stdin" ]; then
-        while read LINE; do
-            echo ${LINE}
-        done
-    else
-        zless $INFILE 
-    fi | perl -an -F'/\,/' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
-elif [ ! -z "$NCOL" ]; then
-    if [ "$INFILE" == "stdin" ]; then
-        while read LINE; do
-            echo ${LINE}
-        done
-    else
-        zless $INFILE 
-    fi | perl -ane 'print $F[0]; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } if(scalar(@F)<'$NCOL') { $i='$NCOL'-scalar(@F); while($i>0) { print "\tNA"; $i--; } print "\n"; }'
-else
-    ## create temporary BED file if input is from stdin
-    if [ "$INFILE" == "stdin" ]; then
-        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-        while read LINE; do
-            echo ${LINE}
-        done | perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";' > $TMP
-        INFILE=$TMP
-    fi
+## create temporary BED file if input is from stdin
+if [ "$INFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo "${LINE}"
+    done > $TMP 
+    #| perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";' > $TMP
+    INFILE=$TMP
+fi
 
+if [ ! -z "$ADDGENE" ]; then
+    zless $INFILE | perl -ane '$match=`zgrep -E \"\\s+$F[3]\\s+\" '$ADDGENE' -m 1`; @coor=split(/\s+/,$match); chomp($_); print "$_\t$coor[0]:$coor[1]-$coor[2]\n";'
+elif [ ! -z "$TAB" ]; then
+    zless $INFILE | perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
+elif [ ! -z "$COMMA" ]; then
+    zless $INFILE | perl -an -F'/\,/' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
+elif [ ! -z "$NCOL" ]; then
+    zless $INFILE | perl -ane 'print $F[0]; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } if(scalar(@F)<'$NCOL') { $i='$NCOL'-scalar(@F); while($i>0) { print "\tNA"; $i--; } print "\n"; }'
+else
     ## remove empty columns
     if [ ! -z "$REMOVE" ]; then
         #tr -s '\t' < $INFILE
@@ -79,9 +68,9 @@ else
     else
         zless $INFILE | perl -an -F'/\t{1}/' -e 'print scalar(@F)."\n";' | sort | uniq -c
     fi
+fi
 
-    ## remove temporary file, if exists
-    if [ ! -z "$TMP" ]; then
-        rm $TMP
-    fi
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
 fi

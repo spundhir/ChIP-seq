@@ -22,7 +22,7 @@ usage() {
     echo " -e          [extend 3' end of reads (useful for ChIP-seq data)]"
     echo " -c          [scale the coverage to TPM]"
     echo " -C          [scale the coverage to 1x]"
-    echo " -z <float>  [scale the coverage by input size factor (computed using DESeq2)]"
+    echo " -z <float>  [scale the coverage by input factor (computed using DESeq2 or spike-in data)]"
     echo " -b          [also output the BED file]"
     echo " -p <int>    [number of processors to use (default: 1)]"
 	echo " -h          [help]"
@@ -40,7 +40,7 @@ while getopts i:o:g:kecCz:bp:h ARG; do
         e) EXTEND=1;;
         c) SCALE=1;;
         C) SCALE1x=1;;
-        z) SIZEFACTOR=$OPTARG;;
+        z) SCALE_FACTOR=$OPTARG;;
         b) BED=1;;
         p) PROCESSORS=$OPTARG;;
 		h) HELP=1;;
@@ -76,9 +76,6 @@ echo
 fi
 echo done
 
-<<"COMMENT"
-COMMENT
-
 ## determine read extension parameter, if required
 if [ ! -z "$EXTEND" ]; then
     echo -n "Determing read extension parameter (`date`).. "
@@ -100,6 +97,8 @@ if [ ! -z "$EXTEND" ]; then
 
     echo "$EXTEND_VALUE - done"
 fi
+<<"COMMENT"
+COMMENT
 
 ## retrieve file name
 echo -n "Converting bam to bigwig format (`date`).. "
@@ -111,22 +110,24 @@ if [ ! -z "$OUTDIR" ]; then
     ID=`echo $BAMFILE | perl -ane '$_=~s/^.+\///g; $_=~s/\..+$//g; print $_;'`;
 
     ## create bigwig files for viualization at the UCSC genome browser
-    if [ ! -z "$SCALE" ]; then
+    if [ ! -z "$SCALE_FACTOR" ]; then
+        #SCALE_FACTOR=$(echo $SCALE_FACTOR | perl -ane 'printf("%0.6f", 1/$_);')
+        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $OUTDIR/$ID.bedGraph
+
+        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR
+    elif [ ! -z "$SCALE" ]; then
         #MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
         #SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
         #EXTEND_VALUE=$(echo $EXTEND_VALUE | perl -ane 'printf("%0.0f", $_/2);')
         #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $OUTDIR/$ID.bedGraph
 
         ## use deeptools instead
-        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeUsingRPKM -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates --normalizeUsingRPKM -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
     elif [ ! -z "$SCALE1x" ]; then
-        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeTo1x $GENOME_SIZE -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
-    elif [ ! -z "$SIZE_FACTOR" ]; then
-        SCALE_FACTOR=$(echo $SIZE_FACTOR | perl -ane 'printf("%0.6f", 1/$_);')
-        bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $OUTDIR/$ID.bedGraph
+        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates --normalizeTo1x $GENOME_SIZE -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
     else
         #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split > $OUTDIR/$ID.bedGraph
-        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
     fi
 
     if [ -e "$ID.bedGraph" ]; then
@@ -140,7 +141,12 @@ else
     ID=`echo $BAMFILE | perl -ane '$_=~s/\.bam*//g; print $_;'`;
 
     ## create bigwig files for viualization at the UCSC genome browser
-    if [ ! -z "$SCALE" ]; then
+    if [ ! -z "$SCALE_FACTOR" ]; then
+        #SCALE_FACTOR=$(echo $SCALE_FACTOR | perl -ane 'printf("%0.6f", 1/$_);')
+        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $ID.bedGraph
+
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR
+    elif [ ! -z "$SCALE" ]; then
         #MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
         #SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
         #EXTEND_VALUE=$(echo $EXTEND_VALUE | perl -ane 'printf("%0.0f", $_/2);')
@@ -150,9 +156,6 @@ else
         bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeUsingRPKM -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
     elif [ ! -z "$SCALE1x" ]; then
         bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeTo1x $GENOME_SIZE -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
-    elif [ ! -z "$SIZE_FACTOR" ]; then
-        SCALE_FACTOR=$(echo $SIZE_FACTOR | perl -ane 'printf("%0.6f", 1/$_);')
-        bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $ID.bedGraph
     else
         #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split > $ID.bedGraph
         bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS

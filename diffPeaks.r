@@ -12,7 +12,7 @@ opt <- parse_args(parser)
 
 ## check, if all required arguments are given
 if(is.null(opt$datasetFile) | is.null(opt$outDir)) {
-	cat("\nProgram: diffPeaks.R (R script to identify differentially bound regions)\n")
+	cat("\nProgram: diffPeaks.R (R script to identify differentially bound regions using DiffBind)\n")
 	cat("Author: University of Copenhagen, Denmark\n")
 	cat("Version: 1.0\n")
 	cat("Contact: pundhir@binf.ku.dk\n");
