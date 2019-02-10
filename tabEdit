@@ -1,6 +1,8 @@
 #!/bin/bash
 #PBS -l nodes=1:ppn=4
 
+GENECOL=4
+
 #### usage ####
 usage() {
 	echo Program: "tabEdit (edit or gather information about a tab delimited file)"
@@ -18,13 +20,14 @@ usage() {
     echo " -a <file>   [input file in BED format containing gene coordintaes]"
     echo "             [used to add gene coordinate information to file]"
     echo "             [assumes gene name in fourth column]"
+    echo " -e <int>    [column containing gene name information (default: 4)]"
     echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:crtmn:a:h ARG; do
+while getopts i:crtmn:a:e:h ARG; do
     case "$ARG" in
     i) INFILE=$OPTARG;;
     c) COUNT=1;;
@@ -33,6 +36,7 @@ while getopts i:crtmn:a:h ARG; do
     m) COMMA=1;;
     n) NCOL=$OPTARG;;
     a) ADDGENE=$OPTARG;;
+    e) GENECOL=$OPTARG;;
     h) HELP=1;;
     esac
 done
@@ -53,7 +57,11 @@ if [ "$INFILE" == "stdin" ]; then
 fi
 
 if [ ! -z "$ADDGENE" ]; then
-    zless $INFILE | perl -ane '$match=`zgrep -E \"\\s+$F[3]\\s+\" '$ADDGENE' -m 1`; @coor=split(/\s+/,$match); chomp($_); print "$_\t$coor[0]:$coor[1]-$coor[2]\n";'
+    if [ "$GENECOL" -eq "1" ]; then
+        zless $INFILE | perl -ane '$match=`zgrep -E \"\\s+$F['$((GENECOL-1))']\\s+\" '$ADDGENE' -m 1`; chomp($_); if($match!~/^$/) { @coor=split(/\s+/,$match); print "$coor[0]\t$coor[1]\t$coor[2]\t$coor[3]\t$coor[4]\t$coor[5]\t$_\n"; } else { print "#$_\n"; }'
+    else
+        zless $INFILE | perl -ane '$match=`zgrep -E \"\\s+$F['$((GENECOL-1))']\\s+\" '$ADDGENE' -m 1`; chomp($_); if($match!~/^$/) { @coor=split(/\s+/,$match); print "$_\t$coor[0]:$coor[1]-$coor[2]|$coor[5]\n"; } else { print "$_\tNA\n"; }'
+    fi
 elif [ ! -z "$TAB" ]; then
     zless $INFILE | perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
 elif [ ! -z "$COMMA" ]; then
