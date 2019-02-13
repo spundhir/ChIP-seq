@@ -12,8 +12,13 @@ usage() {
     echo "Note: Different from multiIntersectBed (bedtools) since, this only selects the single most observed coordinate among the consecutive overlapping coordinates"
 	echo "Options:"
     echo " -i <files>  [input BED files seperated by a comma]"
+    echo "             **OR**"
+    echo "             [input configuration file containing bed file information]"
+    echo "             [<id> <bed file> (id should start with peaks_<unique_id>)]"
     echo "[OPTIONS]"
-    echo " -j <string> [names to describe each input files seperated by a comma]"
+    echo " -j <string> [unique name to describe each input bed file separated by a comma]"
+    echo "             **OR**"
+    echo "             [can be specified in the config file]"
     echo " -f <string> [filter input BED files for this input string parameter]"
 	echo " -h          [help]"
 	echo
@@ -46,6 +51,35 @@ function wait_for_jobs_to_finish {
     echo $1
 }
 ###############
+
+
+## check if input is BED files or configuration file containing BED file information
+INPUT=$(echo $BEDFILE | perl -ane '$_=~s/\,.*//g; print $_;')
+if [ "$(sortBed -i $INPUT 2>/dev/null | wc -l)" -le 0 ]; then
+    ## read configuration file
+    NAME=$(cat $BEDFILE | perl -ane '
+        if($_=~/^'$CONFIG_FILTER'/) {
+            if(!$seen{$F[0]}) { 
+                $file_name.="$F[0],";
+                $seen{$F[0]}=1;
+            }
+        } END {
+            $file_name=~s/\,$//g;
+            print "$file_name\n";
+        }'
+    )
+
+    INPUT=$(cat $BEDFILE | perl -ane '
+        if($_=~/^'$CONFIG_FILTER'/) {
+            $file.="$F[1],";
+        } END {
+            $file=~s/\,$//g;
+            print "$file\n";
+        }'
+    )
+    BEDFILE=$INPUT
+fi
+#echo -e "$BEDFILE\t$NAME"; exit
 
 ## parse input bam files in an array
 IFS=","
@@ -89,12 +123,12 @@ wait
 
 if [ ! -z "$NAME" ]; then
     bedtools multiinter -i $COMMAND_BED -names $COMMAND_NAME | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; } } elsif($last_coor!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'
-    ## last_counter=$F[3] removed from else condition (Feb 22, 2017
+    ## last_counter=$F[3] removed from else condition (Feb 22, 2017)
     #bedtools multiinter -i $COMMAND_BED -names $COMMAND_NAME | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; $last_counter=$F[3]; } } elsif($last_coor!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'
     #bedtools multiinter -i $COMMAND_BED -names $COMMAND_NAME | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; $last_counter=$F[3]; } } elsif($last_counter!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'
 else
     bedtools multiinter -i $COMMAND_BED | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; } } elsif($last_coor!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'
-    ## last_counter=$F[3] removed from else condition (Feb 22, 2017
+    ## last_counter=$F[3] removed from else condition (Feb 22, 2017)
     #bedtools multiinter -i $COMMAND_BED | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; $last_counter=$F[3]; } } elsif($last_coor!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'
     #bedtools multiinter -i $COMMAND_BED | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; $last_counter=$F[3]; } } elsif($last_counter!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'
 fi | while read line; do 
