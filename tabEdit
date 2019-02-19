@@ -17,6 +17,7 @@ usage() {
     echo " -t          [convert spaces to tab]"
     echo " -m          [convert comma to tab]"
     echo " -n <int>    [reformat file to ensure input number of columns]"
+    echo "             [fill missing columns with NA]"
     echo " -a <file>   [input file in BED format containing gene coordintaes]"
     echo "             [used to add gene coordinate information to file]"
     echo "             [assumes gene name in fourth column]"
@@ -67,7 +68,7 @@ elif [ ! -z "$TAB" ]; then
 elif [ ! -z "$COMMA" ]; then
     zless $INFILE | perl -an -F'/\,/' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
 elif [ ! -z "$NCOL" ]; then
-    zless $INFILE | perl -ane 'print $F[0]; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } if(scalar(@F)<'$NCOL') { $i='$NCOL'-scalar(@F); while($i>0) { print "\tNA"; $i--; } print "\n"; }'
+    zless $INFILE | perl -an -F'/\s+/' -e 'print $F[0]; foreach(@F[1..scalar(@F)-1]) { chomp($_); print "\t$_"; } if(scalar(@F)<'$NCOL') { $i='$NCOL'-scalar(@F); while($i>0) { print "\tNA"; $i--; } } print "\n";'
 else
     ## remove empty columns
     if [ ! -z "$REMOVE" ]; then
