@@ -18,6 +18,7 @@ usage() {
     echo " -m          [convert comma to tab]"
     echo " -n <int>    [reformat file to ensure input number of columns]"
     echo "             [fill missing columns with NA]"
+    echo " -f          [format input file into proper five column BED format]"
     echo " -a <file>   [input file in BED format containing gene coordintaes]"
     echo "             [used to add gene coordinate information to file]"
     echo "             [assumes gene name in fourth column]"
@@ -28,7 +29,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:crtmn:a:e:h ARG; do
+while getopts i:crtmn:ifa:e:h ARG; do
     case "$ARG" in
     i) INFILE=$OPTARG;;
     c) COUNT=1;;
@@ -36,6 +37,7 @@ while getopts i:crtmn:a:e:h ARG; do
     t) TAB=1;;
     m) COMMA=1;;
     n) NCOL=$OPTARG;;
+    f) FORMATBED=1;;
     a) ADDGENE=$OPTARG;;
     e) GENECOL=$OPTARG;;
     h) HELP=1;;
@@ -63,6 +65,8 @@ if [ ! -z "$ADDGENE" ]; then
     else
         zless $INFILE | perl -ane '$match=`zgrep -E \"\\s+$F['$((GENECOL-1))']\\s+\" '$ADDGENE' -m 1`; chomp($_); if($match!~/^$/) { @coor=split(/\s+/,$match); print "$_\t$coor[0]:$coor[1]-$coor[2]|$coor[5]\n"; } else { print "$_\tNA\n"; }'
     fi
+elif [ ! -z "$FORMATBED" ]; then
+    zless $INFILE | perl -ane 'if($_!~/^#/) { print $_; }' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }'
 elif [ ! -z "$TAB" ]; then
     zless $INFILE | perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
 elif [ ! -z "$COMMA" ]; then
