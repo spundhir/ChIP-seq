@@ -1,6 +1,8 @@
 #!/bin/bash
 #PBS -l nodes=1:ppn=4
 
+CONFIG_FILTER="multiIn"
+
 #### usage ####
 usage() {
     echo
@@ -14,7 +16,7 @@ usage() {
     echo " -i <files>  [input BED files seperated by a comma]"
     echo "             **OR**"
     echo "             [input configuration file containing bed file information]"
-    echo "             [<id> <bed file> (id should start with peaks_<unique_id>)]"
+    echo "             [<id> <uniqueId> <bed file> (id should be multiIn]"
     echo "[OPTIONS]"
     echo " -j <string> [unique name to describe each input bed file separated by a comma]"
     echo "             **OR**"
@@ -52,16 +54,15 @@ function wait_for_jobs_to_finish {
 }
 ###############
 
-
 ## check if input is BED files or configuration file containing BED file information
 INPUT=$(echo $BEDFILE | perl -ane '$_=~s/\,.*//g; print $_;')
 if [ "$(sortBed -i $INPUT 2>/dev/null | wc -l)" -le 0 ]; then
     ## read configuration file
     NAME=$(cat $BEDFILE | perl -ane '
         if($_=~/^'$CONFIG_FILTER'/) {
-            if(!$seen{$F[0]}) { 
-                $file_name.="$F[0],";
-                $seen{$F[0]}=1;
+            if(!$seen{$F[1]}) { 
+                $file_name.="$F[1],";
+                $seen{$F[1]}=1;
             }
         } END {
             $file_name=~s/\,$//g;
@@ -71,7 +72,7 @@ if [ "$(sortBed -i $INPUT 2>/dev/null | wc -l)" -le 0 ]; then
 
     INPUT=$(cat $BEDFILE | perl -ane '
         if($_=~/^'$CONFIG_FILTER'/) {
-            $file.="$F[1],";
+            $file.="$F[2],";
         } END {
             $file=~s/\,$//g;
             print "$file\n";
