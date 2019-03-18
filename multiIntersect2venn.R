@@ -90,4 +90,7 @@ if(length(names(lst)) <= 3 & opt$type=="ellipses") {
     dev.off()
 }
 
+## determine names of overlapping elements
+#attr(gplots::venn(lst, show.plot=FALSE), "intersections")
+
 #save.session("overlap_venn.session")
