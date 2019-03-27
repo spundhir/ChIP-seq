@@ -69,8 +69,12 @@ elif [ "$GENOME" == "hg38" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg38.genome"
     GENOME_MACS2="hs"
     GENOME_SIZE=2451960000
+elif [ "$GENOME" == "dm6" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/drosophila.dm6.genome"
+    GENOME_MACS2="dm"
+    GENOME_SIZE=120000000
 else
-    echo "Presently the program only support analysis for mm9, mm10, hg19 or hg38"
+    echo "Presently the program only support analysis for mm9, mm10, hg19, hg38 or dm6"
 echo
     usage
 fi
