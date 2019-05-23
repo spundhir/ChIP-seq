@@ -34,14 +34,14 @@ sub usage {
 
 my @data=();
 
-if(defined($inFile)) {
-    chomp($inFile);
-    @data=`zless $inFile`;
-}
-else {
+if(!defined($inFile) || $inFile=~/^stdin$/) {
     my $INFILE=();
     $INFILE=*STDIN;
     @data=<$INFILE>;
+}
+else {
+    chomp($inFile);
+    @data=`zless $inFile`;
 }
 
 my $id=(); my $des=();
@@ -86,6 +86,19 @@ foreach my $l(@data) {
         }
         push(@freq, $max);
     }
+}
+
+## print output for the last motif read
+if($start) {
+    foreach(@freq) {
+        $score+=log($_/0.25);
+    }
+    $score=$score-4;
+    print ">$id\t$des\t$score\n";
+    foreach(@matrix) {
+        print $_;
+    }
+    $start=0;
 }
 
 exit;
