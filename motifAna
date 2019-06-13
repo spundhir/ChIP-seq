@@ -52,7 +52,7 @@ usage() {
     echo "                          [if multiple separate them by a comma]"
     echo "                          [If not provided analysis will be done using all motifs]"
     echo "              -f          [output file as histogram (default: annotation)]"
-    echo " -g <string> [genome for which to perform the analysis (default: mm9)]"
+    echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm9)]"
     echo " -p <int>    [number of processors to use (default: 1)]"
     echo " -d <int>    [size of region (default: 200bp)]"
     echo "             [The size of the region used for motif finding is important.  If analyzing ChIP-Seq peaks from a transcription factor,]"
@@ -129,6 +129,14 @@ elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
     REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg19.simpleRepeat.gz"
     GENOME_MOTIF="hg19r"
+elif [ "$GENOME" == "mm10" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm10.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/mouse.mm10.simpleRepeat.gz"
+    GENOME_MOTIF="mm10r"
+elif [ "$GENOME" == "hg38" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg38.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg38.simpleRepeat.gz"
+    GENOME_MOTIF="hg38r"
 elif [ "$GENOME" == "danRer7" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.genome"
     REPEAT_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.simpleRepeat.gz"
