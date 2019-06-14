@@ -30,9 +30,9 @@ usage() {
     echo " -p <int>    [number of processors to use (default: 1)]"
     echo " -c <int>    [number of top motifs to analyze from each sample (default: 50)]"
     echo " -t <string> [motif length (default=8,10,12)]"
-    echo " -u <float>  [similarity threshold used to remove similar motifs (default: 0.6)]"
-    echo " -v <float>  [remove motifs with information content less than # (default: not used)]"
-    echo " -w <int>    [remove motifs with less than # number of target instances (default: not used)]"
+    echo " -u <float>  [similarity threshold used to remove similar motifs (default: 0.6; **OBSOLETE**)]"
+    echo " -v <float>  [remove motifs with information content less than # (default: not used; **OBSOLETE**)]"
+    echo " -w <int>    [remove motifs with less than # number of target instances (default: not used; **OBSOLETE**)]"
     echo " -x <float>  [p-value cutoff (default: 0.01)]"
     echo " -y <float>  [remove motifs with target percentage less than # (default: 0)]"
     echo " -z <float>  [remove motifs with background percentage greater than # (default: 100)]"
@@ -148,12 +148,12 @@ for CLASS in DENOVO KNOWN; do
     echo -n "Parse through each input directory to compute enrichment of motifs (`date`).. "
     ADDITIONAL_ARGUMENT=""
     echo -n "Determine all TFBS motifs enriched in the input regions... "
-    if [ ! -z "$INFO" ]; then
-        ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -info $INFO"
-    fi
-    if [ ! -z "$MIN_T" ]; then
-        ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -minT $MIN_T"
-    fi
+    #if [ ! -z "$INFO" ]; then
+    #    ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -info $INFO"
+    #fi
+    #if [ ! -z "$MIN_T" ]; then
+    #    ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -minT $MIN_T"
+    #fi
 
     for (( i=0; i<${#INDIRS[@]}; i++)); do
         ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
@@ -161,9 +161,11 @@ for CLASS in DENOVO KNOWN; do
             mkdir -p ${INDIRS[$i]}/$CLASS"_motifDynAna"
         fi
         if [ -z "$BKG_FILE" ]; then
-            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -size $SIZE
+            #findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -size $SIZE
+            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -size $SIZE
         else
-            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE
+            #findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE
+            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE
         fi
 
         if [ -z "$BKG_FILE" ]; then
