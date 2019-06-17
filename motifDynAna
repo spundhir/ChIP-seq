@@ -26,7 +26,7 @@ usage() {
     echo "             [if multiple, seperate them by a comma]"
     echo " -o <dir>    [output directory]"
     echo "[OPTIONS]"
-    echo " -g <string> [genome for which to perform the analysis (default: mm9)]"
+    echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm9)]"
     echo " -p <int>    [number of processors to use (default: 1)]"
     echo " -c <int>    [number of top motifs to analyze from each sample (default: 50)]"
     echo " -t <string> [motif length (default=8,10,12)]"
@@ -113,6 +113,14 @@ elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
     REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg19.simpleRepeat.gz"
     GENOME_MOTIF="hg19r"
+elif [ "$GENOME" == "mm10" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm10.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/mouse.mm10.simpleRepeat.gz"
+    GENOME_MOTIF="mm10r"
+elif [ "$GENOME" == "hg38" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg38.genome"
+    REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg38.simpleRepeat.gz"
+    GENOME_MOTIF="hg38r"
 elif [ "$GENOME" == "danRer7" ]; then
     GENOME_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.genome"
     REPEAT_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.simpleRepeat.gz"
