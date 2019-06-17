@@ -170,10 +170,10 @@ for CLASS in DENOVO KNOWN; do
         fi
         if [ -z "$BKG_FILE" ]; then
             #findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -size $SIZE
-            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -size $SIZE
+            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -size $SIZE -seqlogo
         else
             #findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE
-            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE
+            findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE -seqlogo
         fi
 
         if [ -z "$BKG_FILE" ]; then
