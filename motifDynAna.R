@@ -5,6 +5,7 @@ suppressPackageStartupMessages(library("optparse"))
 option_list <- list(
 	make_option(c("-i", "--inFile"), help="input file containing motif enrichment dynamics (can be stdin)"),
     make_option(c("-n", "--minFreq"), default="50", help="minimum frequency of NFRs in each nfr dynamic class (defaut=%default)"),
+    make_option(c("-y", "--minIdentity"), default="0.8", help="minimum identity of denovo motif with the known motif (defaut=%default)"),
     make_option(c("-d", "--diffFreq"), default="0", help="minimum difference in enrichment between categories (defaut=%default)"),
 	make_option(c("-o", "--outPdfFile"), help="output pdf image file"),
     make_option(c("-f", "--onlyDiffFreq"), action="store_true", help="less stringent criteria. use only difference in frequency"),
@@ -37,23 +38,25 @@ suppressPackageStartupMessages(library(gplots))
 suppressPackageStartupMessages(library(session))
 
 if(identical(opt$inFile, "stdin")==T) { 
-    data <- read.table(file("stdin"))
+    dataRaw <- read.table(file("stdin"))
 } else {
-    data <- read.table(opt$inFile)
+    dataRaw <- read.table(opt$inFile)
 }
 
-data$V13 <- log2((data$V8+0.01)/(data$V10+0.01))
-data$V14 <- gsub("^.*BestGuess:", "", data$V2)
-data$V14 <- gsub("\\(.*", "", data$V14)
-data$V15 <- gsub("^.*BestGuess:", "", data$V2)
-data <- data[which(data$V11>=as.numeric(opt$minFreq)),]
-data$V15 <- as.numeric(gsub("\\)", "", gsub("^.*\\(", "", data$V15)))
-if(length(which( !is.na(data$V15), arr.ind=TRUE))>0) {
-    data <- data[which(data$V11>=as.numeric(opt$minFreq) & data$V15>=0.80),]
+dataRaw$V13 <- log2((dataRaw$V8+0.01)/(dataRaw$V10+0.01))
+dataRaw$V14 <- gsub("^.*BestGuess:", "", dataRaw$V2)
+dataRaw$V14 <- gsub("\\(.*", "", dataRaw$V14)
+dataRaw$V15 <- gsub("^.*BestGuess:", "", dataRaw$V2)
+dataRaw <- dataRaw[which(dataRaw$V11>=as.numeric(opt$minFreq)),]
+dataRaw$V15 <- as.numeric(gsub("\\)", "", gsub("^.*\\(", "", dataRaw$V15)))
+if(length(which( !is.na(dataRaw$V15), arr.ind=TRUE))>0) {
+    data <- dataRaw[which(dataRaw$V11>=as.numeric(opt$minFreq) & dataRaw$V15>=as.numeric(opt$minIdentity)),]
 } else {
-    data <- data[which(data$V11>=as.numeric(opt$minFreq)),]
+    data <- dataRaw[which(dataRaw$V11>=as.numeric(opt$minFreq)),]
     data$V15 <- 0
 }
+cat(sprintf("%d out of %d motifs passed identity score criteria..", nrow(data)/length(unique(data$V1)), nrow(dataRaw)/length(unique(dataRaw$V1))))
+cat("\n")
 no_rows=nrow(data)/length(unique(data$V1))
 tf_info <- as.data.frame(data[1:no_rows, c(14,15)])
 dat <- matrix(data$V8, nrow=no_rows)
@@ -67,19 +70,22 @@ colnames(mat) <- as.vector(unique(data$V1))
 row.names(mat) <- data[1:no_rows,2]
 colnames(dat) <- as.vector(unique(data$V1))
 row.names(dat) <- data[1:no_rows,2]
-if(!is.null(opt$onlyDiffFreq)) {
-    sig_rows <- which(apply(mat, 1, function(x) max(x)-min(x)>as.numeric(opt$diffFreq)))
-} else if(!is.null(opt$plotSim)) {
+if(!is.null(opt$plotSim)) {
     #sig_rows <- which(apply(mat, 1, function(x) max(x) > 0.1 & min(x) > 0.1 & max(x)-min(x) <= as.numeric(opt$diffFreq)))
     #sig_rows <- which(apply(mat, 1, function(x) max(x)-min(x) <= as.numeric(opt$diffFreq)))
     sig_rows <- row(mat)[,1]
 } else if(!is.null(opt$plotRange)) {
     sig_rows <- which(apply(mat, 1, function(x) max(x) > 1.5 & max(x)-min(x) > 0.3 & max(x)-min(x) <= as.numeric(opt$diffFreq)))
+} else if(!is.null(opt$onlyDiffFreq)) {
+    sig_rows <- which(apply(mat, 1, function(x) max(x)-min(x)>as.numeric(opt$diffFreq)))
 } else {
     sig_rows <- which(apply(mat, 1, function(x) max(x) > 0 & min(x) < 0 & max(x)-min(x) > as.numeric(opt$diffFreq)))
     #sig_rows <- which(apply(mat, 1, function(x) max(x) > as.numeric(opt$diffFreq) & min(x) < -1*as.numeric(opt$diffFreq) & max(x)-min(x) > 1))
 }
 sig_rows <- which(apply(dat, 1, function(x) max(x)>3))
+
+cat(sprintf("%d out of %d motifs passed filter criteria..", nrow(mat), length(sig_rows)))
+cat("\n")
 
 if(length(sig_rows)>2) {
     pdf(opt$outPdfFile, height=20)
