@@ -13,6 +13,7 @@ option_list <- list(
     make_option(c("-t", "--tfProfile"), help="plot profile for transcription factor instead (optional)", action="store_true"),
     make_option(c("-l", "--logScale"), help="plot histone profile in log scale (optional)", action="store_true"),
     make_option(c("-m", "--heatMap"), help="plot heatmap instead (optional)", action="store_true"),
+    make_option(c("-f", "--avgProfile"), help="plot average profile instead (optional)", action="store_true"),
     make_option(c("-a", "--go"), help="gene order algorithm for heatmap (total, hc, max, prod, diff, km, none)"),
     make_option(c("-q", "--knc"), default=5, help="K-means or HC number of clusters (default=%default)"),
     make_option(c("-b", "--sc"), help="color scale for heatmap (min,max; local; region; global)"),
@@ -798,19 +799,20 @@ if(!is.null(opt$heatMap)) {
         km.info <- rbind.data.frame(go.list)
         write.table(km.info, file = sprintf("%s/KM.INFO", dirname(opt$sessionFile)), sep="\t", quote = F, col.names = F, row.names = T)
     }
-} else {
-    load(sprintf("%s.avgprof.RData", sessionFile[1]))
-    title <- colnames(regcovMat)
-    color <- NA
-    box_color <- "black"
-    ymin <- min(regcovMat)
-    ymax <- max(regcovMat)
-    ylab <- "TPM"
+} else if(!is.null(opt$avgProfile)) {
     pdf(opt$outPdfFile)
-    plotmat(regcovMat, title, color, bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, confiMat, mw, ymin, ymax, NA, box_color, prof.misc)
+    for(row in 1:length(sessionFile)) {
+        load(sprintf("%s.avgprof.RData", sessionFile[row]))
+        title <- colnames(regcovMat)
+        #color <- NA
+        box_color <- "black"
+        ymin <- min(regcovMat)
+        ymax <- max(regcovMat)
+        ylab <- "Read count Per Million mapped reads"
+        plotmat(regcovMat, title, color, bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, confiMat, mw, ymin, ymax, NA, box_color, prof.misc)
+    }
     dev.off()
-    q()
-
+} else {
     ## plot line plot
     ## determine maximum ylim
     if(is.null(opt$yMax)) {

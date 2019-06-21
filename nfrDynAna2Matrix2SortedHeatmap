@@ -313,9 +313,9 @@ if [ -z "$NOMERGE" ]; then
     fi
     echo "done"
 
-    echo -n "replot avgprofile as separate plots..  "
+    #echo -n "replot avgprofile as separate plots..  "
     #nfrDynAna.R -i $OUTDIR_TMP/heatmap -j avgprof -o $OUTDIR_TMP/heatmap.avgprof.pdf
-    echo "done"
+    #echo "done"
 else
     ## define color codes (http://colorbrewer2.org)
     #if [ -z "$LINE_COLOR" ]; then
@@ -342,4 +342,4 @@ scp $OUTDIR_TMP/heatmap.heatmap.pdf $OUTDIR/$PLOTTITLE.heatmap.pdf
 #scp $OUTDIR_TMP/heatmap.heatmap.RData $OUTDIR/$PLOTTITLE.heatmap.RData
 
 ## remove temporary file
-#rm -r $OUTDIR_TMP
+rm -r $OUTDIR_TMP
