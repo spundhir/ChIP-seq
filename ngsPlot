@@ -264,8 +264,8 @@ if [ -z "$EXIST" ]; then
     while read LINE; do
         BAM_FILE=$(echo ${LINE} | cut -f 1 -d ' ');
         BED_FILE=$(echo ${LINE} | cut -f 2 -d ' ');
-        if [ "${#REGIONS[@]}" -gt "1" ]; then
-            if [ "$LAST_SEEN_BED_FILE" != "$BED_FILE" -o "$LAST_SEEN_BAM_FILE" != "$BAM_FILE" -a -z "$MERGE" ]; then
+        if [ "${#REGIONS[@]}" -gt "1" -a -z "$MERGE" ]; then
+            if [ "$LAST_SEEN_BED_FILE" != "$BED_FILE" -o "$LAST_SEEN_BAM_FILE" != "$BAM_FILE" ]; then
                 k=$(( k+1 ))
             fi
         else 
