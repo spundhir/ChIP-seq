@@ -799,6 +799,18 @@ if(!is.null(opt$heatMap)) {
         write.table(km.info, file = sprintf("%s/KM.INFO", dirname(opt$sessionFile)), sep="\t", quote = F, col.names = F, row.names = T)
     }
 } else {
+    load(sprintf("%s.avgprof.RData", sessionFile[1]))
+    title <- colnames(regcovMat)
+    color <- NA
+    box_color <- "black"
+    ymin <- min(regcovMat)
+    ymax <- max(regcovMat)
+    ylab <- "TPM"
+    pdf(opt$outPdfFile)
+    plotmat(regcovMat, title, color, bam.pair, xticks, pts, m.pts, f.pts, pint, shade.alp, confiMat, mw, ymin, ymax, NA, box_color, prof.misc)
+    dev.off()
+    q()
+
     ## plot line plot
     ## determine maximum ylim
     if(is.null(opt$yMax)) {
