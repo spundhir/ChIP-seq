@@ -207,7 +207,7 @@ if [ ! -z "$SPLIT" ]; then
     echo "done"
 fi
 
-echo -n "Create files for each NFR dynamic class sorted by h3k27ac signal (`date`).. "
+echo -n "Create files for each NFR dynamic class sorted by signal (`date`).. "
 PLOT_TITLES=""
 REGIONS_INTEREST_COUNTS=""
 HEATMAP_FILES=""
