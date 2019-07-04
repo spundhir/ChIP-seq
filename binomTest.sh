@@ -134,3 +134,16 @@ fi
 if [ ! -z "$TMP" ]; then
     rm $TMP
 fi
+
+## regioneR package
+#library(regioneR)
+#library("BSgenome.Mmusculus.UCSC.mm9")
+#peaks_cebpe <- toGRanges(pipe("grep -w promoter /home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/peaks_cebpe/peaks_cebpe_class.bed"), header=F)
+#peaks_e2f <- toGRanges(pipe("grep -v chr8_random /home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_lifted.bed"))
+
+#cebpe_e2f <- permTest(A=peaks_e2f, B=peaks_cebpe, ntimes=1000,
+#                       randomize.function=circularRandomizeRegions,
+#                       evaluate.function=numOverlaps, count.once=TRUE,
+#                       genome="mm9", mc.set.seed=FALSE, mc.cores=1)
+
+#plot(cebpe_e2f)

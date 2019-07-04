@@ -60,9 +60,9 @@ usage() {
     echo "             [finding both primary and 'co-enriched' motifs for a transcription factor.  When looking at histone marked regions,   ]"
     echo "             [500-1000 bp is probably a good idea (i.e. H3K4me or H3/H4 acetylated regions).  In theory, HOMER can work with very  ]"
     echo "             [large regions (i.e. 10kb), but with the larger the regions comes more sequence and longer execution time.  These     ]"
-    echo "             [regions will be based off the center of the peaks.  If you prefer an offset, you can specify '-size -300,100' to     ]"
+    echo "             [regions will be based off the center of the peaks.  If you prefer an offset, you can specify '-d -300,100' to     ]"
     echo "             [search a region of size 400 that is centered 100 bp upstream of the peak center (useful if doing motif finding on    ]"
-    echo "             [putative TSS regions).  If you have variable length regions, use the option '-size given' and HOMER will use the     ]"
+    echo "             [putative TSS regions).  If you have variable length regions, use the option '-d given' and HOMER will use the     ]"
     echo "             [exact regions that were used as input.]"
 	echo " -h          [help]"
 	echo
