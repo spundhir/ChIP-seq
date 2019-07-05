@@ -159,6 +159,7 @@ echo "done"
 
 echo "Initiate motif analysis (`date`).. "
 MOTIFDIR_ALL=""
+CLASS_COUNT=0
 for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$/) { print "$F[5]\n"; }' | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
     ID=$(echo $CLASS | perl -ane 'if($_=~/^\.$/) { print "other"; } else { $_=~s/\,/\_/g; print $_; }')
     cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[5]=~/^'$CLASS'$/) { print $_; }' > $OUTDIR/enhancer_$ID.bed
@@ -175,13 +176,18 @@ for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$
     fi
 
     MOTIFDIR_ALL="$MOTIFDIR_ALL,$MOTIFDIR"
+    CLASS_COUNT=$(CLASS_COUNT+1))
 done
 wait
 
-MOTIFDIR_ALL=$(echo $MOTIFDIR_ALL | perl -ane '$_=~s/^\,//g; print $_;')
-if [ -z "$BKG_FILE" ]; then
-    motifDynAna -i $MOTIFDIR_ALL -o $OUTDIR/motifDynAna -g $GENOME -p $PROCESSOR -c $NMOTIFS -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x 1.1 &>$OUTDIR/motifDynAna.log
+if [ "$CLASS_COUNT" -gt 1 ]; then
+    MOTIFDIR_ALL=$(echo $MOTIFDIR_ALL | perl -ane '$_=~s/^\,//g; print $_;')
+    if [ -z "$BKG_FILE" ]; then
+        motifDynAna -i $MOTIFDIR_ALL -o $OUTDIR/motifDynAna -g $GENOME -p $PROCESSOR -c $NMOTIFS -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x 1.1 &>$OUTDIR/motifDynAna.log
+    else
+        motifDynAna -i $MOTIFDIR_ALL -o $OUTDIR/motifDynAna -g $GENOME -p $PROCESSOR -c $NMOTIFS -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x 1.1 -b $BKG_FILE &>$OUTDIR/motifDynAna.log
+    fi
 else
-    motifDynAna -i $MOTIFDIR_ALL -o $OUTDIR/motifDynAna -g $GENOME -p $PROCESSOR -c $NMOTIFS -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x 1.1 -b $BKG_FILE &>$OUTDIR/motifDynAna.log
+    echo "Only one class is found. Not performing differential motif enrichment analysis using motifDynAna" 
 fi
 echo "done"
