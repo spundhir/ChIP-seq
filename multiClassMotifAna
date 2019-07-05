@@ -42,7 +42,8 @@ echo Program: "multiClassMotifAna (perform motif analysis on genomic regions fro
     echo " -y <float>  [remove motifs with target percentage less than # (default: 3)]"
     echo " -z <float>  [remove motifs with background percentage greater than # (default: 100)]"
     echo " -n <int>    [number of motifs to optimize for each motif length (default: 100)]"
-    echo " -b <file>   [custom background file]"
+    echo " -b <file>   [custom background file in bed format]"
+    echo "             [can also be a class identifier, where class is sixth column in input bed file (-i)]"
     echo " -x <int>    [minimum number of elements within each region class to plot (default: 1)]"
     echo " -d <int>    [size of region (default: 200bp)]"  
     echo "             [The size of the region used for motif finding is important.  If analyzing ChIP-Seq peaks from a transcription factor,]"  
@@ -145,6 +146,16 @@ elif [ "$BEDFILE" == "stdin" ]; then
 else
     usage
 fi
+
+echo -e "Reformat input bed file, if -b is defined and is a keyword (`date`).. "
+if [ ! -z "$BKG_FILE" -a ! -f "$BKG_FILE" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    zless $OUTDIR/BEDFILE_INTEREST.TXT | grep -vw $BKG_FILE > $OUTDIR/$TMP.target
+    zless $OUTDIR/BEDFILE_INTEREST.TXT | grep -w $BKG_FILE > $OUTDIR/$TMP.background
+    mv $OUTDIR/$TMP.target $OUTDIR/BEDFILE_INTEREST.TXT
+    BKG_FILE="$OUTDIR/$TMP.background"
+fi
+echo "done"
 
 echo "Initiate motif analysis (`date`).. "
 MOTIFDIR_ALL=""
