@@ -147,17 +147,17 @@ else
     usage
 fi
 
-echo -e "Reformat input bed file, if -b is defined and is a keyword (`date`).. "
+echo "Initiate motif analysis (`date`).. "
 if [ ! -z "$BKG_FILE" -a ! -f "$BKG_FILE" ]; then
+    echo -e "Reformatting input bed file as -b is a keyword (`date`).. "
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     zless $OUTDIR/BEDFILE_INTEREST.TXT | grep -vw $BKG_FILE > $OUTDIR/$TMP.target
     zless $OUTDIR/BEDFILE_INTEREST.TXT | grep -w $BKG_FILE > $OUTDIR/$TMP.background
     mv $OUTDIR/$TMP.target $OUTDIR/BEDFILE_INTEREST.TXT
     BKG_FILE="$OUTDIR/$TMP.background"
+    echo "done"
 fi
-echo "done"
 
-echo "Initiate motif analysis (`date`).. "
 MOTIFDIR_ALL=""
 CLASS_COUNT=0
 for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$/) { print "$F[5]\n"; }' | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
@@ -175,8 +175,8 @@ for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$
         motifAna -i $OUTDIR/enhancer_$ID.bed -o $MOTIFDIR -m 1 -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x $PVALUE -y $MIN_P_T -n $S -g $GENOME -p $PROCESSOR -s $TFBS_FILE -b $BKG_FILE -d $SIZE &>$MOTIFDIR/$ID.log &
     fi
 
+    CLASS_COUNT=$((CLASS_COUNT+1))
     MOTIFDIR_ALL="$MOTIFDIR_ALL,$MOTIFDIR"
-    CLASS_COUNT=$(CLASS_COUNT+1))
 done
 wait
 
