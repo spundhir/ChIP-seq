@@ -125,7 +125,7 @@ if(length(sig_rows)>2) {
     dat_df$class <- 0
     dat_df[which(apply(dat_df, 1, function(x) max(x)>5)==T),]$class <- 1
     dat_df[which(apply(dat_df, 1, function(x) max(x)>10)==T),]$class <- 2
-    dat_df[which(apply(dat_df, 1, function(x) max(x)>20)==T),]$class <- 3
+    #dat_df[which(apply(dat_df, 1, function(x) max(x)>20)==T),]$class <- 3
     mat_df <- merge(mat_df, dat_df, by=0) 
     write.table(mat_df[order(-mat_df[,5]),], txtFile, quote=F, append=F, sep="\t", col.names=T, row.names=T)
 } else if(length(sig_rows)>=1) {
@@ -140,7 +140,7 @@ if(length(sig_rows)>2) {
 } else {
     cat("\nNo significant motif is found\n")
 }
-save.session("test.session")
+#save.session("test.session")
 
 ## old code (v2.0)
 #data <- read.table(opt$inFile)
