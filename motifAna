@@ -152,12 +152,24 @@ echo done
 ## determine, if the input regions are from a file or stdin
 echo -n "Create region file depending on if the input is from file or STDIN... "
 if [ -f "$BEDFILE" ]; then
-    zless $BEDFILE | perl -ane 'BEGIN { $counter=1; } $line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$F[0]\t$F[1]\t$F[2]\tREGION$counter\t1\t."; if($F[5]!~/^$/) { print "\t$F[5]"; } print "\n"; $counter++;' > $OUTDIR/REGIONS_INTEREST.bed
+    zless $BEDFILE > $OUTDIR/REGIONS_INTEREST.bed.tmp 
 elif [ "$BEDFILE" == "stdin" ]; then
-    while read LINE; do echo ${LINE}; done | perl -ane 'BEGIN { $counter=1; } $line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$F[0]\t$F[1]\t$F[2]\tREGION$counter\t1\t."; if($F[5]!~/^$/) { print "\t$F[5]"; } print "\n"; $counter++;' > $OUTDIR/REGIONS_INTEREST.bed
+    while read LINE; do echo "${LINE}"; done > $OUTDIR/REGIONS_INTEREST.bed.tmp
 else
     usage
 fi
+
+ROW_COUNT=$(zless $OUTDIR/REGIONS_INTEREST.bed.tmp | wc -l)
+ID_COUNT=$(zless $OUTDIR/REGIONS_INTEREST.bed.tmp | cut -f 4 | sort | uniq | wc -l)
+
+KEEP_ID=0
+if [ "$ROW_COUNT" -eq "$ID_COUNT" ]; then
+    KEEP_ID=1
+fi
+
+#echo -e "$ROW_COUNT\t$ID_COUNT\t$KEEP_ID\n"; exit
+zless $OUTDIR/REGIONS_INTEREST.bed.tmp | perl -ane 'BEGIN { $counter=1; } $line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; if('$KEEP_ID') { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t1\t."; } else { print "$F[0]\t$F[1]\t$F[2]\tREGION$counter\t1\t."; } if($F[5]!~/^$/) { print "\t$F[5]"; } print "\n"; $counter++;' > $OUTDIR/REGIONS_INTEREST.bed
+rm $OUTDIR/REGIONS_INTEREST.bed.tmp
 echo "done"
 
 ## determine motifs at input genomic regions
