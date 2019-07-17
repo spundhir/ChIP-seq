@@ -6,7 +6,7 @@ option_list <- list(
 	make_option(c("-i", "--inFile"), help="input file containing numeric value for fit (first column) (can be stdin)"),
     make_option(c("-o", "--outFile"), help="output file"),
     make_option(c("-d", "--distribution"), default="pois", help="name of distribution to fit (pois, nbinom, gamma, weibull, nnorm, gumbel, binom, geom, hyper) (if multiple separate them by a comma) (default=%default)"),
-    make_option(c("-c", "--discrete"), default=T, help="if distribution of discrete or continuous (default: %default)")
+    make_option(c("-c", "--discrete"), default=T, help="if distribution is discrete or continuous (default: %default)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
