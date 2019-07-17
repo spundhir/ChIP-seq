@@ -84,7 +84,7 @@ if(!is.null(opt$plotSim)) {
 }
 sig_rows <- which(apply(dat, 1, function(x) max(x)>3))
 
-cat(sprintf("%d out of %d motifs passed filter criteria..", nrow(mat), length(sig_rows)))
+cat(sprintf("%d out of %d motifs passed filter criteria..", length(sig_rows), nrow(mat)))
 cat("\n")
 
 if(length(sig_rows)>2) {
