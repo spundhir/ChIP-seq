@@ -81,7 +81,7 @@ IFS=$oIFS
 for (( i=0; i<${#MOTIFS[@]}; i++ )); do
     MOTIFS[$i]=$(echo ${MOTIFS[$i]} | perl -ane 's/\//\\\//g; print $_;')
     zless $MOTIFFILE | perl -ane '
-        if($_=~/'${MOTIFS[$i]}'\//i) {
+        if($_=~/'${MOTIFS[$i]}'\//) {
             @t=split(/\s+/,$_);
             $t[1]=~s/^.*\(/'${MOTIFS[$i]}'(/g;
             $line=();
