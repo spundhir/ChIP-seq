@@ -48,13 +48,14 @@ usage() {
     echo "             [search a region of size 400 that is centered 100 bp upstream of the peak center (useful if doing motif finding on    ]"
     echo "             [putative TSS regions).  If you have variable length regions, use the option '-size given' and HOMER will use the     ]"
     echo "             [exact regions that were used as input.]"
+    echo " -M <file>   [file containing TF motifs which must be included in the output]"
     echo " -h          [help]"
     echo
     exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:d:h ARG; do
+while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:d:M:h ARG; do
 	case "$ARG" in
 		i) INDIR=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -71,6 +72,7 @@ while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:d:h ARG; do
         n) S=$OPTARG;;
         b) BKG_FILE=$OPTARG;;
         d) SIZE=$OPTARG;;
+        M) MUST_INCLUDE_MOTIF_FILE=$OPTARG;;
         h) HELP=1;;
 	esac
 done
@@ -152,6 +154,11 @@ for CLASS in DENOVO KNOWN; do
         cat $MOTIF_FILE
     done > $OUTDIR/"$CLASS"_MOTIFS.MOTIFS
     echo "done"
+
+    ## check, if any "must include" motifs are provided
+    if [ -s "$MUST_INCLUDE_MOTIF_FILE" ]; then
+        zless $MUST_INCLUDE_MOTIF_FILE >> $OUTDIR/"$CLASS"_MOTIFS.MOTIFS
+    fi
 
     echo -n "Parse through each input directory to compute enrichment of motifs (`date`).. "
     ADDITIONAL_ARGUMENT=""

@@ -55,13 +55,15 @@ echo Program: "multiClassMotifAna (perform motif analysis on genomic regions fro
     echo "             [search a region of size 400 that is centered 100 bp upstream of the peak center (useful if doing motif finding on    ]"
     echo "             [putative TSS regions).  If you have variable length regions, use the option '-d given' and HOMER will use the     ]"
     echo "             [exact regions that were used as input.]"
+    echo " -l <string> [name of motifs that must be included in the final output]"
+    echo "             [if multiple, separate them by a comma]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:s:g:r:c:t:u:v:w:p:y:z:n:b:x:d:h ARG; do
+while getopts i:o:s:g:r:c:t:u:v:w:p:y:z:n:b:x:d:l:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -80,6 +82,7 @@ while getopts i:o:s:g:r:c:t:u:v:w:p:y:z:n:b:x:d:h ARG; do
         b) BKG_FILE=$OPTARG;;
         x) MIN_N_CLASS=$OPTARG;;
         d) SIZE=$OPTARG;;
+        l) MUST_INCLUDE_MOTIF=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -181,11 +184,17 @@ done
 wait
 
 if [ "$CLASS_COUNT" -gt 1 ]; then
+    ARGS=""
+    if [ ! -z "$MUST_INCLUDE_MOTIF" ]; then
+        extractMotifs -i $TFBS_FILE -j $MUST_INCLUDE_MOTIF -g $GENOME > $OUTDIR/MUST_INCLUDE.MOTIFS
+        ARGS="$ARGS -M $OUTDIR/MUST_INCLUDE.MOTIFS"
+    fi
+
     MOTIFDIR_ALL=$(echo $MOTIFDIR_ALL | perl -ane '$_=~s/^\,//g; print $_;')
     if [ -z "$BKG_FILE" ]; then
-        motifDynAna -i $MOTIFDIR_ALL -o $OUTDIR/motifDynAna -g $GENOME -p $PROCESSOR -c $NMOTIFS -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x 1.1 &>$OUTDIR/motifDynAna.log
+        motifDynAna -i $MOTIFDIR_ALL -o $OUTDIR/motifDynAna -g $GENOME -p $PROCESSOR -c $NMOTIFS -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x 1.1 $ARGS &>$OUTDIR/motifDynAna.log
     else
-        motifDynAna -i $MOTIFDIR_ALL -o $OUTDIR/motifDynAna -g $GENOME -p $PROCESSOR -c $NMOTIFS -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x 1.1 -b $BKG_FILE &>$OUTDIR/motifDynAna.log
+        motifDynAna -i $MOTIFDIR_ALL -o $OUTDIR/motifDynAna -g $GENOME -p $PROCESSOR -c $NMOTIFS -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x 1.1 $ARGS -b $BKG_FILE &>$OUTDIR/motifDynAna.log
     fi
 else
     echo "Only one class is found. Not performing differential motif enrichment analysis using motifDynAna" 
