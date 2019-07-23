@@ -37,6 +37,20 @@ suppressPackageStartupMessages(library(RColorBrewer))
 suppressPackageStartupMessages(library(gplots))
 suppressPackageStartupMessages(library(session))
 
+## header of DENOVO- or KNOWN-MOTIF_ENRICHMENT_DYNAMICS.TXT
+# 1. SAMPLE_ID 
+# 2. MOTIF_NAME 
+# 3. MOTIF
+# 4. P-value
+# 5. log_P-value
+# 6. q-value 
+# 7. No_of_target_sequences_with_motif 
+# 8. %_of_target_sequences_with_motif
+# 9. No_of_background_sequences_with_motif
+# 10. %_of_background_sequences_with_motif
+# 11. No_of_target_sequences
+# 12. No_of_background_sequences
+
 if(identical(opt$inFile, "stdin")==T) { 
     dataRaw <- read.table(file("stdin"))
 } else {
