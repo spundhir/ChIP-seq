@@ -187,6 +187,7 @@ if [ "$CLASS_COUNT" -gt 1 ]; then
     ARGS=""
     if [ ! -z "$MUST_INCLUDE_MOTIF" ]; then
         extractMotifs -i $TFBS_FILE -j $MUST_INCLUDE_MOTIF -g $GENOME > $OUTDIR/MUST_INCLUDE.MOTIFS
+        ARGS="$ARGS -l $MUST_INCLUDE_MOTIF"
         ARGS="$ARGS -M $OUTDIR/MUST_INCLUDE.MOTIFS"
     fi
 

@@ -48,6 +48,8 @@ usage() {
     echo "             [search a region of size 400 that is centered 100 bp upstream of the peak center (useful if doing motif finding on    ]"
     echo "             [putative TSS regions).  If you have variable length regions, use the option '-size given' and HOMER will use the     ]"
     echo "             [exact regions that were used as input.]"
+    echo " -l <string> [name of motifs that must be included in the final output]"
+    echo "             [if multiple, separate them by a comma]"
     echo " -M <file>   [file containing TF motifs which must be included in the output]"
     echo " -h          [help]"
     echo
@@ -55,7 +57,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:d:M:h ARG; do
+while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:d:l:M:h ARG; do
 	case "$ARG" in
 		i) INDIR=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -72,6 +74,7 @@ while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:d:M:h ARG; do
         n) S=$OPTARG;;
         b) BKG_FILE=$OPTARG;;
         d) SIZE=$OPTARG;;
+        l) MUST_INCLUDE_MOTIF=$OPTARG;;
         M) MUST_INCLUDE_MOTIF_FILE=$OPTARG;;
         h) HELP=1;;
 	esac
@@ -156,7 +159,7 @@ for CLASS in DENOVO KNOWN; do
     echo "done"
 
     ## check, if any "must include" motifs are provided
-    if [ -s "$MUST_INCLUDE_MOTIF_FILE" ]; then
+    if [ ! -z "$MUST_INCLUDE_MOTIF" -a -s "$MUST_INCLUDE_MOTIF_FILE" ]; then
         zless $MUST_INCLUDE_MOTIF_FILE >> $OUTDIR/"$CLASS"_MOTIFS.MOTIFS
     fi
 
@@ -200,7 +203,11 @@ for CLASS in DENOVO KNOWN; do
     echo "done"
 
     echo -n "Plot motif dynamics (`date`).. "
-    motifDynAna.R -i $OUTDIR/"$CLASS"_MOTIF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_motif_dynamics.pdf
+    if [ ! -z "$MUST_INCLUDE_MOTIF" -a -s "$MUST_INCLUDE_MOTIF_FILE" ]; then
+        motifDynAna.R -i $OUTDIR/"$CLASS"_MOTIF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_motif_dynamics.pdf -l $MUST_INCLUDE_MOTIF
+    else
+        motifDynAna.R -i $OUTDIR/"$CLASS"_MOTIF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_motif_dynamics.pdf
+    fi
     echo "done"
 
     echo -n "Plot logo for significant motifs (`date`).. "
@@ -209,6 +216,17 @@ for CLASS in DENOVO KNOWN; do
         motifFile=$(echo $motifInfo | sed -E 's/^.*\#//g');
         motif2Logo.pl $motifFile -pdf -o $OUTDIR/motifs_logo/$logoFile;
     done
+
+    if [ ! -z "$MUST_INCLUDE_MOTIF" -a -s "$MUST_INCLUDE_MOTIF_FILE" ]; then
+        oIFS=$IFS
+        IFS=","
+        MUST_INCLUDE_MOTIFS=($MUST_INCLUDE_MOTIF)
+        IFS=$oIFS
+
+        for (( i=0; i<${#MUST_INCLUDE_MOTIFS[@]}; i++)); do
+            extractMotifs -i $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -j ${MUST_INCLUDE_MOTIFS[$i]} | motif2Logo.pl - -pdf -o $OUTDIR/motifs_logo/${MUST_INCLUDE_MOTIFS[$i]}
+        done
+    fi
     echo "done"
 done
 
