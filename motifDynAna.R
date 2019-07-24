@@ -14,7 +14,8 @@ option_list <- list(
     make_option(c("-r", "--rescale"), action="store_true", help="rescale color bar between min and max value"),
     make_option(c("-k", "--breaks"), default="0.3", help="breaks for rescale color bar (default=%default)"),
     make_option(c("-c", "--color"), default="RdBu", help="color palette (default=%default)"),
-    make_option(c("-b", "--colorBias"), default="1", help="bias in color (default=%default)")
+    make_option(c("-b", "--colorBias"), default="1", help="bias in color (default=%default)"),
+    make_option(c("-l", "--mustIncludeMotif"), help="name of motifs that must be included in the final output (if multiple, separate them by a comma)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -69,8 +70,16 @@ if(length(which( !is.na(dataRaw$V15), arr.ind=TRUE))>0) {
     data <- dataRaw[which(dataRaw$V11>=as.numeric(opt$minFreq)),]
     data$V15 <- 0
 }
-cat(sprintf("%d out of %d motifs passed identity score criteria..", nrow(data)/length(unique(data$V1)), nrow(dataRaw)/length(unique(dataRaw$V1))))
+
+if(!is.null(opt$mustIncludeMotif)) {
+    data <- rbind(data, dataRaw[grep(paste(unlist(strsplit(as.character(opt$mustInclude),",")),collapse="\\/|"), dataRaw$V2),])
+    data <- data[order(data$V1, data$V2),]
+    data[is.na(data$V15),]$V15 <- 0
+}
+
+cat(sprintf("%d out of %d motifs passed identity (%s) and frequency (%s) score criteria..", nrow(data)/length(unique(data$V1)), nrow(dataRaw)/length(unique(dataRaw$V1)), opt$minIdentity, opt$minFreq))
 cat("\n")
+
 no_rows=nrow(data)/length(unique(data$V1))
 tf_info <- as.data.frame(data[1:no_rows, c(14,15)])
 dat <- matrix(data$V8, nrow=no_rows)
