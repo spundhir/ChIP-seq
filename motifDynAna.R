@@ -37,6 +37,7 @@ suppressPackageStartupMessages(library(reshape2))
 suppressPackageStartupMessages(library(RColorBrewer))
 suppressPackageStartupMessages(library(gplots))
 suppressPackageStartupMessages(library(session))
+suppressPackageStartupMessages(library(pheatmap))
 
 ## header of DENOVO- or KNOWN-MOTIF_ENRICHMENT_DYNAMICS.TXT
 # 1. SAMPLE_ID 
@@ -132,11 +133,13 @@ if(length(sig_rows)>2) {
         #    #myCol <- colorpanel(n=length(breaks)-1,low="#2166ac",mid="#f7f7f7",high="#b2182b")
         #}
         myCol <- rev(colorRampPalette(brewer.pal(11, opt$color), bias=as.numeric(opt$colorBias))(length(breaks)-1))
-        heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1, breaks=breaks)
+        #heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1, breaks=breaks)
+        pheatmap(mat[sig_rows,], col=myCol, border_color = NA, cluster_rows=F, breaks=breaks)
     } else {
         myCol <- rev(colorRampPalette(brewer.pal(11, opt$color), bias=as.numeric(opt$colorBias))(256))
         #myCol <- rev(brewer.pal(11, opt$color))
-        heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1)
+        #heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1)
+        pheatmap(mat[sig_rows,], col=myCol, border_color = NA, cluster_rows=F)
         #heatmap.2(mat, trace="none", col=myCol, margins=c(15,20), cexCol=1, cexRow=1)
     }
     dev.off()
