@@ -76,6 +76,7 @@ if(!is.null(opt$mustIncludeMotif)) {
     data <- rbind(data, dataRaw[grep(paste(unlist(strsplit(as.character(opt$mustInclude),",")),collapse="\\/|"), dataRaw$V2),])
     data <- data[order(data$V1, data$V2),]
     data[is.na(data$V15),]$V15 <- 0
+    data <- unique(data)
 }
 
 cat(sprintf("%d out of %d motifs passed identity (%s) and frequency (%s) score criteria..", nrow(data)/length(unique(data$V1)), nrow(dataRaw)/length(unique(dataRaw$V1)), opt$minIdentity, opt$minFreq))
