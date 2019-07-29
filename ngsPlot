@@ -71,7 +71,7 @@ usage() {
     echo " -e <string> [genomic regions (bed or genebody; default: bed)]"
     echo " -x <string> [strand-specific coverage calculation: both (default), same, opposite]"
     echo " -M <int>    [moving window width to smooth avg. profiles, must be integer]"
-    echo "             [1=no(default); 3=slightly; 5=somewhat; 9=quite; 13=super]" 
+    echo "             [1=no; 3=slightly; 5=somewhat; 9=quite; 13=super (default)]" 
 	echo " -h          [help]"
 	echo
 	exit 0
