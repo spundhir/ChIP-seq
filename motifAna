@@ -20,6 +20,7 @@ MIN_P_T=0 ## recommended 3 (Andersson et al. 2014)
 B=100 ## recommended 30 (Andersson et al. 2014)
 S=25 ## recommended 100 (Andersson et al. 2014)
 SIZE=200
+SIZE_HIST=1000
 
 #### usage ####
 usage() {
@@ -53,9 +54,10 @@ usage() {
     echo "                          [if multiple separate them by a comma]"
     echo "                          [If not provided analysis will be done using all motifs]"
     echo "              -f          [output histogram file only (default: histogram + annotation)]"
+    echo "              -D <int>    [size of region for histogram (default: 1000 bp)]"
     echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm9)]"
     echo " -p <int>    [number of processors to use (default: 1)]"
-    echo " -d <int>    [size of region (default: 200bp)]"
+    echo " -d <int>    [size of region (default: 200 bp)]"
     echo "             [The size of the region used for motif finding is important.  If analyzing ChIP-Seq peaks from a transcription factor,]"
     echo "             [Chuck would recommend 50 bp for establishing the primary motif bound by a given transcription factor and 200 bp for  ]"
     echo "             [finding both primary and 'co-enriched' motifs for a transcription factor.  When looking at histone marked regions,   ]"
@@ -71,7 +73,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:fg:p:d:h ARG; do
+while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:fD:g:p:d:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -89,6 +91,7 @@ while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:fg:p:d:h ARG; do
         l) LIST=$OPTARG;;
         j) MOTIF_NAME=$OPTARG;;
         f) FORMAT_HIST=1;;
+        D) SIZE_HIST=$OPTARG;;
         g) GENOME=$OPTARG;;
         p) PROCESSOR=$OPTARG;;
         d) SIZE=$OPTARG;;
@@ -240,10 +243,10 @@ elif [ ! -z "$LIST" ]; then
 
     echo -n "Analyze the enrichment of specific TFBS motifs in the input regions.. "
     ## parameter histNorm added on Nov 12, 2015 for Janus project
-    if [ "$SIZE" == "given" ]; then
-        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE -hist 500 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
+    if [ "$SIZE_HIST" == "given" ]; then
+        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE_HIST -hist 500 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
     else
-        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE -hist 10 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
+        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE_HIST -hist 10 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
     fi
 
     if [ -z "$FORMAT_HIST" ]; then
@@ -251,7 +254,7 @@ elif [ ! -z "$LIST" ]; then
 
         ## filter only highest scoring motif postion for each region
         cat <(grep -w Offset $OUTDIR/REGIONS_INTEREST.find) <(grep -wv Offset $OUTDIR/REGIONS_INTEREST.find | sort -k 4,4 -k 1,1 -k 6rg,6 | perl -ane 'if(!$seen{$F[3]}{$F[0]}) { print $_; $seen{$F[3]}{$F[0]}=1; }') > $OUTDIR/REGIONS_INTEREST.find.unique
-        mv $OUTDIR/REGIONS_INTEREST.find.unique $OUTDIR/REGIONS_INTEREST.find
+        #mv $OUTDIR/REGIONS_INTEREST.find.unique $OUTDIR/REGIONS_INTEREST.find
 
         annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -annStats $OUTDIR/REGIONS_INTEREST.annoStats -size $SIZE > $OUTDIR/REGIONS_INTEREST.anno
 
