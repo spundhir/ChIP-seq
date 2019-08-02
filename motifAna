@@ -171,7 +171,7 @@ if [ "$ROW_COUNT" -eq "$ID_COUNT" ]; then
 fi
 
 #echo -e "$ROW_COUNT\t$ID_COUNT\t$KEEP_ID\n"; exit
-zless $OUTDIR/REGIONS_INTEREST.bed.tmp | perl -ane 'BEGIN { $counter=1; } $line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; if('$KEEP_ID') { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t1\t."; } else { print "$F[0]\t$F[1]\t$F[2]\tREGION$counter\t1\t."; } if($F[5]!~/^$/) { print "\t$F[5]"; } print "\n"; $counter++;' > $OUTDIR/REGIONS_INTEREST.bed
+zless $OUTDIR/REGIONS_INTEREST.bed.tmp | perl -ane 'BEGIN { $counter=1; } if($F[5]!~/^\+$/ && $F[5]!~/^\-$/) { $F[5]="."; } if('$KEEP_ID') { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t1\t$F[5]"; } else { print "$F[0]\t$F[1]\t$F[2]\tREGION$counter\t1\t$F[5]"; } print "\n"; $counter++;' > $OUTDIR/REGIONS_INTEREST.bed
 rm $OUTDIR/REGIONS_INTEREST.bed.tmp
 echo "done"
 
@@ -256,7 +256,7 @@ elif [ ! -z "$LIST" ]; then
         cat <(grep -w Offset $OUTDIR/REGIONS_INTEREST.find) <(grep -wv Offset $OUTDIR/REGIONS_INTEREST.find | sort -k 4,4 -k 1,1 -k 6rg,6 | perl -ane 'if(!$seen{$F[3]}{$F[0]}) { print $_; $seen{$F[3]}{$F[0]}=1; }') > $OUTDIR/REGIONS_INTEREST.find.unique
         #mv $OUTDIR/REGIONS_INTEREST.find.unique $OUTDIR/REGIONS_INTEREST.find
 
-        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -annStats $OUTDIR/REGIONS_INTEREST.annoStats -size $SIZE > $OUTDIR/REGIONS_INTEREST.anno
+        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -annStats $OUTDIR/REGIONS_INTEREST.annoStats -size $SIZE -mbed $OUTDIR/REGIONS_INTEREST.annoBed > $OUTDIR/REGIONS_INTEREST.anno
 
         TOTAL=$(cat $OUTDIR/REGIONS_INTEREST.bed | wc -l)
         MAPPED=$(grep -v Offset $OUTDIR/REGIONS_INTEREST.find | wc -l)
