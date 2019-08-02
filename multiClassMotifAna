@@ -26,7 +26,7 @@ echo Program: "multiClassMotifAna (perform motif analysis on genomic regions fro
 	echo "Options:"
 	echo " -i <file>   [input file containing gene list(s) (can be stdin)]"
     echo "             [format]"
-    echo "             => chr start end name score class"
+    echo "             => chr start end name score strand class"
     echo " -o <dir>    [output directory]"
     echo "[OPTIONS]"
     echo " -s <file>   [input file having PWM of TFBS motifs]"
@@ -163,9 +163,12 @@ fi
 
 MOTIFDIR_ALL=""
 CLASS_COUNT=0
-for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$/) { print "$F[5]\n"; }' | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
+## Date: Aug 2, 2019; changed input file requirement to ensure strand information is provided. If missing, motif position as histogram was wrong in analysis using motifAna
+STRAND_NOTGIVEN=$(cat $OUTDIR/BEDFILE_INTEREST.TXT | cut -f 6 | sort | uniq | grep -v '+\|-\|\\.' | wc -l)
+
+for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$/) { if('$STRAND_NOTGIVEN') { print "$F[5]\n"; } else { print "$F[6]\n"; } }' | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
     ID=$(echo $CLASS | perl -ane 'if($_=~/^\.$/) { print "other"; } else { $_=~s/\,/\_/g; print $_; }')
-    cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[5]=~/^'$CLASS'$/) { print $_; }' > $OUTDIR/enhancer_$ID.bed
+    cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if('$STRAND_NOTGIVEN') { if($F[5]=~/^'$CLASS'$/) { print $_; } } else { if($F[6]=~/^'$CLASS'$/) { print $_; } }' > $OUTDIR/enhancer_$ID.bed
 
     MOTIFDIR="$OUTDIR/$ID"
     if [ ! -d "$MOTIFDIR" ]; then
