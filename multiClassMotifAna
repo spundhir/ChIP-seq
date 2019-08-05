@@ -164,7 +164,8 @@ fi
 MOTIFDIR_ALL=""
 CLASS_COUNT=0
 ## Date: Aug 2, 2019; changed input file requirement to ensure strand information is provided. If missing, motif position as histogram was wrong in analysis using motifAna
-STRAND_NOTGIVEN=$(cat $OUTDIR/BEDFILE_INTEREST.TXT | cut -f 6 | sort | uniq | grep -v '+\|-\|\\.' | wc -l)
+STRAND_NOTGIVEN=$(cat $OUTDIR/BEDFILE_INTEREST.TXT | cut -f 6 | sort | uniq | grep -v '+\|-\|\.' | wc -l)
+#echo $STRAND_NOTGIVEN; exit
 
 for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$/) { if('$STRAND_NOTGIVEN') { print "$F[5]\n"; } else { print "$F[6]\n"; } }' | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
     ID=$(echo $CLASS | perl -ane 'if($_=~/^\.$/) { print "other"; } else { $_=~s/\,/\_/g; print $_; }')
