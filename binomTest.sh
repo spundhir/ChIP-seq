@@ -1,5 +1,7 @@
 #!/bin/bash
 
+GENOME_SIZE=3000000000
+
 #### usage ####
 usage() {
 	echo Program: "binomTest.sh (perform binomial test)"
@@ -14,6 +16,7 @@ usage() {
     echo " -k <string> [list of specific reference features to search for eg. E, TSS etc]"
     echo "             [if multiple, seperate them by a comma]"
     echo " -l <string> [list of specific features to filter regions of interest]"
+    echo " -s <int>    [genome size (default: 3000000000)]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -22,12 +25,13 @@ usage() {
 MAPPING_FREQUENCY=1
 
 #### parse options ####
-while getopts i:j:k:l:h ARG; do
+while getopts i:j:k:l:s:h ARG; do
 	case "$ARG" in
         i) FEATURES_REF=$OPTARG;;
         j) FEATURES_INT=$OPTARG;;
         k) FILTER_REF=$OPTARG;;
         l) FILTER_INT=$OPTARG;;
+        s) GENOME_SIZE=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -62,7 +66,7 @@ echo -e "#file\tfeatures\ttotal\toverlap\tmean\tstddev\tp-value\tpercentage\texp
 
 if [ -z "$FILTER_REF" ]; then
     N=`zless $FEATURES_INT | wc -l | cut -f 1 -d " "`;
-    Pr=`zless $FEATURES_REF | perl -ane '$cov+=($F[2]-$F[1])+1; END { printf("%0.6f", $cov/3000000000); }'`;
+    Pr=`zless $FEATURES_REF | perl -ane '$cov+=($F[2]-$F[1])+1; END { printf("%0.6f", $cov/'$GENOME_SIZE'); }'`;
     mean=`echo $Pr | perl -ane '$mean='$N'*$_; printf("%0.6f", $mean);'`;
     stdev=`echo $Pr | perl -ane '$stdev=sqrt('$N'*$_*(1-$_)); printf("%0.6f", $stdev);'`;
 
@@ -88,7 +92,7 @@ else
         entity=${FEATURES[$i]};
         ENTITY_COL=$(intersectBed -a $FEATURES_INT -b $FEATURES_REF -wo | grep -w $entity | head -n 1 | perl -ane 'BEGIN { $col=1; } foreach(@F) { if($_=~/^'$entity'$/) { print $col; last; } $col++; }')
         N=`zless $FEATURES_INT | wc -l | cut -f 1 -d " "`;
-        Pr=`zgrep -w $entity $FEATURES_REF | perl -ane '$cov+=($F[2]-$F[1])+1; END { printf("%0.6f", $cov/3000000000); }'`;
+        Pr=`zgrep -w $entity $FEATURES_REF | perl -ane '$cov+=($F[2]-$F[1])+1; END { printf("%0.6f", $cov/'$GENOME_SIZE'); }'`;
         mean=`echo $Pr | perl -ane '$mean='$N'*$_; printf("%0.6f", $mean);'`;
         stdev=`echo $Pr | perl -ane '$stdev=sqrt('$N'*$_*(1-$_)); printf("%0.6f", $stdev);'`;
 
@@ -116,7 +120,7 @@ else
 
     ## performing enrichment analysis for features that do not overlap with reference
     N=`zless $FEATURES_INT | wc -l | cut -f 1 -d " "`;
-    Pr=`zless $FEATURES_REF | perl -ane '$cov+=($F[2]-$F[1])+1; END { printf("%0.6f", (3000000000-$cov)/3000000000); }'`;
+    Pr=`zless $FEATURES_REF | perl -ane '$cov+=($F[2]-$F[1])+1; END { printf("%0.6f", ('$GENOME_SIZE'-$cov)/'$GENOME_SIZE'); }'`;
     mean=`echo $Pr | perl -ane '$mean='$N'*$_; printf("%0.6f", $mean);'`;
     stdev=`echo $Pr | perl -ane '$stdev=sqrt('$N'*$_*(1-$_)); printf("%0.6f", $stdev);'`;
     overlap=`intersectBed -a $FEATURES_INT -b $FEATURES_REF -v | wc -l`;
