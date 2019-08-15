@@ -107,7 +107,7 @@ if(!is.null(opt$plotSim)) {
     sig_rows <- which(apply(mat, 1, function(x) max(x) > 0 & min(x) < 0 & max(x)-min(x) > as.numeric(opt$diffFreq)))
     #sig_rows <- which(apply(mat, 1, function(x) max(x) > as.numeric(opt$diffFreq) & min(x) < -1*as.numeric(opt$diffFreq) & max(x)-min(x) > 1))
 }
-sig_rows <- which(apply(dat, 1, function(x) max(x)>3))
+#sig_rows <- which(apply(dat, 1, function(x) max(x)>3))
 
 cat(sprintf("%d out of %d motifs passed filter criteria..", length(sig_rows), nrow(mat)))
 cat("\n")
