@@ -27,7 +27,7 @@ usage() {
 	echo "Options:"
 	echo " -i <file>           [file containing NFR with statistics from nfrDynAna2Matrix script (can be stdin)]"
     echo "                     [stdin, only if -l is not stdin]"
-    echo "                     [bed: chr start end name class (strand ...)]"
+    echo "                     [bed: chr start end name score strand class (....)]"
     echo "                     [genebody: gene class (....)]"
     echo "                     [(...) additional columns can be TPM values by which to sort coordinates using -a param]"
     echo " -k <dir>            [input directory containing BAM files for various histone marks]"
@@ -213,7 +213,9 @@ REGIONS_INTEREST_COUNTS=""
 HEATMAP_FILES=""
 
 if [ "$GENOMIC_REGIONS" == "bed" ]; then
-    CLASS_COL=5;
+    #CLASS_COL=5;
+    ## On Sep 4, updated input file format to correct BED format
+    CLASS_COL=$(less $OUTDIR_TMP/NFR_DYNAMICS.TXT | cut -f 5 | sort | uniq | perl -ane 'BEGIN { $class=7; } if($_!~/^[0-9]+$/) { $class=5; last; } END { print "$class\n"; }')
 else
     CLASS_COL=2
 fi
