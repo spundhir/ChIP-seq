@@ -15,7 +15,7 @@ opt <- parse_args(parser)
 
 ## check, if all required arguments are given
 if(is.null(opt$inFile) | is.null(opt$outFile)) {
-	cat("\nProgram: multiIntersect2venn.R (R script to plot venn diagram from multiIntersectBed results)\n")
+	cat("\nProgram: multiIntersect2venn.R (R script to plot venn diagram from multiIntersectBed results - max 5 classes)\n")
 	cat("Author: BRIC, University of Copenhagen, Denmark\n")
 	cat("Version: 1.0\n")
 	cat("Contact: pundhir@binf.ku.dk\n");
