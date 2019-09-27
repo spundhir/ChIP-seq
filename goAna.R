@@ -408,10 +408,21 @@ if(!is.null(opt$listAnnotation)) {
         data$geneIDf <- apply(data, 1, function(y) paste(unlist(lapply(unlist(strsplit(y[8], "/")), function(x) gene[which(gene$ENTREZID==x),]$V1)), collapse="/"))
     }
     write.table(data, file=outFile, sep="\t", quote=F, col.names=T, row.names=F)
-    pdf(sprintf("%s/go_analysis_list_%s.pdf", opt$outDir, opt$annotation))
+
+    #pdf(sprintf("%s/go_analysis_list_%s.pdf", opt$outDir, opt$annotation))
     #dotplot(results, x="count", showCategory=opt$maxClass, colorBy="qvalue")
-    barplot(results)
-    dev.off()
+    #barplot(results)
+    #dev.off()
+    outFile <- sprintf("%s/go_analysis_list_%s.pdf", opt$outDir, opt$annotation)
+    data$pvalue <- -log10(data$pvalue)
+    data <- data[order(-data$pvalue),]
+    p <- ggplot(data[c(1:opt$maxClass),], aes(x = 1, y = Description)) +
+            geom_point(aes(colour=pvalue,size=Count)) +
+            scale_colour_gradient(high="#00441b", low="#99d8c9", name="-log10(p-value)") +
+            scale_size_area(breaks=seq(0,100,by=10), max_size=20) +
+            theme(text=element_text(size=10), axis.text.x=element_text(angle=90)) +
+            theme_bw(base_size=15)
+    ggsave(p, dpi=300, height=as.numeric(opt$figHeight), width=as.numeric(opt$figWidth), filename=outFile, useDingbats=FALSE)
 
     save.session(opt$sessionFile)
 }
