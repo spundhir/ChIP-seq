@@ -34,9 +34,9 @@ suppressPackageStartupMessages(library("Rsubread"))
 suppressPackageStartupMessages(library(session))
 
 if(identical(opt$configFile, "stdin")==T) { 
-    data <- read.table(file("stdin"))
+    data <- read.table(file("stdin"), stringsAsFactors=F)
 } else {
-    data <- read.table(opt$configFile)
+    data <- read.table(opt$configFile, stringsAsFactors=F)
 }
 
 if(is.null(opt$gtfFile)) {
