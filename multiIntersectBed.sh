@@ -58,7 +58,7 @@ function wait_for_jobs_to_finish {
 
 ## check if input is BED files or configuration file containing BED file information
 INPUT=$(echo $BEDFILE | perl -ane '$_=~s/\,.*//g; print $_;')
-if [ "$(grep -wvi start $INPUT | sortBed -i stdin 2>/dev/null | wc -l)" -le 0 ]; then
+if [ "$(zless $INPUT | grep -wvi start | sortBed -i stdin 2>/dev/null | wc -l)" -le 0 ]; then
     ## read configuration file
     NAME=$(cat $BEDFILE | perl -ane '
         if($_=~/^'$CONFIG_FILTER'/) {
