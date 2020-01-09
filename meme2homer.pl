@@ -6,11 +6,12 @@ use Getopt::Long;
 
 ###############################################################################
 ## parse input options
-use vars qw($inFile $db $help);
+use vars qw($inFile $db $motifName $help);
 $db="NA";
 
 GetOptions ("i=s"  => \$inFile,
             "j=s"  => \$db,
+            "k=s"  => \$motifName,
             "help" => \$help,
             "h"    => \$help);
 
@@ -26,6 +27,7 @@ sub usage {
 	print STDERR " -i <file>         [input file in MEME format (can be stdin)]\n";
     print STDERR "[OPTIONS]\n";
     print STDERR " -j <string>       [database name (default: NA)]\n";
+    print STDERR " -k <string>       [motif name (default: as defined by MEME)]\n";
 	print STDERR " -h                [help]\n";
 	exit(-1);
 }
@@ -52,8 +54,11 @@ my $max=(); my @F=();
 foreach my $l(@data) {
     @F=split(/\s+/,$l);
     if($l=~/MOTIF/) {
-        if(defined($F[2])) {
-            $id=$F[1]; $des="$F[2]/$db";
+        if(defined($motifName)) {
+            $id=$motifName; $des="$motifName/$db";
+        }
+        elsif(defined($F[2])) {
+            $id=$F[2]; $des="$F[2]/$db";
         }
         else {
             $id=$F[1]; $des="$F[1]/$db";
