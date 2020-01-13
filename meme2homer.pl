@@ -54,6 +54,11 @@ my @freq=(); my @matrix=();
 my $max=(); my @F=();
 
 if(defined($extractMotif)) {
+    print "MEME version 4\n\n";
+    print "ALPHABET= ACGT\n\n";
+    print "strands: + -\n\n";
+    print "Background letter frequencies (from uniform background):\n";
+    print "A 0.25000 C 0.25000 G 0.25000 T 0.25000\n\n";
     $start=0;
     foreach my $l(@data) {
         @F=split(/\s+/,$l);
