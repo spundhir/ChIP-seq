@@ -6,12 +6,13 @@ use Getopt::Long;
 
 ###############################################################################
 ## parse input options
-use vars qw($inFile $db $motifName $help);
+use vars qw($inFile $db $motifName $extractMotif $help);
 $db="NA";
 
 GetOptions ("i=s"  => \$inFile,
             "j=s"  => \$db,
             "k=s"  => \$motifName,
+            "e"    => \$extractMotif,
             "help" => \$help,
             "h"    => \$help);
 
@@ -28,6 +29,7 @@ sub usage {
     print STDERR "[OPTIONS]\n";
     print STDERR " -j <string>       [database name (default: NA)]\n";
     print STDERR " -k <string>       [motif name (default: as defined by input matrix)]\n";
+    print STDERR " -e                [only extract the matrix for given motif name in MEME format]\n";
 	print STDERR " -h                [help]\n";
 	exit(-1);
 }
@@ -84,7 +86,10 @@ foreach my $l(@counts) {
     }
 }
 
-#foreach(@data) { print "$_\n"; } exit;
+## print motif probability matrix in MEME format
+if(defined($extractMotif)) {
+    foreach(@data) { print "$_\n"; } exit;
+}
 
 ## convert from probabilities in MEME format to homer matrix
 my $id=(); my $des=();
