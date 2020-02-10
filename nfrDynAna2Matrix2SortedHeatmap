@@ -215,10 +215,12 @@ HEATMAP_FILES=""
 if [ "$GENOMIC_REGIONS" == "bed" ]; then
     #CLASS_COL=5;
     ## On Sep 4, updated input file format to correct BED format
-    CLASS_COL=$(less $OUTDIR_TMP/NFR_DYNAMICS.TXT | cut -f 5 | sort | uniq | perl -ane 'BEGIN { $class=7; } if($_!~/^[0-9]+$/) { $class=5; last; } END { print "$class\n"; }')
+    CLASS_COL=$(less $OUTDIR_TMP/NFR_DYNAMICS.TXT | cut -f 5 | sort | uniq | perl -ane 'BEGIN { $class=7; } if($_!~/^[0-9]+$/ && $_!~/^\.$/) { $class=5; last; } END { print "$class\n"; }')
 else
     CLASS_COL=2
 fi
+
+#echo $CLASS_COL; exit
 
 if [ ! -z "$IGNORE_CLASS" ]; then
     PLOT_TITLES="NGSPLOT"
