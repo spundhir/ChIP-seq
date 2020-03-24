@@ -53,6 +53,8 @@ usage() {
     echo "              -j <string> [name of motifs that are of interest (id before a '/', eg. E2F1_MOUSE.H10MO.A in E2F1_MOUSE.H10MO.A/hocomoco)]"
     echo "                          [if multiple separate them by a comma]"
     echo "                          [If not provided analysis will be done using all motifs]"
+    echo "              -S          [soft match to motif name, regexp based (default: hard match)]"
+    echo "                          [id before a '/', eg. E2F1_MOUSE.H10MO.A in E2F1_MOUSE.H10MO.A/hocomoco]"
     echo "              -f          [output histogram file only (default: histogram + annotation)]"
     echo "              -D <int>    [size of region for histogram (default: 1000 bp)]"
     echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm9)]"
@@ -73,7 +75,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:fD:g:p:d:h ARG; do
+while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:SfD:g:p:d:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -90,6 +92,7 @@ while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:fD:g:p:d:h ARG; do
         b) BKG_FILE=$OPTARG;;
         l) LIST=$OPTARG;;
         j) MOTIF_NAME=$OPTARG;;
+        S) SOFTMATCH=1;;
         f) FORMAT_HIST=1;;
         D) SIZE_HIST=$OPTARG;;
         g) GENOME=$OPTARG;;
@@ -236,7 +239,11 @@ elif [ ! -z "$LIST" ]; then
     then
         echo -n "Create motif file depending upon input motifs of interest.. "
         TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-        zless $PWM | extractMotifs -i stdin -j $MOTIF_NAME > $TMP
+        if [ -z "$SOFTMATCH" ]; then
+            zless $PWM | extractMotifs -i stdin -j $MOTIF_NAME > $TMP
+        else
+            zless $PWM | extractMotifs -i stdin -j $MOTIF_NAME -S > $TMP
+        fi
         echo "done"
         PWM=$TMP
     fi
