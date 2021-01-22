@@ -14,17 +14,19 @@ usage() {
 	echo " -j <string> [name of motifs needs to be extracted]"
     echo "             [if multiple, separate them by a comma]"
     echo "[OPTIONS]"
-    echo " -g <string> [genome for which to perform the analysis (default: mm9)]"
+    echo " -S          [soft match to motif name, regexp based (default: hard match)]"
+    echo "             [id before a '/', eg. E2F1_MOUSE.H10MO.A in E2F1_MOUSE.H10MO.A/hocomoco]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:h ARG; do
+while getopts i:j:Sh ARG; do
 	case "$ARG" in
 		i) MOTIFFILE=$OPTARG;;
         j) MOTIF=$OPTARG;;
+        S) SOFTMATCH=1;;
 		h) HELP=1;;
 	esac
 done
@@ -78,21 +80,39 @@ IFS=","
 MOTIFS=($MOTIF)
 IFS=$oIFS
 
-for (( i=0; i<${#MOTIFS[@]}; i++ )); do
-    MOTIFS[$i]=$(echo ${MOTIFS[$i]} | perl -ane 's/\//\\\//g; print $_;')
-    zless $MOTIFFILE | perl -ane '
-        if($_=~/'${MOTIFS[$i]}'\//) {
-            @t=split(/\s+/,$_);
-            $t[1]=~s/^.*\(/'${MOTIFS[$i]}'(/g;
-            $line=();
-            foreach(@t) { $line.="$_\t"; }
-            $line=~s/\t$//g;
-            print "$line\n"; $start=1;
-        }
-        elsif($_=~/^\>/) { $start=0; }
-        elsif($start) { print $_; }
-    '
-done
+if [ -z "$SOFTMATCH" ]; then
+    for (( i=0; i<${#MOTIFS[@]}; i++ )); do
+        MOTIFS[$i]=$(echo ${MOTIFS[$i]} | perl -ane 's/\//\\\//g; print $_;')
+        zless $MOTIFFILE | perl -ane '
+            if($_=~/'${MOTIFS[$i]}'\//) {
+                @t=split(/\s+/,$_);
+                $t[1]=~s/^.*\(/'${MOTIFS[$i]}'(/g;
+                $line=();
+                foreach(@t) { $line.="$_\t"; }
+                $line=~s/\t$//g;
+                print "$line\n"; $start=1;
+            }
+            elsif($_=~/^\>/) { $start=0; }
+            elsif($start) { print $_; }
+        '
+    done
+else
+    for (( i=0; i<${#MOTIFS[@]}; i++ )); do
+        MOTIFS[$i]=$(echo ${MOTIFS[$i]} | perl -ane 's/\//\\\//g; print $_;')
+        zless $MOTIFFILE | perl -ane '
+            if($_=~/'${MOTIFS[$i]}'.*\//) {
+                @t=split(/\s+/,$_);
+                $t[1]=~s/^.*\(/'${MOTIFS[$i]}'(/g;
+                $line=();
+                foreach(@t) { $line.="$_\t"; }
+                $line=~s/\t$//g;
+                print "$line\n"; $start=1;
+            }
+            elsif($_=~/^\>/) { $start=0; }
+            elsif($start) { print $_; }
+        '
+    done
+fi
 
 if [ ! -z "$TMP" ]; then
     rm $TMP
