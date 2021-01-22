@@ -61,7 +61,7 @@ elif [ "$GENOME" == "danRer7" ]; then
     REPEAT_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.simpleRepeat.gz"
     GENOME_MOTIF="danRer7r"
 else
-    echo "Presently the program only support analysis for mm9, hg19 or danRer7"
+    echo "Presently the program only support analysis for mm9, hg19 or danRer7."
     echo
     usage
 fi
