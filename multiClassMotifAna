@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 GENOME="mm9";
-TFBS_FILE="/home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs"
+TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs"
 PROCESSOR=1
 NMOTIFS=50
 LENGTH="7,8,9,10,11,12,13,14" ## recommended 7,8,9,10,11,12,13,14 (Andersson et al. 2014)
@@ -30,7 +30,7 @@ echo Program: "multiClassMotifAna (perform motif analysis on genomic regions fro
     echo " -o <dir>    [output directory]"
     echo "[OPTIONS]"
     echo " -s <file>   [input file having PWM of TFBS motifs]"
-    echo "             [default: /home/pundhir/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs]"
+    echo "             [default: /localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs]"
     echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm9)]"
     echo " -r <int>    [number fo processors to use (default: 1)]"
     echo " -c <int>    [number of top motifs to analyze from each sample (default: 50)]"
@@ -114,24 +114,24 @@ echo "done"
 
 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 if [ "$GENOME" == "mm9" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
-    REPEAT_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.simpleRepeat.gz"
+    GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm9.genome"
+    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz"
     GENOME_MOTIF="mm9r"
 elif [ "$GENOME" == "hg19" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
-    REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg19.simpleRepeat.gz"
+    GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg19.genome"
+    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
     GENOME_MOTIF="hg19r"
 elif [ "$GENOME" == "mm10" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm10.genome"
-    REPEAT_FILE="/home/pundhir/project/genome_annotations/mouse.mm10.simpleRepeat.gz"
+    GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm10.genome"
+    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
     GENOME_MOTIF="mm10r"
 elif [ "$GENOME" == "hg38" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg38.genome"
-    REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg38.simpleRepeat.gz"
+    GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg38.genome"
+    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
     GENOME_MOTIF="hg38r"
 elif [ "$GENOME" == "danRer7" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.genome"
-    REPEAT_FILE="/home/pundhir/project/genome_annotations/zebrafish.danRer7.simpleRepeat.gz"   
+    GENOME_FILE="/scratch/genomes/annotations/SIZE/zebrafish.danRer7.genome"
+    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"   
     GENOME_MOTIF="danRer7r"
 else
     echo "Presently the program only support analysis for mm9, hg19 or danRer7"
